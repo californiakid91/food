@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1a1d27"/>
+  <g transform="translate(256,280)">
+    <!-- Manzana -->
+    <ellipse cx="-40" cy="0" rx="95" ry="110" fill="#e74c3c"/>
+    <ellipse cx="40" cy="0" rx="95" ry="110" fill="#c0392b"/>
+    <ellipse cx="0" cy="10" rx="70" ry="105" fill="#e74c3c"/>
+    <!-- Brillo -->
+    <ellipse cx="-55" cy="-40" rx="20" ry="30" fill="#ffffff" opacity="0.15" transform="rotate(-15)"/>
+    <!-- Tallo -->
+    <path d="M0,-110 Q5,-140 -5,-155" stroke="#6dbf3a" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <!-- Hoja -->
+    <path d="M-2,-140 Q25,-160 40,-135 Q20,-130 -2,-140Z" fill="#27ae60"/>
+  </g>
+</svg>
