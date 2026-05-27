@@ -1275,7 +1275,9 @@ function schedulePush() {
     const ref = userDocRef();
     if (!ref) return;
     try {
-      await ref.set(buildSyncPayload());
+      const payload = buildSyncPayload();
+      console.log('Push to Firestore:', payload.portfolios?.length, 'portfolios, savedAt:', payload.savedAt);
+      await ref.set(payload);
       setSyncUI('ok');
     } catch(e) { console.error('schedulePush:', e); }
   }, 800);
@@ -1307,15 +1309,22 @@ auth.onAuthStateChanged(async user => {
     try {
       const synced = await pullFromFirestore();
       if (!synced) {
-        const ref = userDocRef();
-        if (ref) await ref.set(buildSyncPayload());
+        const hasLocalData = portfolios.some(p => {
+          const r = (p.id === currentPortId) ? rows : (() => { try { const raw = localStorage.getItem(rowsKey(p.id)); return raw ? (JSON.parse(raw).rows || []) : []; } catch { return []; } })();
+          return r.length > 0;
+        });
+        if (hasLocalData) {
+          const ref = userDocRef();
+          if (ref) await ref.set(buildSyncPayload());
+        }
       }
       listenFirestore();
       setNewMoneyInput();
       renderTabs();
       render();
       setTimeout(resizeCharts, 50);
-    } catch {
+    } catch(e) {
+      console.error('onAuthStateChanged:', e);
       setSyncUI('ok');
     }
   } else {
