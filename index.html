@@ -1089,6 +1089,10 @@ function setSyncUI(state) {
   }
 }
 
+function isMobile() {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
 function toggleAuth() {
   if (currentUser) {
     if (confirm('¿Cerrar sesión? Los datos se mantienen en este dispositivo.')) {
@@ -1096,13 +1100,19 @@ function toggleAuth() {
     }
   } else {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).catch(err => {
-      if (err.code === 'auth/popup-blocked') {
-        auth.signInWithRedirect(provider);
-      }
-    });
+    if (isMobile()) {
+      auth.signInWithRedirect(provider);
+    } else {
+      auth.signInWithPopup(provider).catch(err => {
+        if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+          auth.signInWithRedirect(provider);
+        }
+      });
+    }
   }
 }
+
+auth.getRedirectResult().catch(() => {});
 
 function userDocRef() {
   if (!currentUser) return null;
