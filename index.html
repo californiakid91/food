@@ -506,6 +506,23 @@
       text-align: right;
     }
 
+    /* ── Chips de selección global ── */
+    .global-chip {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      touch-action: manipulation;
+      transition: all 0.12s;
+    }
+    .global-chip.active {
+      background: var(--surface2);
+    }
+
     /* ── Tabla de rebalanceo en móvil ── */
     @media (max-width: 700px) {
       .result-table { min-width: 0; }
@@ -557,9 +574,10 @@
 
 <!-- ── Posición global ── -->
 <div id="global-position" class="card" style="padding:14px 20px;margin-bottom:16px;">
+  <div id="global-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div>
-      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Posición total</div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Posición seleccionada</div>
       <div id="global-total" style="font-size:24px;font-weight:700;">—</div>
     </div>
     <div id="global-breakdown" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
@@ -1457,15 +1475,38 @@ function render() {
   renderGlobalPosition();
 }
 
+let globalSelectedPorts = new Set();
+
+function toggleGlobalPort(portId) {
+  if (globalSelectedPorts.has(portId)) {
+    globalSelectedPorts.delete(portId);
+  } else {
+    globalSelectedPorts.add(portId);
+  }
+  renderGlobalPosition();
+}
+
 function renderGlobalPosition() {
   const totalEl     = document.getElementById('global-total');
   const breakdownEl = document.getElementById('global-breakdown');
-  if (!totalEl || !breakdownEl) return;
+  const chipsEl     = document.getElementById('global-chips');
+  if (!totalEl || !breakdownEl || !chipsEl) return;
 
-  let grandTotal = 0;
+  if (globalSelectedPorts.size === 0) {
+    portfolios.forEach(p => globalSelectedPorts.add(p.id));
+  }
+
+  let chipsHtml = '';
   const parts = [];
 
   portfolios.forEach((p, i) => {
+    const c = TAB_COLORS[i % TAB_COLORS.length];
+    const active = globalSelectedPorts.has(p.id);
+
+    chipsHtml += `<button class="global-chip${active ? ' active' : ''}"
+      style="${active ? `border-color:${c.border};color:${c.text};` : ''}"
+      onclick="toggleGlobalPort('${p.id}')">${esc(p.name)}</button>`;
+
     let portRows;
     if (p.id === currentPortId) {
       portRows = rows;
@@ -1476,13 +1517,16 @@ function renderGlobalPosition() {
       } catch { portRows = []; }
     }
     const portTotal = portRows.reduce((s, r) => s + getRowValue(r), 0);
-    grandTotal += portTotal;
-    const c = TAB_COLORS[i % TAB_COLORS.length];
-    parts.push({ name: p.name, total: portTotal, color: c.text });
+    parts.push({ id: p.id, name: p.name, total: portTotal, color: c.text, active });
   });
 
+  chipsEl.innerHTML = chipsHtml;
+
+  const selected = parts.filter(p => p.active);
+  const grandTotal = selected.reduce((s, p) => s + p.total, 0);
+
   totalEl.textContent = fmt(grandTotal) + ' €';
-  breakdownEl.innerHTML = parts.map(p =>
+  breakdownEl.innerHTML = selected.map(p =>
     `<div style="text-align:center;">
       <div style="font-size:10px;color:var(--muted);">${esc(p.name)}</div>
       <div style="font-size:15px;font-weight:600;color:${p.color}">${fmt(p.total)} €</div>
