@@ -1171,7 +1171,7 @@ async function pullFromFirestore() {
     if ((data.savedAt || 0) >= localSaved) applySyncPayload(data);
     setSyncUI('ok');
     return true;
-  } catch { setSyncUI('offline'); return false; }
+  } catch(e) { console.error('pullFromFirestore:', e); return false; }
 }
 
 function schedulePush() {
@@ -1183,7 +1183,7 @@ function schedulePush() {
     try {
       await ref.set(buildSyncPayload());
       setSyncUI('ok');
-    } catch { setSyncUI('offline'); }
+    } catch(e) { console.error('schedulePush:', e); }
   }, 800);
 }
 
