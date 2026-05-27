@@ -1093,18 +1093,23 @@ function isMobile() {
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 }
 
-function toggleAuth() {
+async function toggleAuth() {
   if (currentUser) {
     if (confirm('¿Cerrar sesión? Los datos se mantienen en este dispositivo.')) {
       auth.signOut();
     }
   } else {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithRedirect(provider);
+    try {
+      await auth.signInWithPopup(provider);
+    } catch(e) {
+      console.error('auth error:', e.code, e.message);
+      if (e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request') {
+        alert('Error de login: ' + e.message);
+      }
+    }
   }
 }
-
-auth.getRedirectResult().catch(e => console.error('redirectResult:', e));
 
 function userDocRef() {
   if (!currentUser) return null;
