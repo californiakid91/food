@@ -433,6 +433,81 @@
       .rebalance-inputs .field input { width: 100%; }
       h1 { font-size: 19px; }
     }
+
+    /* ── Tabla como tarjetas en móvil ── */
+    @media (max-width: 700px) {
+      #portfolio-table { min-width: 0; }
+      #portfolio-table thead { display: none; }
+      #portfolio-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px 12px;
+        padding: 14px 12px;
+        margin-bottom: 10px;
+        background: var(--surface2);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        position: relative;
+      }
+      #portfolio-table tbody tr td {
+        border: none;
+        padding: 2px 0;
+      }
+      #portfolio-table tbody tr td::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: var(--muted);
+        margin-bottom: 2px;
+      }
+      #portfolio-table .col-name { grid-column: 1 / -1; }
+      #portfolio-table .col-name input { font-size: 16px !important; }
+      #portfolio-table .col-del {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: auto;
+      }
+      #portfolio-table .col-del::before { display: none; }
+      #portfolio-table .col-obj { grid-column: 1 / -1; }
+      #portfolio-table .col-act,
+      #portfolio-table .col-dev,
+      #portfolio-table .col-estado { text-align: left; }
+      #portfolio-table input[type="number"],
+      #portfolio-table input[type="text"] { padding: 8px 10px; }
+      .valor-auto { text-align: left; }
+
+      /* Tabla de rebalanceo */
+      .result-table { min-width: 0; }
+      .result-table thead { display: none; }
+      .result-table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 12px;
+        padding: 12px;
+        margin-bottom: 8px;
+        background: var(--surface2);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+      }
+      .result-table tbody tr td {
+        border: none;
+        padding: 2px 0;
+        text-align: left !important;
+      }
+      .result-table tbody tr td::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: var(--muted);
+        margin-bottom: 2px;
+      }
+      .result-table tbody tr td:first-child { grid-column: 1 / -1; }
+    }
   </style>
 </head>
 <body>
@@ -1451,35 +1526,35 @@ function renderTable() {
 
     tbody.insertAdjacentHTML('beforeend', `
       <tr data-id="${row.id}">
-        <td class="col-ticker">
+        <td class="col-ticker" data-label="Símbolo">
           <input class="ticker-badge" type="text" value="${esc(row.ticker||'')}" placeholder="TICKER"
             oninput="updateRow(${row.id},'ticker',this.value)">
         </td>
-        <td class="col-name">
+        <td class="col-name" data-label="Activo">
           <div style="display:flex;align-items:center;gap:8px;">
             <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
             <input class="input-name" type="text" value="${esc(row.name)}" placeholder="Nombre del activo"
               oninput="updateRow(${row.id},'name',this.value)">
           </div>
         </td>
-        <td class="col-precio">
+        <td class="col-precio" data-label="Precio">
           <input type="number" value="${price||''}" placeholder="0.00" min="0" step="0.01"
             oninput="updateRow(${row.id},'price',this.value)">
         </td>
-        <td class="col-titulos">
+        <td class="col-titulos" data-label="Títulos">
           <input type="number" value="${titulos||''}" placeholder="0" min="0" step="1"
             oninput="updateRow(${row.id},'titulos',this.value)">
         </td>
-        <td class="col-valor">${valorCell}</td>
-        <td class="col-obj" id="target-cell-${row.id}">
+        <td class="col-valor" data-label="Valor">${valorCell}</td>
+        <td class="col-obj" data-label="% Objetivo" id="target-cell-${row.id}">
           <div class="target-display" onclick="startEditTarget(${row.id})">
             <span>${tgt > 0 ? tgt + '%' : '—'}</span>
             <span class="edit-hint">✏</span>
           </div>
         </td>
-        <td class="col-act num">${actual.toFixed(1)}%</td>
-        <td class="col-dev num ${devClass}">${devStr}</td>
-        <td class="col-estado">${badge}</td>
+        <td class="col-act num" data-label="% Actual">${actual.toFixed(1)}%</td>
+        <td class="col-dev num ${devClass}" data-label="Desviación">${devStr}</td>
+        <td class="col-estado" data-label="Estado">${badge}</td>
         <td class="col-del"><button class="btn btn-danger" onclick="deleteRow(${row.id})" title="Eliminar">×</button></td>
       </tr>
     `);
@@ -1616,7 +1691,6 @@ function calcRebalance() {
       <table class="result-table">
         <thead>
           <tr>
-            <th>Símbolo</th>
             <th>Activo</th>
             <th style="text-align:right">Valor actual (€)</th>
             <th style="text-align:right">Valor objetivo (€)</th>
@@ -1652,17 +1726,17 @@ function calcRebalance() {
 
     html += `
       <tr>
-        <td>${tickerHtml}</td>
-        <td>
+        <td data-label="Activo">
           <div style="display:flex;align-items:center;gap:8px;">
+            ${tickerHtml}
             <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
             ${esc(row.name || '—')}
           </div>
         </td>
-        <td class="num" style="text-align:right">${fmt(val)} €</td>
-        <td class="num" style="text-align:right">${fmt(targetVal)} €</td>
-        <td style="text-align:right">${investHtml}</td>
-        <td style="text-align:right">${unitsHtml}</td>
+        <td class="num" style="text-align:right" data-label="Valor actual">${fmt(val)} €</td>
+        <td class="num" style="text-align:right" data-label="Valor objetivo">${fmt(targetVal)} €</td>
+        <td style="text-align:right" data-label="Asignación">${investHtml}</td>
+        <td style="text-align:right" data-label="Unidades">${unitsHtml}</td>
       </tr>
     `;
   });
@@ -1675,7 +1749,7 @@ function calcRebalance() {
         </tbody>
         <tfoot>
           <tr style="border-top:1px solid var(--border)">
-            <td colspan="6" style="padding:10px 12px;color:var(--muted);font-size:12px;">
+            <td colspan="5" style="padding:10px 12px;color:var(--muted);font-size:12px;">
               Total a comprar: <strong style="color:var(--green)">${fmt(totalSpent)} €</strong>${footNote}
             </td>
           </tr>
