@@ -1209,17 +1209,21 @@ function listenFirestore() {
 auth.onAuthStateChanged(async user => {
   currentUser = user;
   if (user) {
-    const synced = await pullFromFirestore();
-    if (!synced) {
-      const ref = userDocRef();
-      if (ref) await ref.set(buildSyncPayload());
-    }
-    listenFirestore();
     setSyncUI('ok');
-    setNewMoneyInput();
-    renderTabs();
-    render();
-    setTimeout(resizeCharts, 50);
+    try {
+      const synced = await pullFromFirestore();
+      if (!synced) {
+        const ref = userDocRef();
+        if (ref) await ref.set(buildSyncPayload());
+      }
+      listenFirestore();
+      setNewMoneyInput();
+      renderTabs();
+      render();
+      setTimeout(resizeCharts, 50);
+    } catch {
+      setSyncUI('ok');
+    }
   } else {
     if (unsubFirestore) { unsubFirestore(); unsubFirestore = null; }
     setSyncUI('offline');
