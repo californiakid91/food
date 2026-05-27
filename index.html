@@ -33,6 +33,22 @@
       --font: 'Segoe UI', system-ui, sans-serif;
     }
 
+    :root.light {
+      --bg: #f5f5f7;
+      --surface: #ffffff;
+      --surface2: #f0f0f2;
+      --border: #d1d1d6;
+      --text: #1a1a1a;
+      --muted: #6e6e73;
+    }
+
+    :root.light .badge-ok   { background: #d4edda; color: #155724; }
+    :root.light .badge-high { background: #f8d7da; color: #721c24; }
+    :root.light .badge-low  { background: #fff3cd; color: #856404; }
+    :root.light .alert-warn { background: #fff3cd; color: #856404; border-color: #ffc107; }
+    :root.light .alert-info { background: #d1ecf1; color: #0c5460; border-color: #bee5eb; }
+    :root.light .tab.tab-active { border-width: 2px; }
+
     body {
       background: var(--bg);
       color: var(--text);
@@ -474,10 +490,15 @@
     .asset-item.open .asset-chevron { transform: rotate(90deg); }
 
     .asset-body {
-      display: none;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.25s ease;
+      padding: 0 14px;
+    }
+    .asset-item.open .asset-body {
+      max-height: 500px;
       padding: 0 14px 14px;
     }
-    .asset-item.open .asset-body { display: block; }
 
     .asset-fields {
       display: grid;
@@ -523,6 +544,61 @@
       background: var(--surface2);
     }
 
+    /* ── P&L colores ── */
+    .pnl-positive { color: var(--green); font-weight: 600; font-size: 12px; }
+    .pnl-negative { color: var(--red); font-weight: 600; font-size: 12px; }
+
+    /* ── Theme toggle ── */
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--muted);
+      transition: border-color 0.15s, color 0.15s;
+      flex-shrink: 0;
+      touch-action: manipulation;
+    }
+    .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Pull-to-refresh ── */
+    .ptr-indicator {
+      text-align: center;
+      height: 0;
+      overflow: hidden;
+      transition: height 0.2s ease;
+      color: var(--muted);
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .ptr-indicator.active { height: 40px; }
+    .ptr-indicator.loading { height: 40px; }
+
+    /* ── Refresh prices button ── */
+    .btn-refresh-prices {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--muted);
+      transition: border-color 0.15s, color 0.15s;
+      touch-action: manipulation;
+    }
+    .btn-refresh-prices:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-refresh-prices.loading { opacity: 0.6; pointer-events: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-refresh-prices.loading span { display: inline-block; animation: spin 1s linear infinite; }
+
     /* ── Tabla de rebalanceo en móvil ── */
     @media (max-width: 700px) {
       .result-table { min-width: 0; }
@@ -557,6 +633,9 @@
 </head>
 <body>
 
+<!-- ── Pull-to-refresh indicator ── -->
+<div id="ptr-indicator" class="ptr-indicator">Actualizando precios...</div>
+
 <!-- ── Header ── -->
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
   <div style="display:flex;align-items:center;gap:10px;">
@@ -566,6 +645,7 @@
   <div style="display:flex;align-items:center;gap:10px;">
     <span id="save-indicator" style="font-size:12px;color:var(--green);opacity:0;transition:opacity 0.4s;"></span>
     <span id="sync-dot" title="Sin conexión" style="width:8px;height:8px;border-radius:50%;background:var(--border);display:inline-block;flex-shrink:0;"></span>
+    <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Cambiar tema">&#9790;</button>
     <button id="auth-btn" class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" onclick="toggleAuth()">Entrar</button>
   </div>
 </div>
@@ -578,6 +658,8 @@
     <div>
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Posición total</div>
       <div id="global-total" style="font-size:26px;font-weight:700;letter-spacing:-0.5px;">—</div>
+      <div id="global-delta" style="font-size:13px;margin-top:2px;"></div>
+      <div id="global-pnl" style="font-size:13px;margin-top:2px;"></div>
     </div>
     <div id="global-breakdown" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
   </div>
@@ -598,7 +680,10 @@
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
     <div class="card-title" id="port-card-title" style="margin:0">Cartera</div>
-    <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" onclick="addRow()">+ Activo</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button id="btn-refresh-prices" class="btn-refresh-prices" onclick="refreshAllPrices()" title="Actualizar precios"><span>&#128260;</span></button>
+      <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" onclick="addRow()">+ Activo</button>
+    </div>
   </div>
   <div id="obj-warning" class="alert alert-warn" style="display:none">
     ⚠ Los porcentajes objetivo no suman 100%.
@@ -712,6 +797,7 @@ function saveMonthSnapshot() {
       name:      r.name    || '',
       titulos:   parseFloat(r.titulos) || 0,
       price:     parseFloat(r.price)   || 0,
+      avgPrice:  parseFloat(r.avgPrice) || 0,
       value:     getRowValue(r),
       target:    parseFloat(r.target)  || 0,
       pctActual: total > 0 ? getRowValue(r) / total * 100 : 0
@@ -1075,6 +1161,7 @@ function setSyncUI(state) {
     dot.style.background = '#27ae60';
     dot.title = 'Sincronizado';
     status.textContent = 'Sincronizado con tu cuenta.';
+    status.style.display = 'none';
     if (btn) {
       if (currentUser && currentUser.photoURL) {
         btn.innerHTML = `<img src="${currentUser.photoURL}" style="width:28px;height:28px;border-radius:50%;display:block;" alt="" referrerpolicy="no-referrer">`;
@@ -1088,11 +1175,13 @@ function setSyncUI(state) {
     dot.style.background = '#e74c3c';
     dot.title = 'Error de autenticación';
     status.textContent = 'Error de autenticación.';
+    status.style.display = 'block';
     if (btn) { btn.textContent = 'Entrar'; btn.style.padding = '5px 12px'; }
   } else {
     dot.style.background = 'var(--border)';
     dot.title = 'Sin conexión';
     status.textContent = 'Datos en este dispositivo. Entra con Google para sincronizar.';
+    status.style.display = 'block';
     if (btn) { btn.textContent = 'Entrar'; btn.style.padding = '5px 12px'; }
   }
 }
@@ -1420,7 +1509,7 @@ window.addEventListener('load', () => {
 });
 
 function addRow() {
-  rows.push({ id: genId(), name: '', value: 0, target: 0 });
+  rows.push({ id: genId(), name: '', value: 0, target: 0, avgPrice: 0 });
   schedSave();
   render();
   setTimeout(() => {
@@ -1500,6 +1589,65 @@ function renderGlobalPosition() {
 
   const selected = parts.filter(p => p.active);
   const grandTotal = selected.reduce((s, p) => s + p.total, 0);
+
+  // Compare with most recent history snapshot for delta coloring (feature #6)
+  const deltaEl = document.getElementById('global-delta');
+  const pnlEl = document.getElementById('global-pnl');
+  let lastSnapTotal = 0;
+  let hasSnap = false;
+  selected.forEach(p => {
+    const snaps = loadHistory(p.id);
+    if (snaps.length > 0) {
+      lastSnapTotal += snaps[snaps.length - 1].totalValue || 0;
+      hasSnap = true;
+    }
+  });
+
+  if (hasSnap && grandTotal > 0) {
+    const delta = grandTotal - lastSnapTotal;
+    const deltaPct = lastSnapTotal > 0 ? (delta / lastSnapTotal * 100) : 0;
+    const sign = delta >= 0 ? '+' : '';
+    const cls = delta >= 0 ? 'color:var(--green)' : 'color:var(--red)';
+    totalEl.style.color = delta >= 0 ? 'var(--green)' : 'var(--red)';
+    if (deltaEl) deltaEl.innerHTML = `<span style="${cls};font-weight:600;">vs último snapshot: ${sign}${fmt(delta)} € (${sign}${deltaPct.toFixed(1)}%)</span>`;
+  } else {
+    totalEl.style.color = '';
+    if (deltaEl) deltaEl.innerHTML = '';
+  }
+
+  // Global P&L from avgPrice data (feature #3)
+  if (pnlEl) {
+    let totalPnlVal = 0;
+    let totalCostVal = 0;
+    let hasPnlData = false;
+    selected.forEach(p => {
+      let portRows;
+      if (p.id === currentPortId) {
+        portRows = rows;
+      } else {
+        try {
+          const raw = localStorage.getItem(rowsKey(p.id));
+          portRows = raw ? (JSON.parse(raw).rows || []) : [];
+        } catch { portRows = []; }
+      }
+      portRows.forEach(r => {
+        const pnlData = getRowPnl(r);
+        if (pnlData) {
+          totalPnlVal += pnlData.pnl;
+          totalCostVal += (parseFloat(r.avgPrice) || 0) * (parseFloat(r.titulos) || 0);
+          hasPnlData = true;
+        }
+      });
+    });
+    if (hasPnlData) {
+      const pnlPct = totalCostVal > 0 ? (totalPnlVal / totalCostVal * 100) : 0;
+      const sign = totalPnlVal >= 0 ? '+' : '';
+      const cls = totalPnlVal >= 0 ? 'pnl-positive' : 'pnl-negative';
+      pnlEl.innerHTML = `<span class="${cls}">P&L: ${sign}${fmt(totalPnlVal)} € (${sign}${pnlPct.toFixed(1)}%)</span>`;
+    } else {
+      pnlEl.innerHTML = '';
+    }
+  }
 
   totalEl.textContent = fmt(grandTotal) + ' €';
   breakdownEl.innerHTML = selected.map(p =>
@@ -1621,6 +1769,7 @@ function renderTable() {
           ${ticker ? `<span class="asset-ticker">${esc(ticker)}</span>` : ''}
           <span class="asset-name">${esc(row.name || (ticker ? '' : 'Sin nombre'))}</span>
           <span class="asset-value">${val > 0 ? fmt(val) + ' €' : ''}</span>
+          ${(() => { const p = getRowPnl(row); return p ? formatPnl(p) : ''; })()}
           <span class="asset-pct ${devClass}">${tgt > 0 ? actual.toFixed(1) + '%' : ''}</span>
           ${badge}
           <span class="asset-chevron">&#9654;</span>
@@ -1659,11 +1808,17 @@ function renderTable() {
               <input type="number" value="${tgt || ''}" placeholder="0" min="0" step="1"
                 oninput="updateRow(${row.id},'target',this.value)">
             </div>
+            <div class="asset-field">
+              <label>Precio medio (€)</label>
+              <input type="number" value="${parseFloat(row.avgPrice) || ''}" placeholder="0.00" min="0" step="0.01"
+                oninput="updateRow(${row.id},'avgPrice',this.value)">
+            </div>
           </div>
           <div class="asset-stats">
             <span class="asset-stat">Actual: <strong>${actual.toFixed(1)}%</strong></span>
             <span class="asset-stat">Objetivo: <strong>${tgt}%</strong></span>
             <span class="asset-stat ${devClass}">Desv: <strong>${(dev >= 0 ? '+' : '') + dev.toFixed(1)}%</strong></span>
+            ${(() => { const p = getRowPnl(row); return p ? `<span class="asset-stat">P&L: ${formatPnl(p)}</span>` : ''; })()}
           </div>
           <div class="asset-delete">
             <button class="btn btn-danger" style="font-size:13px;padding:4px 10px;" onclick="deleteRow(${row.id})">Eliminar activo</button>
@@ -1679,7 +1834,7 @@ function updateRow(id, field, value) {
   const row = rows.find(r => r.id === id);
   if (!row) return;
   row[field] = (field === 'name' || field === 'ticker') ? value : (parseFloat(value) || 0);
-  if (field === 'titulos' || field === 'price' || field === 'value' || field === 'target') {
+  if (field === 'titulos' || field === 'price' || field === 'value' || field === 'target' || field === 'avgPrice') {
     renderTable();
   }
   updateStats();
@@ -1850,11 +2005,11 @@ function drawPie() {
   const legend = document.getElementById('pie-legend');
 
   if (total === 0 || rows.length === 0) {
-    ctx.fillStyle = '#2e3350';
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#2e3350';
     ctx.beginPath();
     ctx.arc(W/2, H/2, 100, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#7a7f99';
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#7a7f99';
     ctx.font = '13px Segoe UI, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Sin datos', W/2, H/2 + 5);
@@ -1879,7 +2034,7 @@ function drawPie() {
     ctx.closePath();
     ctx.fillStyle = s.color;
     ctx.fill();
-    ctx.strokeStyle = '#0f1117';
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0f1117';
     ctx.lineWidth = 2;
     ctx.stroke();
     angle += sweep;
@@ -1888,11 +2043,11 @@ function drawPie() {
   // Donut hole
   ctx.beginPath();
   ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
-  ctx.fillStyle = '#1a1d27';
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#1a1d27';
   ctx.fill();
 
   // Centro: total
-  ctx.fillStyle = '#e8eaf0';
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#e8eaf0';
   ctx.font = 'bold 14px Segoe UI, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(fmt(total) + ' €', cx, cy + 5);
@@ -1933,12 +2088,14 @@ function drawBar() {
   const gap = 4;
 
   // Líneas de guía
-  ctx.strokeStyle = '#2e3350';
+  const cssBorder = getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || '#2e3350';
+  const cssMuted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#7a7f99';
+  ctx.strokeStyle = cssBorder;
   ctx.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
     const y = pad.top + chartH - (i / 4) * chartH;
     ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + chartW, y); ctx.stroke();
-    ctx.fillStyle = '#7a7f99';
+    ctx.fillStyle = cssMuted;
     ctx.font = '10px Segoe UI, sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText((maxPct * i / 4).toFixed(0) + '%', pad.left - 4, y + 3);
@@ -1969,7 +2126,7 @@ function drawBar() {
 
     // Etiqueta
     const label = (row.name || '—').slice(0, 9);
-    ctx.fillStyle = '#7a7f99';
+    ctx.fillStyle = cssMuted;
     ctx.font = '10px Segoe UI, sans-serif';
     ctx.textAlign = 'center';
     ctx.save();
@@ -1981,19 +2138,20 @@ function drawBar() {
 
   // Leyenda del gráfico
   const ly = H - 8;
-  ctx.fillStyle = '#5b7cf6';
+  const cssAccent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#5b7cf6';
+  ctx.fillStyle = cssAccent;
   ctx.fillRect(pad.left, ly - 8, 12, 8);
-  ctx.fillStyle = '#7a7f99';
+  ctx.fillStyle = cssMuted;
   ctx.font = '10px Segoe UI, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('Actual', pad.left + 16, ly);
 
-  ctx.fillStyle = '#5b7cf666';
-  ctx.strokeStyle = '#5b7cf6';
+  ctx.fillStyle = cssAccent + '66';
+  ctx.strokeStyle = cssAccent;
   ctx.lineWidth = 1;
   ctx.fillRect(pad.left + 70, ly - 8, 12, 8);
   ctx.strokeRect(pad.left + 70, ly - 8, 12, 8);
-  ctx.fillStyle = '#7a7f99';
+  ctx.fillStyle = cssMuted;
   ctx.fillText('Objetivo', pad.left + 86, ly);
 }
 
@@ -2032,6 +2190,191 @@ window.addEventListener('resize', () => {
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// LIGHT/DARK THEME TOGGLE
+// ══════════════════════════════════════════════════════════════════════
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  const btn = document.getElementById('theme-btn');
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (theme === 'light') {
+    root.classList.add('light');
+    if (btn) btn.innerHTML = '&#9728;'; // sun
+    if (meta) meta.content = '#f5f5f7';
+  } else {
+    root.classList.remove('light');
+    if (btn) btn.innerHTML = '&#9790;'; // moon
+    if (meta) meta.content = '#0f1117';
+  }
+  localStorage.setItem('food-theme', theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.classList.contains('light') ? 'light' : 'dark';
+  applyTheme(current === 'light' ? 'dark' : 'light');
+  // Redraw charts since colors depend on CSS vars
+  setTimeout(() => { drawCharts(); }, 50);
+}
+
+// Apply saved theme on load
+(function() {
+  const saved = localStorage.getItem('food-theme');
+  if (saved) applyTheme(saved);
+})();
+
+// ══════════════════════════════════════════════════════════════════════
+// AUTO-FETCH STOCK PRICES (Yahoo Finance via CORS proxy)
+// ══════════════════════════════════════════════════════════════════════
+
+const TICKER_YAHOO_MAP = {
+  'SKFB': 'SKF-B.ST',
+  'IFX': 'IFX.DE',
+  'SHA0': 'SHA.DE',
+  'K3R': 'KGX.DE',
+  'URNU': 'URNU.L',
+  // SSM1 has no good Yahoo mapping, skip
+};
+
+// Tickers to skip (no reliable Yahoo mapping)
+const TICKER_SKIP = new Set(['SSM1']);
+
+function getYahooTicker(ticker) {
+  const t = ticker.trim().toUpperCase();
+  if (TICKER_SKIP.has(t)) return null;
+  if (TICKER_YAHOO_MAP[t]) return TICKER_YAHOO_MAP[t];
+  return t;
+}
+
+async function fetchTickerPrice(ticker) {
+  const yahooTicker = getYahooTicker(ticker);
+  if (!yahooTicker) return null;
+  const url = `https://corsproxy.io/?url=https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooTicker)}?interval=1d&range=1d`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const data = await resp.json();
+  const meta = data?.chart?.result?.[0]?.meta;
+  if (!meta) throw new Error('No data');
+  return meta.regularMarketPrice || null;
+}
+
+async function refreshAllPrices() {
+  const btn = document.getElementById('btn-refresh-prices');
+  if (btn) { btn.classList.add('loading'); }
+
+  const tickerRows = rows.filter(r => r.ticker && r.ticker.trim());
+  let updated = 0;
+
+  const promises = tickerRows.map(async (row) => {
+    try {
+      const price = await fetchTickerPrice(row.ticker);
+      if (price !== null && price > 0) {
+        row.price = price;
+        updated++;
+      }
+    } catch (e) {
+      console.warn(`Failed to fetch ${row.ticker}:`, e.message);
+    }
+  });
+
+  await Promise.all(promises);
+
+  if (btn) { btn.classList.remove('loading'); }
+
+  if (updated > 0) {
+    render();
+    schedSave();
+    showSaveIndicator(`${updated} precio${updated > 1 ? 's' : ''} actualizado${updated > 1 ? 's' : ''} ✓`);
+  } else {
+    showSaveIndicator('No se pudieron actualizar precios');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// P&L TRACKING
+// ══════════════════════════════════════════════════════════════════════
+
+function getRowPnl(row) {
+  const price = parseFloat(row.price) || 0;
+  const avgPrice = parseFloat(row.avgPrice) || 0;
+  const titulos = parseFloat(row.titulos) || 0;
+  if (avgPrice <= 0 || price <= 0 || titulos <= 0) return null;
+  const pnl = (price - avgPrice) * titulos;
+  const pnlPct = (price / avgPrice - 1) * 100;
+  return { pnl, pnlPct };
+}
+
+function formatPnl(pnlData) {
+  if (!pnlData) return '';
+  const { pnl, pnlPct } = pnlData;
+  const sign = pnl >= 0 ? '+' : '';
+  const cls = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+  return `<span class="${cls}">${sign}${fmt(pnl)} € (${sign}${pnlPct.toFixed(1)}%)</span>`;
+}
+
+function getTotalPnl() {
+  let totalPnl = 0;
+  let totalCost = 0;
+  let hasPnl = false;
+  rows.forEach(r => {
+    const pnlData = getRowPnl(r);
+    if (pnlData) {
+      totalPnl += pnlData.pnl;
+      totalCost += (parseFloat(r.avgPrice) || 0) * (parseFloat(r.titulos) || 0);
+      hasPnl = true;
+    }
+  });
+  if (!hasPnl) return null;
+  const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost * 100) : 0;
+  return { pnl: totalPnl, pnlPct: totalPnlPct };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PULL-TO-REFRESH
+// ══════════════════════════════════════════════════════════════════════
+
+(function() {
+  let startY = 0;
+  let pulling = false;
+  const threshold = 60;
+
+  document.addEventListener('touchstart', function(e) {
+    if (window.scrollY === 0) {
+      startY = e.touches[0].clientY;
+      pulling = true;
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function(e) {
+    if (!pulling) return;
+    const diff = e.touches[0].clientY - startY;
+    const indicator = document.getElementById('ptr-indicator');
+    if (diff > 10 && window.scrollY === 0 && indicator) {
+      const h = Math.min(diff * 0.5, 50);
+      indicator.style.height = h + 'px';
+      indicator.textContent = diff > threshold ? 'Soltar para actualizar...' : 'Tirar para actualizar...';
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', function(e) {
+    if (!pulling) return;
+    pulling = false;
+    const indicator = document.getElementById('ptr-indicator');
+    if (!indicator) return;
+    const h = parseFloat(indicator.style.height) || 0;
+    if (h >= threshold * 0.5) {
+      indicator.classList.add('loading');
+      indicator.textContent = 'Actualizando precios...';
+      refreshAllPrices().finally(() => {
+        indicator.classList.remove('loading');
+        indicator.style.height = '0';
+      });
+    } else {
+      indicator.style.height = '0';
+    }
+  }, { passive: true });
+})();
 </script>
 </body>
 </html>
