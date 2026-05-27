@@ -1488,6 +1488,54 @@ function getRowValue(row) {
   return parseFloat(row.value) || 0;
 }
 
+const TICKER_NAMES = {
+  // Nuclear / Energía
+  CCJ:'Cameco',CEG:'Constellation Energy',VST:'Vistra',NXE:'NexGen Energy',
+  DNN:'Denison Mines',LEU:'Centrus Energy',UEC:'Uranium Energy',UUUU:'Energy Fuels',
+  SMR:'NuScale Power',OKLO:'Oklo',NNE:'Nano Nuclear Energy',
+  // Robótica / IA / Tech
+  NVDA:'NVIDIA',GOOGL:'Alphabet (Google)',GOOG:'Alphabet (Google)',MSFT:'Microsoft',
+  AMZN:'Amazon',META:'Meta Platforms',AAPL:'Apple',TSM:'TSMC',AVGO:'Broadcom',
+  AMD:'AMD',INTC:'Intel',QCOM:'Qualcomm',ARM:'Arm Holdings',PLTR:'Palantir',
+  CRM:'Salesforce',SNOW:'Snowflake',AI:'C3.ai',PATH:'UiPath',ISRG:'Intuitive Surgical',
+  IRBT:'iRobot',RKLB:'Rocket Lab',IONQ:'IonQ',RGTI:'Rigetti Computing',
+  TSLA:'Tesla',RIVN:'Rivian',UBER:'Uber',ABNB:'Airbnb',SQ:'Block (Square)',
+  COIN:'Coinbase',SHOP:'Shopify',NET:'Cloudflare',CRWD:'CrowdStrike',ZS:'Zscaler',
+  DDOG:'Datadog',MDB:'MongoDB',CFLT:'Confluent',S:'SentinelOne',PANW:'Palo Alto Networks',
+  // ETFs populares
+  SPY:'SPDR S&P 500',QQQ:'Invesco QQQ (Nasdaq)',VTI:'Vanguard Total Market',
+  VOO:'Vanguard S&P 500',ARKK:'ARK Innovation',ARKG:'ARK Genomic',
+  BOTZ:'Global X Robotics & AI',ROBO:'ROBO Global Robotics',
+  SOXX:'iShares Semiconductor',SMH:'VanEck Semiconductor',
+  URA:'Global X Uranium',URNM:'Sprott Uranium Miners',NLR:'VanEck Uranium+Nuclear',
+  ICLN:'iShares Clean Energy',TAN:'Invesco Solar',
+  VGT:'Vanguard Info Tech',XLK:'Tech Select SPDR',
+  IBIT:'iShares Bitcoin Trust',MSTR:'MicroStrategy',
+  // Grandes europeas / otras
+  ASML:'ASML',SAP:'SAP',SIE:'Siemens',OR:'L\'Oréal',MC:'LVMH',
+  NOVO:'Novo Nordisk',AZN:'AstraZeneca',SHEL:'Shell',
+  // Financieras / diversas
+  BRK:'Berkshire Hathaway',JPM:'JPMorgan Chase',V:'Visa',MA:'Mastercard',
+  BAC:'Bank of America',GS:'Goldman Sachs',MS:'Morgan Stanley',
+  JNJ:'Johnson & Johnson',UNH:'UnitedHealth',PFE:'Pfizer',LLY:'Eli Lilly',
+  KO:'Coca-Cola',PEP:'PepsiCo',WMT:'Walmart',COST:'Costco',HD:'Home Depot',
+  DIS:'Walt Disney',NFLX:'Netflix',SPOT:'Spotify',
+};
+
+function autocompleteTicker(id, ticker) {
+  const row = rows.find(r => r.id === id);
+  if (!row) return;
+  const t = ticker.trim().toUpperCase();
+  row.ticker = ticker;
+  if (TICKER_NAMES[t] && (!row.name || row.name === '' || TICKER_NAMES[row._lastAutoTicker])) {
+    row.name = TICKER_NAMES[t];
+    row._lastAutoTicker = t;
+    const nameInput = document.querySelector(`tr[data-id="${id}"] .input-name`);
+    if (nameInput) nameInput.value = row.name;
+  }
+  schedSave();
+}
+
 function getTotal() {
   return rows.reduce((s, r) => s + getRowValue(r), 0);
 }
@@ -1528,7 +1576,7 @@ function renderTable() {
       <tr data-id="${row.id}">
         <td class="col-ticker" data-label="Símbolo">
           <input class="ticker-badge" type="text" value="${esc(row.ticker||'')}" placeholder="TICKER"
-            oninput="updateRow(${row.id},'ticker',this.value)">
+            oninput="autocompleteTicker(${row.id},this.value)">
         </td>
         <td class="col-name" data-label="Activo">
           <div style="display:flex;align-items:center;gap:8px;">
