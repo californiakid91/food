@@ -1712,6 +1712,21 @@ const TICKER_NAMES = {
   DIS:'Walt Disney',NFLX:'Netflix',SPOT:'Spotify',
 };
 
+function confirmTarget(id) {
+  const inp = document.getElementById('target-input-' + id);
+  if (!inp) return;
+  const newVal = parseFloat(inp.value) || 0;
+  const row = rows.find(r => r.id === id);
+  if (!row) return;
+  if (row.target == newVal) return;
+  row.target = newVal;
+  updateStats();
+  calcRebalance();
+  drawCharts();
+  schedSave();
+  showSaveIndicator('Objetivo guardado ✓');
+}
+
 function autocompleteTicker(id, ticker) {
   const row = rows.find(r => r.id === id);
   if (!row) return;
@@ -1812,10 +1827,13 @@ function renderTable() {
                 : `<input type="number" value="${val || ''}" placeholder="0" min="0" step="100"
                      oninput="updateRow(${row.id},'value',this.value)">`}
             </div>
-            <div class="asset-field">
+            <div class="asset-field" id="target-field-${row.id}">
               <label>% Objetivo</label>
-              <input type="number" value="${tgt || ''}" placeholder="0" min="0" step="1"
-                oninput="updateRow(${row.id},'target',this.value)">
+              <div style="display:flex;gap:4px;align-items:center;">
+                <input id="target-input-${row.id}" type="number" value="${tgt || ''}" placeholder="0" min="0" step="1"
+                  style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmTarget(${row.id});}">
+                <button class="btn btn-ghost" style="padding:4px 8px;font-size:14px;min-height:32px;color:var(--green);" onclick="confirmTarget(${row.id})" title="Confirmar">&#10003;</button>
+              </div>
             </div>
             <div class="asset-field">
               <label>Precio medio (€)</label>
@@ -2256,16 +2274,17 @@ function getYahooTicker(ticker) {
   return t;
 }
 
+const PRICE_PROXY = 'https://food-prices.californiakid91.workers.dev';
+
 async function fetchTickerPrice(ticker) {
   const yahooTicker = getYahooTicker(ticker);
   if (!yahooTicker) return null;
-  const url = `https://corsproxy.io/?url=https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooTicker)}?interval=1d&range=1d`;
+  const url = `${PRICE_PROXY}/?t=${encodeURIComponent(yahooTicker)}`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const data = await resp.json();
-  const meta = data?.chart?.result?.[0]?.meta;
-  if (!meta) throw new Error('No data');
-  return meta.regularMarketPrice || null;
+  if (data.error) throw new Error(data.error);
+  return data.price || null;
 }
 
 async function refreshAllPrices() {
