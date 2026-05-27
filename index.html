@@ -1075,17 +1075,25 @@ function setSyncUI(state) {
     dot.style.background = '#27ae60';
     dot.title = 'Sincronizado';
     status.textContent = 'Sincronizado con tu cuenta.';
-    if (btn) btn.textContent = 'Salir';
+    if (btn) {
+      if (currentUser && currentUser.photoURL) {
+        btn.innerHTML = `<img src="${currentUser.photoURL}" style="width:28px;height:28px;border-radius:50%;display:block;" alt="" referrerpolicy="no-referrer">`;
+        btn.style.padding = '3px';
+        btn.title = currentUser.displayName || 'Cerrar sesión';
+      } else {
+        btn.textContent = 'Salir';
+      }
+    }
   } else if (state === 'auth') {
     dot.style.background = '#e74c3c';
     dot.title = 'Error de autenticación';
     status.textContent = 'Error de autenticación.';
-    if (btn) btn.textContent = 'Entrar';
+    if (btn) { btn.textContent = 'Entrar'; btn.style.padding = '5px 12px'; }
   } else {
     dot.style.background = 'var(--border)';
     dot.title = 'Sin conexión';
     status.textContent = 'Datos en este dispositivo. Entra con Google para sincronizar.';
-    if (btn) btn.textContent = 'Entrar';
+    if (btn) { btn.textContent = 'Entrar'; btn.style.padding = '5px 12px'; }
   }
 }
 
