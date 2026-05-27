@@ -1397,6 +1397,7 @@ window.addEventListener('load', () => {
   renderTabs();
   render();
   setTimeout(resizeCharts, 50);
+  if (currentUser) setSyncUI('ok');
 });
 
 function addRow() {
