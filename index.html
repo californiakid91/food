@@ -991,6 +991,20 @@ const TAB_COLORS = [
   { bg:'#1a0a0a', border:'#e74c3c', text:'#e74c3c' },  // rojo
 ];
 
+// ── Tipo de cambio EUR/USD ────────────────────────────────────────────
+let eurUsd = null;
+
+async function fetchEurUsd() {
+  try {
+    const r = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD', { signal: AbortSignal.timeout(3000) });
+    const d = await r.json();
+    eurUsd = d.rates?.USD || null;
+  } catch { eurUsd = null; }
+}
+
+fetchEurUsd();
+setInterval(fetchEurUsd, 3600000);
+
 // ── Firebase ──────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyDI36kGwCa4_rPwFMkAPG_9W9zryd5rz_M",
@@ -1737,6 +1751,7 @@ function calcRebalance() {
       Cartera actual: <strong>${fmt(total)} €</strong> &nbsp;|&nbsp;
       Aportación: <strong>${fmt(newMoney)} €</strong> &nbsp;|&nbsp;
       Total estimado: <strong>${fmt(total + totalSpent)} €</strong>
+      ${eurUsd ? `&nbsp;|&nbsp; <span style="font-size:12px;opacity:0.8">1 € = ${eurUsd.toFixed(4)} $</span>` : ''}
     </div>
     <div class="table-wrap">
       <table class="result-table">
@@ -1757,12 +1772,12 @@ function calcRebalance() {
       ? `<span style="font-family:'Courier New',monospace;font-size:11px;font-weight:700;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--muted)">${esc(row.ticker.toUpperCase())}</span>`
       : '<span style="color:var(--border)">—</span>';
 
-    // Asignación: siempre muestra el € ideal aunque no llegue a 1 unidad
     let investHtml;
     if (allocated < 0.5) {
       investHtml = '<span class="muted">—</span>';
     } else {
-      investHtml = `<span class="green" style="font-weight:600">+${fmtDec(allocated)} €</span>`;
+      const usdPart = eurUsd ? `<br><span style="color:var(--muted);font-size:11px">~${fmtDec(allocated * eurUsd)} $</span>` : '';
+      investHtml = `<span class="green" style="font-weight:600">+${fmtDec(allocated)} €</span>${usdPart}`;
     }
 
     // Unidades: 0 = no llega a 1, null = sin precio
