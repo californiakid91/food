@@ -557,28 +557,27 @@
 </head>
 <body>
 
-<div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
-  <h1>Balanceo de Cartera</h1>
-  <div style="display:flex;align-items:center;gap:8px;padding-top:4px;flex-wrap:wrap;">
-    <span id="sync-dot" title="Sin conexión" style="width:8px;height:8px;border-radius:50%;background:var(--border);display:inline-block;flex-shrink:0;"></span>
+<!-- ── Header ── -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <img src="icon.svg" alt="" style="width:32px;height:32px;border-radius:7px;">
+    <h1 style="margin:0;">Food</h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
     <span id="save-indicator" style="font-size:12px;color:var(--green);opacity:0;transition:opacity 0.4s;"></span>
-    <button id="auth-btn" class="btn btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="toggleAuth()">Entrar</button>
-    <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="exportData()">Exportar</button>
-    <label  class="btn btn-ghost" style="font-size:12px;padding:5px 10px;cursor:pointer;" title="Importar JSON">
-      Importar<input type="file" accept=".json" onchange="importData(this)" style="display:none">
-    </label>
-    <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px;" onclick="clearStorage()">Borrar</button>
+    <span id="sync-dot" title="Sin conexión" style="width:8px;height:8px;border-radius:50%;background:var(--border);display:inline-block;flex-shrink:0;"></span>
+    <button id="auth-btn" class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" onclick="toggleAuth()">Entrar</button>
   </div>
 </div>
-<p class="subtitle" id="sync-status">Datos guardados en este dispositivo.</p>
+<p class="subtitle" id="sync-status">Datos en este dispositivo.</p>
 
 <!-- ── Posición global ── -->
 <div id="global-position" class="card" style="padding:14px 20px;margin-bottom:16px;">
   <div id="global-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
     <div>
-      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Posición seleccionada</div>
-      <div id="global-total" style="font-size:24px;font-weight:700;">—</div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Posición total</div>
+      <div id="global-total" style="font-size:26px;font-weight:700;letter-spacing:-0.5px;">—</div>
     </div>
     <div id="global-breakdown" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
   </div>
@@ -587,53 +586,31 @@
 <!-- ── Selector de cartera ── -->
 <div id="tabs-container" class="tabs"></div>
 
-<!-- ── Stats ── -->
+<!-- ── Stats de cartera activa ── -->
 <div class="stats" id="stats">
-  <div class="stat"><span class="stat-label">Valor total</span><span class="stat-value" id="stat-total">—</span></div>
+  <div class="stat"><span class="stat-label">Valor</span><span class="stat-value" id="stat-total">—</span></div>
   <div class="stat"><span class="stat-label">Activos</span><span class="stat-value" id="stat-count">—</span></div>
-  <div class="stat"><span class="stat-label">% Obj. asignado</span><span class="stat-value" id="stat-obj">—</span></div>
-  <div class="stat"><span class="stat-label">Desviación máx.</span><span class="stat-value" id="stat-maxdev">—</span></div>
+  <div class="stat"><span class="stat-label">% Asignado</span><span class="stat-value" id="stat-obj">—</span></div>
+  <div class="stat"><span class="stat-label">Desv. máx.</span><span class="stat-value" id="stat-maxdev">—</span></div>
 </div>
 
-<!-- ── Lista de cartera ── -->
+<!-- ── Lista de activos ── -->
 <div class="card">
-  <div class="card-title" id="port-card-title">Mi Cartera</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <div class="card-title" id="port-card-title" style="margin:0">Cartera</div>
+    <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" onclick="addRow()">+ Activo</button>
+  </div>
   <div id="obj-warning" class="alert alert-warn" style="display:none">
-    ⚠ Los porcentajes objetivo no suman 100% — ajústalos antes de calcular.
+    ⚠ Los porcentajes objetivo no suman 100%.
   </div>
   <div id="portfolio-list"></div>
-  <div class="row-actions">
-    <button class="btn btn-ghost" onclick="addRow()">+ Añadir activo</button>
-    <button class="btn btn-ghost" onclick="loadExample()" style="color:var(--muted);font-size:12px;">Cargar ejemplo</button>
-    <button class="btn btn-danger" style="font-size:13px;padding:5px 10px;margin-left:auto;" onclick="deletePortfolioActive()" title="Eliminar esta cartera">Eliminar cartera</button>
+  <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+    <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;color:var(--muted);" onclick="clearStorage()">Vaciar activos</button>
+    <button class="btn btn-danger" style="font-size:11px;padding:4px 10px;margin-left:auto;" onclick="deletePortfolioActive()">Eliminar cartera</button>
   </div>
 </div>
 
-<!-- ── Rebalanceo ── -->
-<div class="card">
-  <div class="card-title">Calcular Rebalanceo</div>
-  <div class="rebalance-inputs">
-    <div class="field">
-      <label>Nuevo dinero a invertir (€)</label>
-      <input type="number" id="new-money" placeholder="250" min="0" step="50" oninput="onNewMoneyChange(this.value)">
-    </div>
-  </div>
-  <div id="rebalance-result"></div>
-</div>
-
-<!-- ── Histórico ── -->
-<div class="card" id="history-card">
-  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
-    <div class="card-title" style="margin:0">Histórico Mensual</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" onclick="saveMonthSnapshot()">+ Guardar mes actual</button>
-      <button class="btn btn-primary" style="font-size:12px;padding:5px 12px;" onclick="exportTaxExcel()">Excel Renta</button>
-    </div>
-  </div>
-  <div id="history-content"></div>
-</div>
-
-<!-- ── Gráficos ── -->
+<!-- ── Distribución (gráficos) ── -->
 <div class="card">
   <div class="card-title">Distribución</div>
   <div class="charts-grid">
@@ -643,10 +620,35 @@
       <div class="chart-legend" id="pie-legend"></div>
     </div>
     <div>
-      <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px;">Actual vs Objetivo (%)</div>
+      <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px;">Actual vs Objetivo</div>
       <canvas id="bar-canvas" width="380" height="260"></canvas>
     </div>
   </div>
+</div>
+
+<!-- ── Rebalanceo ── -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+    <div class="card-title" style="margin:0">Rebalanceo</div>
+    <div class="field" style="gap:3px;">
+      <label style="font-size:11px;color:var(--muted);">Aportación mensual</label>
+      <input type="number" id="new-money" placeholder="250" min="0" step="50" style="width:120px;text-align:right;"
+        oninput="onNewMoneyChange(this.value)">
+    </div>
+  </div>
+  <div id="rebalance-result"></div>
+</div>
+
+<!-- ── Histórico ── -->
+<div class="card" id="history-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+    <div class="card-title" style="margin:0">Histórico</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;" onclick="saveMonthSnapshot()">+ Snapshot</button>
+      <button class="btn btn-primary" style="font-size:11px;padding:5px 10px;" onclick="exportTaxExcel()">Excel IRPF</button>
+    </div>
+  </div>
+  <div id="history-content"></div>
 </div>
 
 <script>
@@ -1214,40 +1216,6 @@ auth.onAuthStateChanged(async user => {
   }
 });
 
-// ── Export / Import manual ─────────────────────────────────────────────
-function exportData() {
-  const payload = buildSyncPayload();
-  const blob    = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const a       = document.createElement('a');
-  a.href        = URL.createObjectURL(blob);
-  a.download    = `cartera-${new Date().toISOString().slice(0,10)}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function importData(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (!data.portfolios) throw new Error('Formato no reconocido');
-      if (!confirm('Esto reemplazará todos los datos actuales. ¿Continuar?')) return;
-      applySyncPayload(data);
-      setNewMoneyInput();
-      renderTabs();
-      render();
-      setTimeout(resizeCharts, 50);
-      showSaveIndicator('Importado ✓');
-    } catch(err) {
-      alert('Error al importar: ' + err.message);
-    }
-  };
-  reader.readAsText(file);
-  input.value = '';
-}
-
 // ── Estado ──
 let rows    = [];
 let nextId  = 1;
@@ -1443,18 +1411,6 @@ function addRow() {
 
 function deleteRow(id) {
   rows = rows.filter(r => r.id !== id);
-  schedSave();
-  render();
-}
-
-function loadExample() {
-  if (rows.length > 0 && !confirm('Esto reemplazará los datos actuales. ¿Continuar?')) return;
-  rows = [
-    { id: genId(), name: 'Activo A', value: 5000, target: 40 },
-    { id: genId(), name: 'Activo B', value: 3000, target: 30 },
-    { id: genId(), name: 'Activo C', value: 2000, target: 20 },
-    { id: genId(), name: 'Liquidez', value: 1000, target: 10 },
-  ];
   schedSave();
   render();
 }
