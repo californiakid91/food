@@ -434,52 +434,80 @@
       h1 { font-size: 19px; }
     }
 
-    /* ── Tabla como tarjetas en móvil ── */
-    @media (max-width: 700px) {
-      #portfolio-table { min-width: 0; }
-      #portfolio-table thead { display: none; }
-      #portfolio-table tbody tr {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px 12px;
-        padding: 14px 12px;
-        margin-bottom: 10px;
-        background: var(--surface2);
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        position: relative;
-      }
-      #portfolio-table tbody tr td {
-        border: none;
-        padding: 2px 0;
-      }
-      #portfolio-table tbody tr td::before {
-        content: attr(data-label);
-        display: block;
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        color: var(--muted);
-        margin-bottom: 2px;
-      }
-      #portfolio-table .col-name { grid-column: 1 / -1; }
-      #portfolio-table .col-name input { font-size: 16px !important; }
-      #portfolio-table .col-del {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: auto;
-      }
-      #portfolio-table .col-del::before { display: none; }
-      #portfolio-table .col-obj { grid-column: 1 / -1; }
-      #portfolio-table .col-act,
-      #portfolio-table .col-dev,
-      #portfolio-table .col-estado { text-align: left; }
-      #portfolio-table input[type="number"],
-      #portfolio-table input[type="text"] { padding: 8px 10px; }
-      .valor-auto { text-align: left; }
+    /* ── Lista acordeón de activos ── */
+    .asset-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+    .asset-item.open { border-color: var(--accent); }
 
-      /* Tabla de rebalanceo */
+    .asset-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      touch-action: manipulation;
+      min-height: 48px;
+      user-select: none;
+    }
+    .asset-header:active { background: var(--surface2); }
+    .asset-color { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .asset-ticker {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+    .asset-name { font-size: 14px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .asset-value { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+    .asset-pct { font-size: 12px; min-width: 45px; text-align: right; }
+    .asset-chevron { font-size: 10px; color: var(--muted); transition: transform 0.15s; }
+    .asset-item.open .asset-chevron { transform: rotate(90deg); }
+
+    .asset-body {
+      display: none;
+      padding: 0 14px 14px;
+    }
+    .asset-item.open .asset-body { display: block; }
+
+    .asset-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 14px;
+    }
+    .asset-field { display: flex; flex-direction: column; gap: 3px; }
+    .asset-field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.3px; }
+    .asset-field-wide { grid-column: 1 / -1; }
+
+    .asset-stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .asset-stat { font-size: 12px; color: var(--muted); }
+    .asset-stat strong { color: var(--text); }
+
+    .asset-delete {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      text-align: right;
+    }
+
+    /* ── Tabla de rebalanceo en móvil ── */
+    @media (max-width: 700px) {
       .result-table { min-width: 0; }
       .result-table thead { display: none; }
       .result-table tbody tr {
@@ -527,6 +555,17 @@
 </div>
 <p class="subtitle" id="sync-status">Datos guardados en este dispositivo.</p>
 
+<!-- ── Posición global ── -->
+<div id="global-position" class="card" style="padding:14px 20px;margin-bottom:16px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Posición total</div>
+      <div id="global-total" style="font-size:24px;font-weight:700;">—</div>
+    </div>
+    <div id="global-breakdown" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
+  </div>
+</div>
+
 <!-- ── Selector de cartera ── -->
 <div id="tabs-container" class="tabs"></div>
 
@@ -538,31 +577,13 @@
   <div class="stat"><span class="stat-label">Desviación máx.</span><span class="stat-value" id="stat-maxdev">—</span></div>
 </div>
 
-<!-- ── Tabla de cartera ── -->
+<!-- ── Lista de cartera ── -->
 <div class="card">
-  <div class="card-title">Mi Cartera</div>
+  <div class="card-title" id="port-card-title">Mi Cartera</div>
   <div id="obj-warning" class="alert alert-warn" style="display:none">
     ⚠ Los porcentajes objetivo no suman 100% — ajústalos antes de calcular.
   </div>
-  <div class="table-wrap">
-    <table id="portfolio-table">
-      <thead>
-        <tr>
-          <th class="col-ticker">Símbolo</th>
-          <th class="col-name">Activo</th>
-          <th class="col-precio">Precio (€)</th>
-          <th class="col-titulos">Títulos</th>
-          <th class="col-valor">Valor (€)</th>
-          <th class="col-obj">% Objetivo</th>
-          <th class="col-act">% Actual</th>
-          <th class="col-dev">Desviación</th>
-          <th class="col-estado">Estado</th>
-          <th class="col-del"></th>
-        </tr>
-      </thead>
-      <tbody id="portfolio-body"></tbody>
-    </table>
-  </div>
+  <div id="portfolio-list"></div>
   <div class="row-actions">
     <button class="btn btn-ghost" onclick="addRow()">+ Añadir activo</button>
     <button class="btn btn-ghost" onclick="loadExample()" style="color:var(--muted);font-size:12px;">Cargar ejemplo</button>
@@ -1424,75 +1445,49 @@ function deletePortfolioActive() {
   deletePortfolio(currentPortId);
 }
 
-// ── Edición de % Objetivo con confirmación ──
-function startEditTarget(id) {
-  const row  = rows.find(r => r.id === id);
-  if (!row) return;
-  const cell = document.getElementById('target-cell-' + id);
-  if (!cell) return;
-  const cur  = parseFloat(row.target) || 0;
-
-  cell.innerHTML = `
-    <div class="target-edit">
-      <input id="target-input-${id}" type="number" value="${cur || ''}"
-        placeholder="0" min="0" step="1" style="width:52px"
-        onkeydown="handleTargetKey(event,${id})">
-      <button class="btn-confirm" onclick="confirmTarget(${id})" title="Confirmar">✓</button>
-      <button class="btn-cancel"  onclick="cancelTarget(${id})"  title="Cancelar">✗</button>
-    </div>`;
-
-  const inp = document.getElementById('target-input-' + id);
-  inp.focus();
-  inp.select();
-}
-
-function handleTargetKey(e, id) {
-  if (e.key === 'Enter')  { e.preventDefault(); confirmTarget(id); }
-  if (e.key === 'Escape') { e.preventDefault(); cancelTarget(id);  }
-}
-
-function confirmTarget(id) {
-  const inp = document.getElementById('target-input-' + id);
-  if (!inp) return;
-  const newVal = parseFloat(inp.value) || 0;
-  const row    = rows.find(r => r.id === id);
-  if (!row) return;
-  row.target = newVal;
-  schedSave();
-  // Refrescar solo la celda y los cálculos
-  const cell = document.getElementById('target-cell-' + id);
-  if (cell) cell.innerHTML = `
-    <div class="target-display" onclick="startEditTarget(${id})">
-      <span>${newVal > 0 ? newVal + '%' : '—'}</span>
-      <span class="edit-hint">✏</span>
-    </div>`;
-  renderTableNumbers();
-  updateStats();
-  calcRebalance();
-  drawCharts();
-}
-
-function cancelTarget(id) {
-  const row  = rows.find(r => r.id === id);
-  const tgt  = parseFloat(row?.target) || 0;
-  const cell = document.getElementById('target-cell-' + id);
-  if (!cell) return;
-  cell.innerHTML = `
-    <div class="target-display" onclick="startEditTarget(${id})">
-      <span>${tgt > 0 ? tgt + '%' : '—'}</span>
-      <span class="edit-hint">✏</span>
-    </div>`;
-}
-
 // ── Render principal ──
 function render() {
   const port = portfolios.find(p => p.id === currentPortId);
-  document.querySelector('.card-title').textContent = port ? port.name : 'Cartera';
+  document.getElementById('port-card-title').textContent = port ? port.name : 'Cartera';
   renderTable();
   updateStats();
   calcRebalance();
   drawCharts();
   renderHistory();
+  renderGlobalPosition();
+}
+
+function renderGlobalPosition() {
+  const totalEl     = document.getElementById('global-total');
+  const breakdownEl = document.getElementById('global-breakdown');
+  if (!totalEl || !breakdownEl) return;
+
+  let grandTotal = 0;
+  const parts = [];
+
+  portfolios.forEach((p, i) => {
+    let portRows;
+    if (p.id === currentPortId) {
+      portRows = rows;
+    } else {
+      try {
+        const raw = localStorage.getItem(rowsKey(p.id));
+        portRows = raw ? (JSON.parse(raw).rows || []) : [];
+      } catch { portRows = []; }
+    }
+    const portTotal = portRows.reduce((s, r) => s + getRowValue(r), 0);
+    grandTotal += portTotal;
+    const c = TAB_COLORS[i % TAB_COLORS.length];
+    parts.push({ name: p.name, total: portTotal, color: c.text });
+  });
+
+  totalEl.textContent = fmt(grandTotal) + ' €';
+  breakdownEl.innerHTML = parts.map(p =>
+    `<div style="text-align:center;">
+      <div style="font-size:10px;color:var(--muted);">${esc(p.name)}</div>
+      <div style="font-size:15px;font-weight:600;color:${p.color}">${fmt(p.total)} €</div>
+    </div>`
+  ).join('');
 }
 
 // Si el usuario tiene títulos + precio, el valor se calcula automáticamente
@@ -1548,7 +1543,7 @@ function autocompleteTicker(id, ticker) {
   if (TICKER_NAMES[t] && (!row.name || row.name === '' || TICKER_NAMES[row._lastAutoTicker])) {
     row.name = TICKER_NAMES[t];
     row._lastAutoTicker = t;
-    const nameInput = document.querySelector(`tr[data-id="${id}"] .input-name`);
+    const nameInput = document.querySelector(`.asset-item[data-id="${id}"] .input-name`);
     if (nameInput) nameInput.value = row.name;
   }
   schedSave();
@@ -1558,130 +1553,121 @@ function getTotal() {
   return rows.reduce((s, r) => s + getRowValue(r), 0);
 }
 
+let openAssetId = null;
+
+function toggleAsset(id) {
+  openAssetId = openAssetId === id ? null : id;
+  renderTable();
+}
+
 function renderTable() {
-  const tbody = document.getElementById('portfolio-body');
+  const container = document.getElementById('portfolio-list');
   const total = getTotal();
   const totalObj = rows.reduce((s, r) => s + (parseFloat(r.target) || 0), 0);
 
   document.getElementById('obj-warning').style.display =
     (rows.length > 0 && Math.abs(totalObj - 100) > 0.01) ? 'block' : 'none';
 
-  tbody.innerHTML = '';
+  if (rows.length === 0) {
+    container.innerHTML = '<div class="empty-state">Añade activos para empezar.</div>';
+    return;
+  }
+
+  let html = '';
   rows.forEach((row, i) => {
-    const price  = parseFloat(row.price)   || 0;
+    const price   = parseFloat(row.price)   || 0;
     const titulos = parseFloat(row.titulos) || 0;
-    const isAuto = titulos > 0 && price > 0;
-    const val    = getRowValue(row);
-    const tgt    = parseFloat(row.target)  || 0;
-    const actual = total > 0 ? (val / total * 100) : 0;
-    const dev    = actual - tgt;
-    const color  = PALETTE[i % PALETTE.length];
+    const isAuto  = titulos > 0 && price > 0;
+    const val     = getRowValue(row);
+    const tgt     = parseFloat(row.target)  || 0;
+    const actual  = total > 0 ? (val / total * 100) : 0;
+    const dev     = actual - tgt;
+    const color   = PALETTE[i % PALETTE.length];
+    const isOpen  = openAssetId === row.id;
 
     let badge = '';
     if (Math.abs(dev) < 1)  badge = '<span class="badge badge-ok">OK</span>';
     else if (dev > 0)        badge = '<span class="badge badge-high">Alto</span>';
     else                     badge = '<span class="badge badge-low">Bajo</span>';
 
-    const devStr   = (dev >= 0 ? '+' : '') + dev.toFixed(1) + '%';
     const devClass = dev > 1 ? 'red' : dev < -1 ? 'green' : 'muted';
+    const ticker   = row.ticker ? row.ticker.toUpperCase() : '';
+    const label    = ticker || row.name || 'Nuevo activo';
 
-    const valorCell = isAuto
-      ? `<div class="valor-auto" title="Calculado: ${titulos} × ${fmtDec(price)} €">${fmtDec(val)} €</div>`
-      : `<input type="number" value="${val || ''}" placeholder="0" min="0" step="100"
-           oninput="updateRow(${row.id},'value',this.value)">`;
-
-    tbody.insertAdjacentHTML('beforeend', `
-      <tr data-id="${row.id}">
-        <td class="col-ticker" data-label="Símbolo">
-          <input class="ticker-badge" type="text" value="${esc(row.ticker||'')}" placeholder="TICKER"
-            oninput="autocompleteTicker(${row.id},this.value)">
-        </td>
-        <td class="col-name" data-label="Activo">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
-            <input class="input-name" type="text" value="${esc(row.name)}" placeholder="Nombre del activo"
-              oninput="updateRow(${row.id},'name',this.value)">
+    html += `
+      <div class="asset-item${isOpen ? ' open' : ''}" data-id="${row.id}">
+        <div class="asset-header" onclick="toggleAsset(${row.id})">
+          <div class="asset-color" style="background:${color}"></div>
+          ${ticker ? `<span class="asset-ticker">${esc(ticker)}</span>` : ''}
+          <span class="asset-name">${esc(row.name || (ticker ? '' : 'Sin nombre'))}</span>
+          <span class="asset-value">${val > 0 ? fmt(val) + ' €' : ''}</span>
+          <span class="asset-pct ${devClass}">${tgt > 0 ? actual.toFixed(1) + '%' : ''}</span>
+          ${badge}
+          <span class="asset-chevron">&#9654;</span>
+        </div>
+        <div class="asset-body">
+          <div class="asset-fields">
+            <div class="asset-field">
+              <label>Símbolo</label>
+              <input class="ticker-badge" type="text" value="${esc(row.ticker||'')}" placeholder="TICKER"
+                oninput="autocompleteTicker(${row.id},this.value)" onclick="event.stopPropagation()">
+            </div>
+            <div class="asset-field">
+              <label>Nombre</label>
+              <input class="input-name" type="text" value="${esc(row.name)}" placeholder="Nombre del activo"
+                oninput="updateRow(${row.id},'name',this.value)" onclick="event.stopPropagation()">
+            </div>
+            <div class="asset-field">
+              <label>Precio (€)</label>
+              <input type="number" value="${price||''}" placeholder="0.00" min="0" step="0.01"
+                oninput="updateRow(${row.id},'price',this.value)">
+            </div>
+            <div class="asset-field">
+              <label>Títulos</label>
+              <input type="number" value="${titulos||''}" placeholder="0" min="0" step="1"
+                oninput="updateRow(${row.id},'titulos',this.value)">
+            </div>
+            <div class="asset-field">
+              <label>Valor (€)</label>
+              ${isAuto
+                ? `<div class="valor-auto">${fmtDec(val)} € <span style="font-size:11px;color:var(--border)">(${titulos} × ${fmtDec(price)})</span></div>`
+                : `<input type="number" value="${val || ''}" placeholder="0" min="0" step="100"
+                     oninput="updateRow(${row.id},'value',this.value)">`}
+            </div>
+            <div class="asset-field">
+              <label>% Objetivo</label>
+              <input type="number" value="${tgt || ''}" placeholder="0" min="0" step="1"
+                oninput="updateRow(${row.id},'target',this.value)">
+            </div>
           </div>
-        </td>
-        <td class="col-precio" data-label="Precio">
-          <input type="number" value="${price||''}" placeholder="0.00" min="0" step="0.01"
-            oninput="updateRow(${row.id},'price',this.value)">
-        </td>
-        <td class="col-titulos" data-label="Títulos">
-          <input type="number" value="${titulos||''}" placeholder="0" min="0" step="1"
-            oninput="updateRow(${row.id},'titulos',this.value)">
-        </td>
-        <td class="col-valor" data-label="Valor">${valorCell}</td>
-        <td class="col-obj" data-label="% Objetivo" id="target-cell-${row.id}">
-          <div class="target-display" onclick="startEditTarget(${row.id})">
-            <span>${tgt > 0 ? tgt + '%' : '—'}</span>
-            <span class="edit-hint">✏</span>
+          <div class="asset-stats">
+            <span class="asset-stat">Actual: <strong>${actual.toFixed(1)}%</strong></span>
+            <span class="asset-stat">Objetivo: <strong>${tgt}%</strong></span>
+            <span class="asset-stat ${devClass}">Desv: <strong>${(dev >= 0 ? '+' : '') + dev.toFixed(1)}%</strong></span>
           </div>
-        </td>
-        <td class="col-act num" data-label="% Actual">${actual.toFixed(1)}%</td>
-        <td class="col-dev num ${devClass}" data-label="Desviación">${devStr}</td>
-        <td class="col-estado" data-label="Estado">${badge}</td>
-        <td class="col-del"><button class="btn btn-danger" onclick="deleteRow(${row.id})" title="Eliminar">×</button></td>
-      </tr>
-    `);
+          <div class="asset-delete">
+            <button class="btn btn-danger" style="font-size:13px;padding:4px 10px;" onclick="deleteRow(${row.id})">Eliminar activo</button>
+          </div>
+        </div>
+      </div>`;
   });
+
+  container.innerHTML = html;
 }
 
 function updateRow(id, field, value) {
   const row = rows.find(r => r.id === id);
   if (!row) return;
   row[field] = (field === 'name' || field === 'ticker') ? value : (parseFloat(value) || 0);
-  // Si titulos o precio cambian y ambos están presentes, refrescar la celda de valor
-  if (field === 'titulos' || field === 'price') {
-    const t = parseFloat(row.titulos) || 0;
-    const p = parseFloat(row.price)   || 0;
-    if (t > 0 && p > 0) {
-      // Forzar re-render completo para actualizar el display del valor auto
-      renderTable();
-      updateStats();
-      calcRebalance();
-      drawCharts();
-      schedSave();
-      return;
-    }
+  if (field === 'titulos' || field === 'price' || field === 'value' || field === 'target') {
+    renderTable();
   }
-  renderTableNumbers();
   updateStats();
   calcRebalance();
   drawCharts();
   schedSave();
 }
 
-function renderTableNumbers() {
-  const total = getTotal();
-  const tbody = document.getElementById('portfolio-body');
-  const trs = tbody.querySelectorAll('tr');
-  const totalObj = rows.reduce((s, r) => s + (parseFloat(r.target) || 0), 0);
-
-  document.getElementById('obj-warning').style.display =
-    (rows.length > 0 && Math.abs(totalObj - 100) > 0.01) ? 'block' : 'none';
-
-  trs.forEach((tr, i) => {
-    const row = rows[i];
-    if (!row) return;
-    const val = getRowValue(row);
-    const tgt = parseFloat(row.target) || 0;
-    const actual = total > 0 ? (val / total * 100) : 0;
-    const dev = actual - tgt;
-    const devStr = (dev >= 0 ? '+' : '') + dev.toFixed(1) + '%';
-    const devClass = dev > 1 ? 'red' : dev < -1 ? 'green' : 'muted';
-
-    let badge = '';
-    if (Math.abs(dev) < 1)  badge = '<span class="badge badge-ok">OK</span>';
-    else if (dev > 0)        badge = '<span class="badge badge-high">Alto</span>';
-    else                     badge = '<span class="badge badge-low">Bajo</span>';
-
-    tr.querySelector('.col-act').textContent = actual.toFixed(1) + '%';
-    tr.querySelector('.col-dev').textContent = devStr;
-    tr.querySelector('.col-dev').className = 'col-dev num ' + devClass;
-    tr.querySelector('.col-estado').innerHTML = badge;
-  });
-}
 
 // ── Stats ──
 function updateStats() {
