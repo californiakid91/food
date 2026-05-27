@@ -996,9 +996,10 @@ let eurUsd = null;
 
 async function fetchEurUsd() {
   try {
-    const r = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD', { signal: AbortSignal.timeout(3000) });
+    const r = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD', { signal: AbortSignal.timeout(5000) });
     const d = await r.json();
     eurUsd = d.rates?.USD || null;
+    if (eurUsd && document.getElementById('rebalance-result')) calcRebalance();
   } catch { eurUsd = null; }
 }
 
