@@ -1720,6 +1720,10 @@ function confirmTarget(id) {
   if (!row) return;
   if (row.target == newVal) return;
   row.target = newVal;
+  refreshRowDerived(id, 'target');
+  const totalObj = rows.reduce((s, r) => s + (parseFloat(r.target) || 0), 0);
+  document.getElementById('obj-warning').style.display =
+    (rows.length > 0 && Math.abs(totalObj - 100) > 0.01) ? 'block' : 'none';
   updateStats();
   calcRebalance();
   drawCharts();
@@ -1793,9 +1797,9 @@ function renderTable() {
           ${ticker ? `<span class="asset-ticker">${esc(ticker)}</span>` : ''}
           <span class="asset-name">${esc(row.name || (ticker ? '' : 'Sin nombre'))}</span>
           <span class="asset-value">${val > 0 ? fmt(val) + ' €' : ''}</span>
-          ${(() => { const p = getRowPnl(row); return p ? formatPnl(p) : ''; })()}
+          <span class="asset-pnl">${(() => { const p = getRowPnl(row); return p ? formatPnl(p) : ''; })()}</span>
           <span class="asset-pct ${devClass}">${tgt > 0 ? actual.toFixed(1) + '%' : ''}</span>
-          ${badge}
+          <span class="asset-badge">${badge}</span>
           <span class="asset-chevron">&#9654;</span>
         </div>
         <div class="asset-body">
@@ -1820,7 +1824,7 @@ function renderTable() {
               <input type="number" value="${titulos||''}" placeholder="0" min="0" step="1"
                 oninput="updateRow(${row.id},'titulos',this.value)">
             </div>
-            <div class="asset-field">
+            <div class="asset-field" id="valor-field-${row.id}">
               <label>Valor (€)</label>
               ${isAuto
                 ? `<div class="valor-auto">${fmtDec(val)} € <span style="font-size:11px;color:var(--border)">(${titulos} × ${fmtDec(price)})</span></div>`
@@ -1841,7 +1845,7 @@ function renderTable() {
                 oninput="updateRow(${row.id},'avgPrice',this.value)">
             </div>
           </div>
-          <div class="asset-stats">
+          <div class="asset-stats" id="stats-field-${row.id}">
             <span class="asset-stat">Actual: <strong>${actual.toFixed(1)}%</strong></span>
             <span class="asset-stat">Objetivo: <strong>${tgt}%</strong></span>
             <span class="asset-stat ${devClass}">Desv: <strong>${(dev >= 0 ? '+' : '') + dev.toFixed(1)}%</strong></span>
@@ -1862,12 +1866,72 @@ function updateRow(id, field, value) {
   if (!row) return;
   row[field] = (field === 'name' || field === 'ticker') ? value : (parseFloat(value) || 0);
   if (field === 'titulos' || field === 'price' || field === 'value' || field === 'target' || field === 'avgPrice') {
-    renderTable();
+    // Actualización dirigida: NO reconstruimos la tabla (eso destruiría el
+    // input que el usuario está editando y le haría perder el foco).
+    refreshRowDerived(id, field);
   }
   updateStats();
   calcRebalance();
   drawCharts();
   schedSave();
+}
+
+// Actualiza solo las partes derivadas (no-input) de una fila tras editar
+// un campo numérico, preservando el foco del input que se está escribiendo.
+function refreshRowDerived(id, editedField) {
+  const el  = document.querySelector(`.asset-item[data-id="${id}"]`);
+  const row = rows.find(r => r.id === id);
+  if (!el || !row) return;
+
+  const total   = getTotal();
+  const price   = parseFloat(row.price)   || 0;
+  const titulos = parseFloat(row.titulos) || 0;
+  const isAuto  = titulos > 0 && price > 0;
+  const val     = getRowValue(row);
+  const tgt     = parseFloat(row.target)  || 0;
+  const actual  = total > 0 ? (val / total * 100) : 0;
+  const dev     = actual - tgt;
+  const devClass = dev > 1 ? 'red' : dev < -1 ? 'green' : 'muted';
+
+  let badge = '';
+  if (Math.abs(dev) < 1) badge = '<span class="badge badge-ok">OK</span>';
+  else if (dev > 0)      badge = '<span class="badge badge-high">Alto</span>';
+  else                   badge = '<span class="badge badge-low">Bajo</span>';
+
+  const pnl = getRowPnl(row);
+
+  // Cabecera
+  const valEl = el.querySelector('.asset-value');
+  if (valEl) valEl.textContent = val > 0 ? fmt(val) + ' €' : '';
+  const pnlEl = el.querySelector('.asset-pnl');
+  if (pnlEl) pnlEl.innerHTML = pnl ? formatPnl(pnl) : '';
+  const pctEl = el.querySelector('.asset-pct');
+  if (pctEl) { pctEl.className = 'asset-pct ' + devClass; pctEl.textContent = tgt > 0 ? actual.toFixed(1) + '%' : ''; }
+  const badgeEl = el.querySelector('.asset-badge');
+  if (badgeEl) badgeEl.innerHTML = badge;
+
+  // Celda "Valor": solo se reconstruye cuando NO se está editando ese campo
+  // directamente (al editar 'value' su input tiene el foco y no debe tocarse).
+  if (editedField !== 'value') {
+    const valorField = document.getElementById('valor-field-' + id);
+    if (valorField) {
+      valorField.innerHTML = `<label>Valor (€)</label>
+        ${isAuto
+          ? `<div class="valor-auto">${fmtDec(val)} € <span style="font-size:11px;color:var(--border)">(${titulos} × ${fmtDec(price)})</span></div>`
+          : `<input type="number" value="${val || ''}" placeholder="0" min="0" step="100"
+               oninput="updateRow(${id},'value',this.value)">`}`;
+    }
+  }
+
+  // Línea de estadísticas del activo
+  const statsField = document.getElementById('stats-field-' + id);
+  if (statsField) {
+    statsField.innerHTML = `
+      <span class="asset-stat">Actual: <strong>${actual.toFixed(1)}%</strong></span>
+      <span class="asset-stat">Objetivo: <strong>${tgt}%</strong></span>
+      <span class="asset-stat ${devClass}">Desv: <strong>${(dev >= 0 ? '+' : '') + dev.toFixed(1)}%</strong></span>
+      ${pnl ? `<span class="asset-stat">P&L: ${formatPnl(pnl)}</span>` : ''}`;
+  }
 }
 
 
