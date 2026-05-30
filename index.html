@@ -1289,8 +1289,22 @@ function schedulePush() {
     if (!ref) return;
     try {
       const payload = buildSyncPayload();
-      console.log('Push to Firestore:', payload.portfolios?.length, 'portfolios, savedAt:', payload.savedAt);
-      await ref.set(payload);
+      const localHasData = hasRealLocalData();
+      // Transacción atómica: NUNCA sobrescribir una nube que tiene activos
+      // reales usando un estado local vacío (dispositivo nuevo/sin sincronizar).
+      // Simétrico al guardia de pullFromFirestore; evita pérdida de datos.
+      await db.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+        if (snap.exists && !localHasData) {
+          const cloudAssets = Object.values(snap.data().portfolioData || {})
+            .reduce((s, pd) => s + ((pd.rows || []).length), 0);
+          if (cloudAssets > 0) {
+            console.warn('[SYNC] push omitido: estado local vacío, la nube tiene', cloudAssets, 'activos');
+            return; // no escribimos: la nube se conserva
+          }
+        }
+        tx.set(ref, payload);
+      });
       setSyncUI('ok');
     } catch(e) { console.error('schedulePush:', e); }
   }, 800);
