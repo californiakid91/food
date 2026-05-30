@@ -1252,6 +1252,16 @@ function applySyncPayload(data) {
   return true;
 }
 
+// ¿Hay activos reales en local? (false = solo carteras por defecto vacías)
+function hasRealLocalData() {
+  return portfolios.some(p => {
+    const r = (p.id === currentPortId)
+      ? rows
+      : (() => { try { const raw = localStorage.getItem(rowsKey(p.id)); return raw ? (JSON.parse(raw).rows || []) : []; } catch { return []; } })();
+    return r.length > 0;
+  });
+}
+
 async function pullFromFirestore() {
   const ref = userDocRef();
   if (!ref) return false;
@@ -1262,7 +1272,10 @@ async function pullFromFirestore() {
     if (!data.portfolios) return false;
     const localMeta  = localStorage.getItem(META_KEY);
     const localSaved = localMeta ? (JSON.parse(localMeta).savedAt || 0) : 0;
-    if ((data.savedAt || 0) >= localSaved) applySyncPayload(data);
+    // Si lo local no tiene activos reales (solo carteras por defecto vacías,
+    // recién creadas con un savedAt "de ahora"), la nube debe ganar siempre.
+    // La comparación de fechas solo aplica cuando hay datos locales que proteger.
+    if (!hasRealLocalData() || (data.savedAt || 0) >= localSaved) applySyncPayload(data);
     setSyncUI('ok');
     return true;
   } catch(e) { console.error('pullFromFirestore:', e); return false; }
@@ -1309,11 +1322,7 @@ auth.onAuthStateChanged(async user => {
     try {
       const synced = await pullFromFirestore();
       if (!synced) {
-        const hasLocalData = portfolios.some(p => {
-          const r = (p.id === currentPortId) ? rows : (() => { try { const raw = localStorage.getItem(rowsKey(p.id)); return raw ? (JSON.parse(raw).rows || []) : []; } catch { return []; } })();
-          return r.length > 0;
-        });
-        if (hasLocalData) {
+        if (hasRealLocalData()) {
           const ref = userDocRef();
           if (ref) await ref.set(buildSyncPayload());
         }
