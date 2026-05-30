@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Food">
@@ -681,6 +682,7 @@
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
     <div class="card-title" id="port-card-title" style="margin:0">Cartera</div>
     <div style="display:flex;gap:8px;align-items:center;">
+      <span id="prices-freshness" style="font-size:11px;color:var(--muted);white-space:nowrap;" title="Última actualización de precios"></span>
       <button id="btn-refresh-prices" class="btn-refresh-prices" onclick="refreshAllPrices()" title="Actualizar precios"><span>&#128260;</span></button>
       <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" onclick="addRow()">+ Activo</button>
     </div>
@@ -1289,22 +1291,24 @@ function schedulePush() {
     if (!ref) return;
     try {
       const payload = buildSyncPayload();
-      const localHasData = hasRealLocalData();
-      // Transacción atómica: NUNCA sobrescribir una nube que tiene activos
-      // reales usando un estado local vacío (dispositivo nuevo/sin sincronizar).
-      // Simétrico al guardia de pullFromFirestore; evita pérdida de datos.
-      await db.runTransaction(async tx => {
-        const snap = await tx.get(ref);
-        if (snap.exists && !localHasData) {
-          const cloudAssets = Object.values(snap.data().portfolioData || {})
-            .reduce((s, pd) => s + ((pd.rows || []).length), 0);
-          if (cloudAssets > 0) {
-            console.warn('[SYNC] push omitido: estado local vacío, la nube tiene', cloudAssets, 'activos');
-            return; // no escribimos: la nube se conserva
-          }
+      if (hasRealLocalData()) {
+        // Caso normal: set directo. Firestore lo encola si estás offline y
+        // lo sincroniza solo al recuperar conexión (no usar transacción aquí:
+        // las transacciones fallan offline y romperían el auto-sync).
+        await ref.set(payload);
+      } else {
+        // Estado local vacío: NUNCA pisar una nube con activos reales.
+        // Comprobación sin transacción para no romper el guardado offline.
+        const snap = await ref.get();
+        const cloudAssets = snap.exists
+          ? Object.values(snap.data().portfolioData || {}).reduce((s, pd) => s + ((pd.rows || []).length), 0)
+          : 0;
+        if (cloudAssets > 0) {
+          console.warn('[SYNC] push omitido: estado local vacío, la nube tiene', cloudAssets, 'activos');
+          return; // la nube se conserva
         }
-        tx.set(ref, payload);
-      });
+        await ref.set(payload);
+      }
       setSyncUI('ok');
     } catch(e) { console.error('schedulePush:', e); }
   }, 800);
@@ -1538,6 +1542,15 @@ window.addEventListener('load', () => {
   render();
   setTimeout(resizeCharts, 50);
   if (currentUser) setSyncUI('ok');
+
+  // Frescura de precios: pinta el "↻ hace X" y lo mantiene al día.
+  updatePricesFreshness();
+  setInterval(updatePricesFreshness, 60000);
+
+  // PWA: registra el service worker para uso offline / instalable.
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW register:', e.message));
+  }
 });
 
 function addRow() {
@@ -2374,21 +2387,52 @@ async function fetchTickerPrice(ticker) {
   return data.price || null;
 }
 
+// ── Frescura de precios ──
+let lastPricesAt = parseInt(localStorage.getItem('balance-prices-at'), 10) || 0;
+
+function formatAgo(ts) {
+  if (!ts) return 'sin actualizar';
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return 'hace un momento';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24);
+  return `hace ${d} día${d > 1 ? 's' : ''}`;
+}
+
+function updatePricesFreshness() {
+  const el = document.getElementById('prices-freshness');
+  if (!el) return;
+  if (!lastPricesAt) { el.textContent = ''; return; }
+  el.textContent = '↻ ' + formatAgo(lastPricesAt);
+  // Marca en ámbar si los precios tienen más de 24 h.
+  const stale = (Date.now() - lastPricesAt) > 24 * 3600 * 1000;
+  el.style.color = stale ? 'var(--yellow)' : 'var(--muted)';
+}
+
 async function refreshAllPrices() {
   const btn = document.getElementById('btn-refresh-prices');
   if (btn) { btn.classList.add('loading'); }
 
   const tickerRows = rows.filter(r => r.ticker && r.ticker.trim());
   let updated = 0;
+  const failed = [];
 
   const promises = tickerRows.map(async (row) => {
+    const tk = row.ticker.trim().toUpperCase();
     try {
       const price = await fetchTickerPrice(row.ticker);
       if (price !== null && price > 0) {
         row.price = price;
         updated++;
+      } else if (getYahooTicker(row.ticker)) {
+        // Tenía un ticker consultable pero no devolvió precio.
+        failed.push(tk);
       }
     } catch (e) {
+      failed.push(tk);
       console.warn(`Failed to fetch ${row.ticker}:`, e.message);
     }
   });
@@ -2397,12 +2441,19 @@ async function refreshAllPrices() {
 
   if (btn) { btn.classList.remove('loading'); }
 
+  const failMsg = failed.length
+    ? ` · fallaron: ${failed.slice(0, 4).join(', ')}${failed.length > 4 ? '…' : ''}`
+    : '';
+
   if (updated > 0) {
+    lastPricesAt = Date.now();
+    try { localStorage.setItem('balance-prices-at', String(lastPricesAt)); } catch {}
+    updatePricesFreshness();
     render();
     schedSave();
-    showSaveIndicator(`${updated} precio${updated > 1 ? 's' : ''} actualizado${updated > 1 ? 's' : ''} ✓`);
+    showSaveIndicator(`${updated} precio${updated > 1 ? 's' : ''} actualizado${updated > 1 ? 's' : ''} ✓${failMsg}`);
   } else {
-    showSaveIndicator('No se pudieron actualizar precios');
+    showSaveIndicator(failed.length ? `No se actualizaron precios${failMsg}` : 'No hay tickers que actualizar');
   }
 }
 
