@@ -568,37 +568,6 @@
     }
     .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
 
-    /* ── Pull-to-refresh ── */
-    .ptr-indicator {
-      text-align: center;
-      height: 0;
-      overflow: hidden;
-      transition: height 0.2s ease;
-      color: var(--muted);
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .ptr-indicator.active { height: 40px; }
-    .ptr-indicator.loading { height: 40px; }
-
-    /* ── Refresh prices button ── */
-    .btn-refresh-prices {
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 4px 10px;
-      font-size: 13px;
-      cursor: pointer;
-      color: var(--muted);
-      transition: border-color 0.15s, color 0.15s;
-      touch-action: manipulation;
-    }
-    .btn-refresh-prices:hover { border-color: var(--accent); color: var(--accent); }
-    .btn-refresh-prices.loading { opacity: 0.6; pointer-events: none; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .btn-refresh-prices.loading span { display: inline-block; animation: spin 1s linear infinite; }
 
     /* ── Tabla de rebalanceo en móvil ── */
     @media (max-width: 700px) {
@@ -634,8 +603,6 @@
 </head>
 <body>
 
-<!-- ── Pull-to-refresh indicator ── -->
-<div id="ptr-indicator" class="ptr-indicator">Actualizando precios...</div>
 
 <!-- ── Header ── -->
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
@@ -682,8 +649,6 @@
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
     <div class="card-title" id="port-card-title" style="margin:0">Cartera</div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <span id="prices-freshness" style="font-size:11px;color:var(--muted);white-space:nowrap;" title="Última actualización de precios"></span>
-      <button id="btn-refresh-prices" class="btn-refresh-prices" onclick="refreshAllPrices()" title="Actualizar precios"><span>&#128260;</span></button>
       <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" onclick="addRow()">+ Activo</button>
     </div>
   </div>
@@ -721,6 +686,11 @@
       <label style="font-size:11px;color:var(--muted);">Aportación mensual</label>
       <input type="number" id="new-money" placeholder="250" min="0" step="50" style="width:120px;text-align:right;"
         oninput="onNewMoneyChange(this.value)">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;margin-top:5px;user-select:none;"
+        title="Calcula el mínimo a aportar (solo comprando) para que cada activo alcance su % objetivo">
+        <input type="checkbox" id="auto-balance" onchange="onAutoBalanceToggle(this.checked)" style="cursor:pointer;">
+        Autobalanceo (mínimo dinero)
+      </label>
     </div>
   </div>
   <div id="rebalance-result"></div>
@@ -1452,6 +1422,39 @@ function onNewMoneyChange(val) {
 function setNewMoneyInput() {
   const port = portfolios.find(p => p.id === currentPortId);
   document.getElementById('new-money').value = port?.defaultMoney ?? 250;
+  const chk = document.getElementById('auto-balance');
+  if (chk) chk.checked = !!(port && port.autoBalance);
+  applyAutoBalanceUI();
+}
+
+// Activa/desactiva el campo manual según el modo autobalanceo.
+function applyAutoBalanceUI() {
+  const port = portfolios.find(p => p.id === currentPortId);
+  const auto = !!(port && port.autoBalance);
+  const inp = document.getElementById('new-money');
+  if (inp) { inp.disabled = auto; inp.style.opacity = auto ? '0.5' : '1'; }
+}
+
+function onAutoBalanceToggle(checked) {
+  const port = portfolios.find(p => p.id === currentPortId);
+  if (port) port.autoBalance = checked;
+  schedSave();
+  applyAutoBalanceUI();
+  calcRebalance();
+}
+
+// Mínimo dinero (solo comprando) para que cada activo alcance su % objetivo.
+// El total mínimo T es el mayor (valor / objetivo): el activo más sobreponderado
+// no se puede vender, así que fija el suelo. Aporte = T − total actual.
+function computeMinRebalanceMoney(total) {
+  let T = total;
+  rows.forEach(row => {
+    const tgt = (parseFloat(row.target) || 0) / 100;
+    if (tgt <= 0) return;
+    const needed = getRowValue(row) / tgt;
+    if (needed > T) T = needed;
+  });
+  return Math.max(0, T - total);
 }
 
 function switchPortfolio(id) {
@@ -1542,10 +1545,6 @@ window.addEventListener('load', () => {
   render();
   setTimeout(resizeCharts, 50);
   if (currentUser) setSyncUI('ok');
-
-  // Frescura de precios: pinta el "↻ hace X" y lo mantiene al día.
-  updatePricesFreshness();
-  setInterval(updatePricesFreshness, 60000);
 
   // PWA: registra el service worker para uso offline / instalable.
   if ('serviceWorker' in navigator) {
@@ -1997,10 +1996,22 @@ function calcRebalance() {
   }
 
   const total    = getTotal();
-  const newMoney = parseFloat(document.getElementById('new-money').value) || 0;
+  const port     = portfolios.find(p => p.id === currentPortId);
+  const auto     = !!(port && port.autoBalance);
+
+  let newMoney;
+  if (auto) {
+    newMoney = computeMinRebalanceMoney(total);
+    const inp = document.getElementById('new-money');
+    if (inp) inp.value = newMoney > 0 ? +newMoney.toFixed(2) : 0;
+  } else {
+    newMoney = parseFloat(document.getElementById('new-money').value) || 0;
+  }
 
   if (newMoney <= 0) {
-    container.innerHTML = '<div class="empty-state">Introduce el dinero mensual a invertir para ver las sugerencias de compra.</div>';
+    container.innerHTML = auto
+      ? '<div class="empty-state">La cartera ya respeta los porcentajes objetivo: no hace falta aportar nada. 🎯</div>'
+      : '<div class="empty-state">Introduce el dinero mensual a invertir para ver las sugerencias de compra.</div>';
     return;
   }
 
@@ -2038,7 +2049,7 @@ function calcRebalance() {
   let html = `
     <div class="alert alert-info" style="margin-bottom:16px;">
       Cartera actual: <strong>${fmt(total)} €</strong> &nbsp;|&nbsp;
-      Aportación: <strong>${fmt(newMoney)} €</strong> &nbsp;|&nbsp;
+      Aportación${auto ? ' mínima' : ''}: <strong>${fmt(newMoney)} €</strong> &nbsp;|&nbsp;
       Total estimado: <strong>${fmt(total + totalSpent)} €</strong>
       ${eurUsd ? `&nbsp;|&nbsp; <span style="font-size:12px;opacity:0.8">1 € = ${eurUsd.toFixed(4)} $</span>` : ''}
     </div>
@@ -2352,112 +2363,6 @@ function toggleTheme() {
 })();
 
 // ══════════════════════════════════════════════════════════════════════
-// AUTO-FETCH STOCK PRICES (Yahoo Finance via CORS proxy)
-// ══════════════════════════════════════════════════════════════════════
-
-const TICKER_YAHOO_MAP = {
-  'SKFB': 'SKF-B.ST',
-  'IFX': 'IFX.DE',
-  'SHA0': 'SHA.DE',
-  'K3R': 'KGX.DE',
-  'URNU': 'URNU.L',
-  // SSM1 has no good Yahoo mapping, skip
-};
-
-// Tickers to skip (no reliable Yahoo mapping)
-const TICKER_SKIP = new Set(['SSM1']);
-
-function getYahooTicker(ticker) {
-  const t = ticker.trim().toUpperCase();
-  if (TICKER_SKIP.has(t)) return null;
-  if (TICKER_YAHOO_MAP[t]) return TICKER_YAHOO_MAP[t];
-  return t;
-}
-
-const PRICE_PROXY = 'https://food-prices.rivegabur.workers.dev';
-
-async function fetchTickerPrice(ticker) {
-  const yahooTicker = getYahooTicker(ticker);
-  if (!yahooTicker) return null;
-  const url = `${PRICE_PROXY}/?t=${encodeURIComponent(yahooTicker)}`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const data = await resp.json();
-  if (data.error) throw new Error(data.error);
-  return data.price || null;
-}
-
-// ── Frescura de precios ──
-let lastPricesAt = parseInt(localStorage.getItem('balance-prices-at'), 10) || 0;
-
-function formatAgo(ts) {
-  if (!ts) return 'sin actualizar';
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return 'hace un momento';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `hace ${m} min`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `hace ${h} h`;
-  const d = Math.floor(h / 24);
-  return `hace ${d} día${d > 1 ? 's' : ''}`;
-}
-
-function updatePricesFreshness() {
-  const el = document.getElementById('prices-freshness');
-  if (!el) return;
-  if (!lastPricesAt) { el.textContent = ''; return; }
-  el.textContent = '↻ ' + formatAgo(lastPricesAt);
-  // Marca en ámbar si los precios tienen más de 24 h.
-  const stale = (Date.now() - lastPricesAt) > 24 * 3600 * 1000;
-  el.style.color = stale ? 'var(--yellow)' : 'var(--muted)';
-}
-
-async function refreshAllPrices() {
-  const btn = document.getElementById('btn-refresh-prices');
-  if (btn) { btn.classList.add('loading'); }
-
-  const tickerRows = rows.filter(r => r.ticker && r.ticker.trim());
-  let updated = 0;
-  const failed = [];
-
-  const promises = tickerRows.map(async (row) => {
-    const tk = row.ticker.trim().toUpperCase();
-    try {
-      const price = await fetchTickerPrice(row.ticker);
-      if (price !== null && price > 0) {
-        row.price = price;
-        updated++;
-      } else if (getYahooTicker(row.ticker)) {
-        // Tenía un ticker consultable pero no devolvió precio.
-        failed.push(tk);
-      }
-    } catch (e) {
-      failed.push(tk);
-      console.warn(`Failed to fetch ${row.ticker}:`, e.message);
-    }
-  });
-
-  await Promise.all(promises);
-
-  if (btn) { btn.classList.remove('loading'); }
-
-  const failMsg = failed.length
-    ? ` · fallaron: ${failed.slice(0, 4).join(', ')}${failed.length > 4 ? '…' : ''}`
-    : '';
-
-  if (updated > 0) {
-    lastPricesAt = Date.now();
-    try { localStorage.setItem('balance-prices-at', String(lastPricesAt)); } catch {}
-    updatePricesFreshness();
-    render();
-    schedSave();
-    showSaveIndicator(`${updated} precio${updated > 1 ? 's' : ''} actualizado${updated > 1 ? 's' : ''} ✓${failMsg}`);
-  } else {
-    showSaveIndicator(failed.length ? `No se actualizaron precios${failMsg}` : 'No hay tickers que actualizar');
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════
 // P&L TRACKING
 // ══════════════════════════════════════════════════════════════════════
 
@@ -2496,51 +2401,6 @@ function getTotalPnl() {
   return { pnl: totalPnl, pnlPct: totalPnlPct };
 }
 
-// ══════════════════════════════════════════════════════════════════════
-// PULL-TO-REFRESH
-// ══════════════════════════════════════════════════════════════════════
-
-(function() {
-  let startY = 0;
-  let pulling = false;
-  const threshold = 60;
-
-  document.addEventListener('touchstart', function(e) {
-    if (window.scrollY === 0) {
-      startY = e.touches[0].clientY;
-      pulling = true;
-    }
-  }, { passive: true });
-
-  document.addEventListener('touchmove', function(e) {
-    if (!pulling) return;
-    const diff = e.touches[0].clientY - startY;
-    const indicator = document.getElementById('ptr-indicator');
-    if (diff > 10 && window.scrollY === 0 && indicator) {
-      const h = Math.min(diff * 0.5, 50);
-      indicator.style.height = h + 'px';
-      indicator.textContent = diff > threshold ? 'Soltar para actualizar...' : 'Tirar para actualizar...';
-    }
-  }, { passive: true });
-
-  document.addEventListener('touchend', function(e) {
-    if (!pulling) return;
-    pulling = false;
-    const indicator = document.getElementById('ptr-indicator');
-    if (!indicator) return;
-    const h = parseFloat(indicator.style.height) || 0;
-    if (h >= threshold * 0.5) {
-      indicator.classList.add('loading');
-      indicator.textContent = 'Actualizando precios...';
-      refreshAllPrices().finally(() => {
-        indicator.classList.remove('loading');
-        indicator.style.height = '0';
-      });
-    } else {
-      indicator.style.height = '0';
-    }
-  }, { passive: true });
-})();
 </script>
 </body>
 </html>
