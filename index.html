@@ -1289,11 +1289,17 @@ function parseEnNum(txt) {
 // decimales (1.47640788 → 147640788). Sabiendo el valor aproximado (importe
 // total ÷ precio unitario) se puede recolocar el punto sin perder decimales.
 function reconstructDecimal(digits, approx) {
-  const clean = String(digits || '').replace(/\D/g, '');
+  const clean = String(digits || '').replace(/\D/g, '').replace(/^0+(?=\d)/, '');
   if (!clean || !(approx > 0)) return null;
   let best = null, bestErr = Infinity;
-  for (let i = 1; i <= clean.length; i++) {
-    const v = parseFloat(clean.slice(0, i) + '.' + clean.slice(i));
+  // `dec` = cuántos dígitos quedan a la derecha del punto. Puede superar la
+  // longitud de la cifra: así se alcanzan valores menores que 1 (0.21833425),
+  // que es justo lo que pasa cuando el OCR se come el «0.» del principio.
+  for (let dec = 0; dec <= clean.length + 8; dec++) {
+    const txt = dec <= clean.length
+      ? clean.slice(0, clean.length - dec) + '.' + clean.slice(clean.length - dec)
+      : '0.' + '0'.repeat(dec - clean.length) + clean;
+    const v = parseFloat(txt);   // se compone como texto: sin error binario
     if (!(v > 0)) continue;
     const err = Math.abs(v - approx) / approx;
     if (err < bestErr) { bestErr = err; best = v; }
@@ -1352,11 +1358,14 @@ function parseRevolutTrade(raw) {
   }
 
   // Línea de datos: … Buy 1.47640788 €169.33 €250 …
-  const deal = flat.match(/\b(Buy|Sell|Bought|Sold)\b\s+([\d.,]+)\s*([€$£]|EUR|USD|GBP)?\s*([\d.,]+)\s*([€$£]|EUR|USD|GBP)?\s*([\d.,]+)?/i);
-  let rawQty = '';
+  // El precio y el importe SOLO se aceptan si van precedidos de su moneda: sin
+  // esa exigencia, la fecha de liquidación ("29 Jan 2026") colaba el 29 como
+  // importe total y de ahí salía una cantidad inventada.
+  const deal = flat.match(/\b(Buy|Sell|Bought|Sold)\b\s*([\d.,]+)\s*([€$£]|EUR|USD|GBP)\s*([\d.,]+)(?:\s*([€$£]|EUR|USD|GBP)\s*([\d.,]+))?/i);
+  const rawQtys = [];   // todas las cantidades candidatas, tal cual las leyó el OCR
   if (deal) {
     out.type    = /sell|sold/i.test(deal[1]) ? 'sell' : 'buy';
-    rawQty      = deal[2];
+    rawQtys.push(deal[2]);
     out.titulos = parseEnNum(deal[2]);
     out.price   = parseEnNum(deal[4]);
     out.total   = parseEnNum(deal[6]);
@@ -1366,20 +1375,57 @@ function parseRevolutTrade(raw) {
     const t = flat.match(/\b(Buy|Sell|Bought|Sold)\b/i);
     if (t) out.type = /sell|sold/i.test(t[1]) ? 'sell' : 'buy';
     const q = flat.match(/Quantity\s*:?\s*([\d.,]+)/i);
-    if (q) { rawQty = q[1]; out.titulos = parseEnNum(q[1]); }
+    if (q) { rawQtys.push(q[1]); out.titulos = parseEnNum(q[1]); }
     const p = flat.match(/Unit\s*Price\s*:?\s*([€$£]|EUR|USD|GBP)?\s*([\d.,]+)/i);
     if (p) { out.price = parseEnNum(p[2]); out.currency = /\$|USD/i.test(p[1] || '') ? 'USD' : 'EUR'; }
   }
 
-  // Cantidad × precio debe dar el importe total. Si no cuadra, casi siempre es
-  // porque se perdió el punto decimal de la cantidad: se recoloca.
+  // Segundas opiniones: la confirmación repite la cantidad en "Execution
+  // details", y el precio/total también aparecen etiquetados.
+  dealLines.forEach(l => {
+    const m = l.match(/\b(?:Buy|Sell|Bought|Sold)\b\s+([\d.,]+)/i);
+    if (m) rawQtys.push(m[1]);
+  });
+  if (!(out.price > 0)) {
+    const p = flat.match(/Unit\s*Price\s*:?\s*([€$£]|EUR|USD|GBP)?\s*([\d.,]+)/i);
+    if (p) { out.price = parseEnNum(p[2]); if (/\$|USD/i.test(p[1] || '')) out.currency = 'USD'; }
+  }
+  if (!(out.total > 0)) {
+    const tot = flat.match(/Total\s*Amount\s*:?\s*([€$£]|EUR|USD|GBP)\s*([\d.,]+)/i);
+    if (tot) out.total = parseEnNum(tot[2]);
+  }
+
+  // El importe total y el precio unitario son la única referencia fiable para
+  // los títulos: el OCR pierde a menudo el punto decimal de las cantidades
+  // (0.21833425 leído como 21.833425 o 21833425). Se elige, entre lo leído y
+  // sus reconstrucciones, el valor que cuadre con total ÷ precio.
   if (out.total > 0 && out.price > 0) {
     const approx = out.total / out.price;
-    if (!(out.titulos > 0) || Math.abs(out.titulos - approx) / approx > 0.02) {
-      const fixed = reconstructDecimal(rawQty || out.titulos, approx);
-      out.titulos = fixed != null ? fixed : approx;
-      out.qtyFixed = true;   // se reconstruyó: merece un vistazo
+    const cands  = [];
+    rawQtys.forEach(raw => {
+      const asRead = parseEnNum(raw);
+      if (asRead > 0) cands.push({ v: asRead, fixed: false });
+      const rebuilt = reconstructDecimal(raw, approx);
+      if (rebuilt != null) cands.push({ v: rebuilt, fixed: true });
+    });
+    const ok = cands
+      .map(c => ({ ...c, err: Math.abs(c.v - approx) / approx }))
+      .filter(c => c.err < 0.02)
+      .sort((a, b) => a.err - b.err)[0];
+
+    if (ok) {
+      out.qtyFixed = ok.fixed || Math.abs(ok.v - out.titulos) > 1e-12;
+      out.titulos  = ok.v;
+    } else {
+      // Nada cuadra: el cociente es lo más fiable que tenemos.
+      out.titulos  = approx;
+      out.qtyFixed = true;
     }
+  } else if (out.titulos > 0) {
+    // Sin importe total no hay con qué contrastar. Una cantidad entera larga
+    // es casi siempre una cifra a la que el OCR le comió los decimales.
+    out.qtyUnverified = true;
+    out.qtySuspicious = !/[.,]/.test(String(rawQtys[0] || '')) && out.titulos >= 1000;
   }
 
   // Comisiones: primero el total cobrado, si no la comisión suelta.
@@ -1434,9 +1480,11 @@ async function onScreenshotPicked(input) {
 
     if (d.titulos && d.price) {
       const avisos = [];
-      if (d.mismatch) avisos.push('el importe total no cuadra con títulos × precio');
-      if (d.qtyFixed) avisos.push('he reconstruido los decimales de los títulos a partir del importe total');
-      if (!d.date)    avisos.push('no he encontrado la fecha');
+      if (d.mismatch)       avisos.push('el importe total no cuadra con títulos × precio');
+      if (d.qtyFixed)       avisos.push('he reconstruido los decimales de los títulos a partir del importe total');
+      if (d.qtySuspicious)  avisos.push('<strong>los títulos parecen haber perdido los decimales</strong> y no he podido comprobarlos contra el importe total: verifícalos en la captura');
+      else if (d.qtyUnverified) avisos.push('no he podido contrastar los títulos con el importe total: compruébalos');
+      if (!d.date)          avisos.push('no he encontrado la fecha');
       show(`Leído: <strong>${d.type === 'sell' ? 'Venta' : 'Compra'} de ${d.titulos} ${esc(d.ticker || d.name || '')}</strong>
             a ${fmtDec(d.price)} ${curSymbol(d.currency)}${d.date ? ' el ' + fmtDate(d.date) : ''}.
             Comprueba los campos y pulsa «+ Apuntar».
