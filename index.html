@@ -180,6 +180,51 @@
     }
     .fx-hint:empty { display: none; }
 
+    /* Formulario de alta de operaciones */
+    .op-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 10px;
+      align-items: end;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .op-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .op-field > label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .op-field input, .op-field select { width: 100%; }
+    .op-field select:not(.cur-sel) {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      padding: 5px 8px;
+      min-height: 32px;
+      outline: none;
+    }
+    .op-field input[type="date"] {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      padding: 5px 8px;
+      min-height: 32px;
+      outline: none;
+    }
+    .op-field-wide { grid-column: span 2; }
+    .op-field-cur  { max-width: 90px; }
+    .op-field-btn  { justify-content: flex-end; }
+    @media (max-width: 640px) {
+      .op-form { grid-template-columns: repeat(2, 1fr); }
+      .op-field-wide, .op-field-btn { grid-column: span 2; }
+      .op-field-cur { max-width: none; }
+    }
+
     .col-ticker { width: 75px; }
     .col-name   { width: 140px; }
     .col-precio { width: 100px; }
@@ -807,6 +852,17 @@
   <div id="rebalance-result"></div>
 </div>
 
+<!-- ── Operaciones (compras y ventas) ── -->
+<div class="card" id="ops-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
+    <div class="card-title" style="margin:0">Operaciones</div>
+  </div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+    Apunta cada compra y cada venta. Actualizan solas los títulos y el precio medio del activo, y se vuelcan al Excel del IRPF.
+  </div>
+  <div id="ops-content"></div>
+</div>
+
 <!-- ── Histórico ── -->
 <div class="card" id="history-card">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
@@ -1015,6 +1071,331 @@ function renderHistory() {
 }
 
 // ══════════════════════════════════════════════════════════════════════
+// OPERACIONES (compras y ventas) — libro de registro para la renta
+// ══════════════════════════════════════════════════════════════════════
+// Cada operación guarda fecha, títulos, precio y comisión EN SU MONEDA, más
+// el tipo de cambio de ESE día (congelado): Hacienda exige valorar en euros
+// al cambio de la fecha de la operación, no al de hoy.
+
+function opsKey(portId) { return 'balance-ops-' + portId; }
+
+let ops = [];   // operaciones de la cartera activa
+
+function loadOps(portId) {
+  try {
+    const d = JSON.parse(localStorage.getItem(opsKey(portId)) || 'null');
+    if (Array.isArray(d)) return d;
+    return d && Array.isArray(d.ops) ? d.ops : [];
+  } catch { return []; }
+}
+
+function saveOpsData(portId, list) {
+  try { localStorage.setItem(opsKey(portId), JSON.stringify(list)); } catch (e) {}
+}
+
+function genOpId() { return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+function todayISO() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+function fmtDate(iso) { const [y, m, d] = String(iso || '').split('-'); return y ? `${d}/${m}/${y}` : '—'; }
+
+// ── Conversión a euros de una operación ──
+function opFx(op)       { return op.currency === 'USD' ? (parseFloat(op.fx) || fxRate()) : 1; }
+function opGrossEur(op) { return ((parseFloat(op.titulos) || 0) * (parseFloat(op.price) || 0)) / opFx(op); }
+function opFeeEur(op)   { return (parseFloat(op.fee) || 0) / opFx(op); }
+// Compra: lo que realmente sale del bolsillo (precio + comisión).
+// Venta: lo que realmente entra (precio − comisión). Así lo admite Hacienda.
+function opNetEur(op)   { return op.type === 'sell' ? opGrossEur(op) - opFeeEur(op) : opGrossEur(op) + opFeeEur(op); }
+
+function opAssetKey(op) { return String(op.ticker || op.name || '').trim().toUpperCase(); }
+function rowAssetKey(r) { return String(r.ticker || r.name || '').trim().toUpperCase(); }
+
+// ── Cálculo FIFO (método obligatorio en España para valores homogéneos) ──
+// Recorre las operaciones por fecha: las compras crean lotes, las ventas
+// consumen los lotes más antiguos primero y de ahí sale la ganancia real.
+function computeFifo(opList) {
+  const byAsset = {};
+  const sorted = [...opList].sort((a, b) =>
+    String(a.date || '').localeCompare(String(b.date || '')) || String(a.id).localeCompare(String(b.id)));
+
+  sorted.forEach(op => {
+    const k = opAssetKey(op);
+    if (!k) return;
+    if (!byAsset[k]) byAsset[k] = { key: k, ticker: op.ticker || '', name: op.name || '', lots: [], sales: [], buys: [] };
+    const a = byAsset[k];
+    if (op.ticker && !a.ticker) a.ticker = op.ticker;
+    if (op.name && !a.name) a.name = op.name;
+
+    const qty = parseFloat(op.titulos) || 0;
+    if (qty <= 0) return;
+
+    if (op.type === 'sell') {
+      const proceedsEur = opNetEur(op);
+      let pending = qty, costEur = 0;
+      const used = [];
+      while (pending > 1e-9 && a.lots.length) {
+        const lot  = a.lots[0];
+        const take = Math.min(pending, lot.qty);
+        costEur += take * lot.unitCostEur;
+        used.push({ date: lot.date, qty: take, unitCostEur: lot.unitCostEur });
+        lot.qty -= take;
+        pending -= take;
+        if (lot.qty <= 1e-9) a.lots.shift();
+      }
+      a.sales.push({
+        op, qty, proceedsEur, costEur,
+        gainEur: proceedsEur - costEur,
+        uncovered: pending,   // títulos vendidos sin compra registrada
+        lots: used
+      });
+    } else {
+      a.buys.push(op);
+      a.lots.push({ date: op.date, qty, unitCostEur: opNetEur(op) / qty });
+    }
+  });
+  return byAsset;
+}
+
+// Posición viva de un activo según sus lotes FIFO pendientes.
+function fifoPosition(agg) {
+  const qty     = agg.lots.reduce((s, l) => s + l.qty, 0);
+  const costEur = agg.lots.reduce((s, l) => s + l.qty * l.unitCostEur, 0);
+  return { qty, costEur, unitCostEur: qty > 0 ? costEur / qty : 0 };
+}
+
+// Vuelca títulos y precio medio de las operaciones a los activos de la cartera.
+// Las operaciones mandan: son el dato real, con comisiones y cambio del día.
+function syncRowsFromOps() {
+  const agg = computeFifo(ops);
+  Object.values(agg).forEach(a => {
+    const row = rows.find(r => rowAssetKey(r) === a.key);
+    if (!row) return;
+    const pos = fifoPosition(a);
+    row.titulos = parseFloat(pos.qty.toFixed(8));
+    if (pos.qty > 0) {
+      // avgPriceEur es el coste real en € (lo que manda para el P&L). El campo
+      // visible avgPrice se expresa en la moneda del activo al cambio de hoy.
+      row.avgPriceEur = pos.unitCostEur;
+      row.avgPrice    = parseFloat((rowCurrency(row) === 'USD' ? pos.unitCostEur * fxRate() : pos.unitCostEur).toFixed(6));
+    } else {
+      row.avgPriceEur = 0;
+      row.avgPrice    = 0;
+    }
+  });
+}
+
+// Tipo de cambio EUR/USD de una fecha concreta (referencia BCE de ese día).
+async function fetchFxOn(date) {
+  try {
+    const r = await fetch(`https://api.frankfurter.dev/v1/${date}?from=EUR&to=USD`, { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    return d.rates?.USD || null;
+  } catch { return null; }
+}
+
+// ── Alta de operación ──
+async function addOp() {
+  const get = id => document.getElementById(id);
+  const date    = get('op-date').value || todayISO();
+  const type    = get('op-type').value === 'sell' ? 'sell' : 'buy';
+  const sel     = get('op-asset').value;
+  const titulos = parseNum(get('op-titulos').value);
+  const price   = parseNum(get('op-price').value);
+  const fee     = parseNum(get('op-fee').value);
+  const currency = get('op-currency').value === 'USD' ? 'USD' : 'EUR';
+
+  let ticker = '', name = '';
+  if (sel === '__other__') {
+    const free = get('op-other').value.trim();
+    if (!free) { alert('Escribe el nombre o ticker del activo.'); return; }
+    ticker = free.toUpperCase();
+    name   = free;
+  } else {
+    const row = rows.find(r => String(r.id) === sel);
+    if (!row) { alert('Elige un activo.'); return; }
+    ticker = (row.ticker || '').toUpperCase();
+    name   = row.name || '';
+  }
+
+  if (titulos <= 0) { alert('Los títulos deben ser mayores que 0.'); return; }
+  if (price   <= 0) { alert('El precio debe ser mayor que 0.'); return; }
+
+  const op = { id: genOpId(), date, type, ticker, name, titulos, price, currency, fee, fx: null, fxApprox: false };
+
+  if (currency === 'USD') {
+    const hist = await fetchFxOn(date);
+    op.fx = hist || fxRate();
+    op.fxApprox = !hist;   // sin red: se usó el cambio de hoy, revisable
+  }
+
+  ops.push(op);
+  persistOps();
+
+  // Limpiar solo los campos variables: la fecha y el activo suelen repetirse.
+  get('op-titulos').value = '';
+  get('op-price').value   = '';
+  get('op-fee').value     = '';
+}
+
+function deleteOp(id) {
+  const op = ops.find(o => o.id === id);
+  if (!op) return;
+  if (!confirm(`¿Eliminar la ${op.type === 'sell' ? 'venta' : 'compra'} de ${op.titulos} ${op.ticker || op.name} del ${fmtDate(op.date)}?`)) return;
+  ops = ops.filter(o => o.id !== id);
+  persistOps();
+}
+
+// Guarda las operaciones y propaga sus efectos a la cartera.
+function persistOps() {
+  saveOpsData(currentPortId, ops);
+  syncRowsFromOps();
+  saveRows();
+  schedSave();
+  render();
+}
+
+// ── Render de la tarjeta Operaciones ──
+let opsYearFilter = 'all';
+
+function setOpsYear(v) { opsYearFilter = v; renderOps(); }
+
+function renderOps() {
+  const container = document.getElementById('ops-content');
+  if (!container) return;
+
+  const years = [...new Set(ops.map(o => String(o.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  const shown = ops
+    .filter(o => opsYearFilter === 'all' || String(o.date || '').startsWith(opsYearFilter))
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id).localeCompare(String(a.id)));
+
+  const assetOptions = rows.map(r =>
+    `<option value="${r.id}" data-cur="${rowCurrency(r)}" data-price="${parseFloat(r.price) || ''}">${esc((r.ticker ? r.ticker.toUpperCase() + ' · ' : '') + (r.name || 'Sin nombre'))}</option>`
+  ).join('');
+
+  let html = `
+    <div class="op-form">
+      <div class="op-field"><label>Fecha</label>
+        <input type="date" id="op-date" value="${todayISO()}"></div>
+      <div class="op-field"><label>Tipo</label>
+        <select id="op-type">
+          <option value="buy">Compra</option>
+          <option value="sell">Venta</option>
+        </select></div>
+      <div class="op-field op-field-wide"><label>Activo</label>
+        <select id="op-asset" onchange="onOpAssetChange()">
+          ${assetOptions}
+          <option value="__other__">— Otro (escribir) —</option>
+        </select></div>
+      <div class="op-field op-field-wide" id="op-other-wrap" style="display:none"><label>Nombre / ticker</label>
+        <input type="text" id="op-other" placeholder="Ej. CEG"></div>
+      <div class="op-field"><label>Títulos</label>
+        <input class="num-in" type="text" inputmode="decimal" id="op-titulos" placeholder="0"></div>
+      <div class="op-field"><label>Precio/ud.</label>
+        <input class="num-in" type="text" inputmode="decimal" id="op-price" placeholder="0.00"></div>
+      <div class="op-field op-field-cur"><label>Moneda</label>
+        <select id="op-currency" class="cur-sel" style="width:100%">
+          <option value="EUR">€</option>
+          <option value="USD">$</option>
+        </select></div>
+      <div class="op-field"><label>Comisión</label>
+        <input class="num-in" type="text" inputmode="decimal" id="op-fee" placeholder="0.00"></div>
+      <div class="op-field op-field-btn">
+        <button class="btn btn-primary" style="font-size:12px;padding:6px 14px;" onclick="addOp()">+ Apuntar</button></div>
+    </div>`;
+
+  if (ops.length === 0) {
+    html += `<div class="empty-state" style="margin-top:14px">
+      Aún no has apuntado ninguna operación.<br>
+      Cada compra o venta que registres actualiza sola los títulos y el precio medio del activo, y sale en el Excel del IRPF.
+    </div>`;
+    container.innerHTML = html;
+    return;
+  }
+
+  // Resumen del periodo mostrado
+  const agg = computeFifo(ops);
+  let invertido = 0, cobrado = 0, ganancia = 0, hasSales = false;
+  shown.forEach(o => { if (o.type === 'buy') invertido += opNetEur(o); else cobrado += opNetEur(o); });
+  Object.values(agg).forEach(a => a.sales.forEach(s => {
+    if (opsYearFilter === 'all' || String(s.op.date || '').startsWith(opsYearFilter)) { ganancia += s.gainEur; hasSales = true; }
+  }));
+
+  const gainCls = ganancia >= 0 ? 'pnl-positive' : 'pnl-negative';
+  html += `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0 10px;">
+      <select class="cur-sel" style="width:auto;padding:5px 8px;font-weight:400;" onchange="setOpsYear(this.value)">
+        <option value="all"${opsYearFilter === 'all' ? ' selected' : ''}>Todos los años</option>
+        ${years.map(y => `<option value="${y}"${opsYearFilter === y ? ' selected' : ''}>${y}</option>`).join('')}
+      </select>
+      <span class="asset-stat">Comprado: <strong>${fmtDec(invertido)} €</strong></span>
+      <span class="asset-stat">Vendido: <strong>${fmtDec(cobrado)} €</strong></span>
+      ${hasSales ? `<span class="asset-stat">Ganancia realizada: <strong class="${gainCls}">${ganancia >= 0 ? '+' : ''}${fmtDec(ganancia)} €</strong></span>` : ''}
+    </div>
+
+    <div class="table-wrap"><table class="hist-table" style="width:100%;min-width:640px">
+      <thead><tr>
+        <th style="text-align:left">Fecha</th>
+        <th style="text-align:left">Tipo</th>
+        <th style="text-align:left">Activo</th>
+        <th style="text-align:right">Títulos</th>
+        <th style="text-align:right">Precio</th>
+        <th style="text-align:right">Comisión</th>
+        <th style="text-align:right">Importe (€)</th>
+        <th></th>
+      </tr></thead><tbody>`;
+
+  shown.forEach(o => {
+    const isSell = o.type === 'sell';
+    const sym    = curSymbol(o.currency);
+    const fxTxt  = o.currency === 'USD'
+      ? `<div style="font-size:10px;color:var(--muted)">1 € = ${opFx(o).toFixed(4)} $${o.fxApprox ? ' (aprox.)' : ''}</div>` : '';
+    html += `
+      <tr>
+        <td style="padding:5px 10px;font-size:12px">${fmtDate(o.date)}</td>
+        <td style="padding:5px 10px"><span class="badge ${isSell ? 'badge-high' : 'badge-ok'}">${isSell ? 'Venta' : 'Compra'}</span></td>
+        <td style="padding:5px 10px;font-size:12px">${esc(o.ticker || o.name || '—')}</td>
+        <td style="padding:5px 10px;text-align:right;font-size:12px">${o.titulos}</td>
+        <td style="padding:5px 10px;text-align:right;font-size:12px">${fmtDec(o.price)} ${sym}${fxTxt}</td>
+        <td style="padding:5px 10px;text-align:right;font-size:12px">${o.fee ? fmtDec(o.fee) + ' ' + sym : '—'}</td>
+        <td style="padding:5px 10px;text-align:right;font-size:12px;font-weight:600">${isSell ? '+' : '−'}${fmtDec(opNetEur(o))} €</td>
+        <td style="padding:5px 10px;text-align:right">
+          <button class="btn btn-danger" style="font-size:12px;padding:1px 6px;" onclick="deleteOp('${o.id}')" title="Eliminar">×</button>
+        </td>
+      </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+}
+
+function onOpAssetChange() {
+  const sel  = document.getElementById('op-asset');
+  const wrap = document.getElementById('op-other-wrap');
+  if (!sel || !wrap) return;
+  const other = sel.value === '__other__';
+  wrap.style.display = other ? '' : 'none';
+  if (other) return;
+  // Prellenar moneda y precio con los del activo elegido.
+  const opt = sel.options[sel.selectedIndex];
+  const cur = opt?.dataset.cur;
+  if (cur) document.getElementById('op-currency').value = cur;
+  const price = opt?.dataset.price;
+  const priceIn = document.getElementById('op-price');
+  if (price && priceIn && !priceIn.value) priceIn.value = price;
+}
+
+// Abre la tarjeta de operaciones con un activo ya seleccionado.
+function newOpFor(rowId, type) {
+  const card = document.getElementById('ops-card');
+  const sel  = document.getElementById('op-asset');
+  if (!card || !sel) return;
+  sel.value = String(rowId);
+  onOpAssetChange();
+  const typeSel = document.getElementById('op-type');
+  if (typeSel) typeSel.value = type === 'sell' ? 'sell' : 'buy';
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimeout(() => document.getElementById('op-titulos')?.focus(), 400);
+}
+
+// ══════════════════════════════════════════════════════════════════════
 // EXCEL PARA DECLARACIÓN DE LA RENTA (España, IRPF)
 // ══════════════════════════════════════════════════════════════════════
 
@@ -1040,6 +1421,25 @@ function exportTaxExcel() {
         costBasis[key].lastPrice = a.priceEur != null ? a.priceEur : a.price;  // Hacienda: siempre en €
         costBasis[key].lastValue = a.value;
       });
+    });
+
+    // Operaciones de esta cartera + reparto FIFO (base de las secciones 4 y 5)
+    const portOps  = port.id === currentPortId ? ops : loadOps(port.id);
+    const fifo     = computeFifo(portOps);
+    const yearOps  = portOps
+      .filter(o => String(o.date || '').startsWith(String(year)))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const yearSales = [];
+    Object.values(fifo).forEach(a => a.sales.forEach(s => {
+      if (String(s.op.date || '').startsWith(String(year))) yearSales.push({ ...s, asset: a });
+    }));
+    yearSales.sort((a, b) => String(a.op.date).localeCompare(String(b.op.date)));
+
+    // Coste real de adquisición (FIFO) de lo que sigue en cartera
+    Object.values(fifo).forEach(a => {
+      const cb = costBasis[a.ticker] || costBasis[a.name] || costBasis[a.key];
+      const pos = fifoPosition(a);
+      if (cb && pos.qty > 0) { cb.costEur = pos.costEur; cb.unitCostEur = pos.unitCostEur; }
     });
 
     const sepStyle = pi > 0 ? 'mso-break-type:section-break' : '';
@@ -1145,21 +1545,129 @@ function exportTaxExcel() {
           <td style="padding:5px 8px;text-align:right">Títulos</td>
           <td style="padding:5px 8px;text-align:right">Precio último (€)</td>
           <td style="padding:5px 8px;text-align:right">Valor mercado (€)</td>
+          <td style="padding:5px 8px;text-align:right">Coste adquisición (€)</td>
+          <td style="padding:5px 8px;text-align:right">Plusvalía latente (€)</td>
           <td style="padding:5px 8px">Tramo IRPF (referencia)</td>
         </tr>
         ${Object.values(costBasis).length === 0
-          ? '<tr><td colspan="6" style="padding:6px 10px;color:#888">Sin datos de base de coste</td></tr>'
-          : Object.values(costBasis).map(cb => `
+          ? '<tr><td colspan="8" style="padding:6px 10px;color:#888">Sin datos de base de coste</td></tr>'
+          : Object.values(costBasis).map(cb => {
+            const latente = cb.costEur != null ? (cb.lastValue || 0) - cb.costEur : null;
+            return `
           <tr>
             <td style="padding:4px 8px;font-family:monospace">${esc(cb.ticker||'')}</td>
             <td style="padding:4px 8px">${esc(cb.name||'')}</td>
             <td style="padding:4px 8px;text-align:right">${cb.titulos || '—'}</td>
             <td style="padding:4px 8px;text-align:right">${cb.lastPrice ? fmtDec(cb.lastPrice) : '—'}</td>
             <td style="padding:4px 8px;text-align:right;font-weight:bold">${fmt(cb.lastValue || 0)}</td>
+            <td style="padding:4px 8px;text-align:right">${cb.costEur != null ? fmtDec(cb.costEur) : '—'}</td>
+            <td style="padding:4px 8px;text-align:right;color:${latente == null ? 'inherit' : latente >= 0 ? 'green' : 'red'}">${latente == null ? '—' : (latente >= 0 ? '+' : '') + fmtDec(latente)}</td>
             <td style="padding:4px 8px;color:#888;font-size:9pt">
               Hasta 6.000€: 19% | 6.000-50.000€: 21% | 50.000-200.000€: 23% | >200.000€: 27%
             </td>
+          </tr>`;
+          }).join('')}
+
+        <tr><td colspan="14" style="height:14px;border:none"></td></tr>
+
+        <!-- SECCIÓN 4: Operaciones del ejercicio -->
+        <tr>
+          <td colspan="14" style="background:#2e3350;color:#e8eaf0;font-weight:bold;padding:6px 10px">
+            4. Operaciones registradas en ${year} (compras y ventas)
+          </td>
+        </tr>
+        <tr>
+          <td colspan="14" style="color:#888;font-size:9pt;padding:4px 10px;font-style:italic">
+            Los importes en € se calculan al tipo de cambio oficial (BCE) de la fecha de cada operación.
+            La comisión se suma al coste en las compras y se resta del importe en las ventas.
+          </td>
+        </tr>
+        <tr style="background:#f0f0f0;font-weight:bold">
+          <td style="padding:5px 8px">Fecha</td>
+          <td style="padding:5px 8px">Tipo</td>
+          <td style="padding:5px 8px">Símbolo</td>
+          <td style="padding:5px 8px">Activo</td>
+          <td style="padding:5px 8px;text-align:right">Títulos</td>
+          <td style="padding:5px 8px;text-align:right">Precio/ud.</td>
+          <td style="padding:5px 8px">Moneda</td>
+          <td style="padding:5px 8px;text-align:right">Cambio (1 € = $)</td>
+          <td style="padding:5px 8px;text-align:right">Comisión (€)</td>
+          <td style="padding:5px 8px;text-align:right">Importe total (€)</td>
+        </tr>
+        ${yearOps.length === 0
+          ? `<tr><td colspan="10" style="padding:6px 10px;color:#888">Sin operaciones registradas en ${year}</td></tr>`
+          : yearOps.map(o => `
+          <tr>
+            <td style="padding:4px 8px">${fmtDate(o.date)}</td>
+            <td style="padding:4px 8px;color:${o.type === 'sell' ? '#b00' : '#070'}">${o.type === 'sell' ? 'Venta' : 'Compra'}</td>
+            <td style="padding:4px 8px;font-family:monospace">${esc(o.ticker || '')}</td>
+            <td style="padding:4px 8px">${esc(o.name || '')}</td>
+            <td style="padding:4px 8px;text-align:right">${o.titulos}</td>
+            <td style="padding:4px 8px;text-align:right">${fmtDec(o.price)}</td>
+            <td style="padding:4px 8px">${o.currency || 'EUR'}</td>
+            <td style="padding:4px 8px;text-align:right">${o.currency === 'USD' ? opFx(o).toFixed(4) + (o.fxApprox ? ' (aprox.)' : '') : '—'}</td>
+            <td style="padding:4px 8px;text-align:right">${o.fee ? fmtDec(opFeeEur(o)) : '—'}</td>
+            <td style="padding:4px 8px;text-align:right;font-weight:bold">${o.type === 'sell' ? '+' : '−'}${fmtDec(opNetEur(o))}</td>
           </tr>`).join('')}
+        ${yearOps.length === 0 ? '' : `
+        <tr style="font-weight:bold;background:#f8f8f8">
+          <td colspan="9" style="padding:4px 8px">TOTAL COMPRADO EN ${year}</td>
+          <td style="padding:4px 8px;text-align:right">${fmtDec(yearOps.filter(o => o.type !== 'sell').reduce((s, o) => s + opNetEur(o), 0))} €</td>
+        </tr>
+        <tr style="font-weight:bold;background:#f8f8f8">
+          <td colspan="9" style="padding:4px 8px">TOTAL VENDIDO EN ${year}</td>
+          <td style="padding:4px 8px;text-align:right">${fmtDec(yearOps.filter(o => o.type === 'sell').reduce((s, o) => s + opNetEur(o), 0))} €</td>
+        </tr>`}
+
+        <tr><td colspan="14" style="height:14px;border:none"></td></tr>
+
+        <!-- SECCIÓN 5: Ganancias y pérdidas patrimoniales realizadas -->
+        <tr>
+          <td colspan="14" style="background:#2e3350;color:#e8eaf0;font-weight:bold;padding:6px 10px">
+            5. Ganancias y pérdidas patrimoniales realizadas en ${year} (método FIFO)
+          </td>
+        </tr>
+        <tr>
+          <td colspan="14" style="color:#888;font-size:9pt;padding:4px 10px;font-style:italic">
+            Se declaran en el apartado de ganancias y pérdidas patrimoniales derivadas de la transmisión
+            de elementos patrimoniales. En valores homogéneos la ley obliga a vender primero los títulos
+            adquiridos antes (FIFO), que es el criterio aplicado aquí.
+          </td>
+        </tr>
+        <tr style="background:#f0f0f0;font-weight:bold">
+          <td style="padding:5px 8px">Fecha venta</td>
+          <td style="padding:5px 8px">Símbolo</td>
+          <td style="padding:5px 8px">Activo</td>
+          <td style="padding:5px 8px;text-align:right">Títulos</td>
+          <td style="padding:5px 8px;text-align:right">Valor transmisión (€)</td>
+          <td style="padding:5px 8px;text-align:right">Valor adquisición (€)</td>
+          <td style="padding:5px 8px;text-align:right">Ganancia/Pérdida (€)</td>
+          <td style="padding:5px 8px">Lotes consumidos (fecha · títulos · coste/ud.)</td>
+        </tr>
+        ${yearSales.length === 0
+          ? `<tr><td colspan="8" style="padding:6px 10px;color:#888">Sin ventas registradas en ${year}</td></tr>`
+          : yearSales.map(s => `
+          <tr>
+            <td style="padding:4px 8px">${fmtDate(s.op.date)}</td>
+            <td style="padding:4px 8px;font-family:monospace">${esc(s.asset.ticker || '')}</td>
+            <td style="padding:4px 8px">${esc(s.asset.name || '')}</td>
+            <td style="padding:4px 8px;text-align:right">${s.qty}</td>
+            <td style="padding:4px 8px;text-align:right">${fmtDec(s.proceedsEur)}</td>
+            <td style="padding:4px 8px;text-align:right">${fmtDec(s.costEur)}</td>
+            <td style="padding:4px 8px;text-align:right;font-weight:bold;color:${s.gainEur >= 0 ? 'green' : 'red'}">${(s.gainEur >= 0 ? '+' : '') + fmtDec(s.gainEur)}</td>
+            <td style="padding:4px 8px;font-size:9pt;color:#666">
+              ${s.lots.map(l => `${fmtDate(l.date)} · ${parseFloat(l.qty.toFixed(8))} ud. · ${fmtDec(l.unitCostEur)} €`).join(' | ') || '—'}
+              ${s.uncovered > 1e-9 ? `<span style="color:#b00"> ⚠ ${parseFloat(s.uncovered.toFixed(8))} ud. sin compra registrada: añade la compra original o pon su coste a mano</span>` : ''}
+            </td>
+          </tr>`).join('')}
+        ${yearSales.length === 0 ? '' : `
+        <tr style="font-weight:bold;background:#f8f8f8">
+          <td colspan="6" style="padding:4px 8px">RESULTADO NETO ${year}</td>
+          <td style="padding:4px 8px;text-align:right;color:${yearSales.reduce((s, v) => s + v.gainEur, 0) >= 0 ? 'green' : 'red'}">
+            ${(yearSales.reduce((s, v) => s + v.gainEur, 0) >= 0 ? '+' : '') + fmtDec(yearSales.reduce((s, v) => s + v.gainEur, 0))} €
+          </td>
+          <td></td>
+        </tr>`}
 
         <tr><td colspan="14" style="height:20px;border:none"></td></tr>
         <tr>
@@ -1362,7 +1870,18 @@ function buildSyncPayload() {
       if (raw) historyData[p.id] = JSON.parse(raw);
     } catch {}
   });
-  return { portfolios, currentPortId, nextId, portfolioData, historyData, savedAt: Date.now() };
+  const opsData = {};
+  portfolios.forEach(p => {
+    if (p.id === currentPortId) {
+      if (ops.length) opsData[p.id] = ops;
+    } else {
+      try {
+        const raw = localStorage.getItem(opsKey(p.id));
+        if (raw) opsData[p.id] = JSON.parse(raw);
+      } catch {}
+    }
+  });
+  return { portfolios, currentPortId, nextId, portfolioData, historyData, opsData, savedAt: Date.now() };
 }
 
 function applySyncPayload(data) {
@@ -1377,8 +1896,12 @@ function applySyncPayload(data) {
   Object.entries(data.historyData || {}).forEach(([id, hist]) => {
     localStorage.setItem(histKey(id), JSON.stringify(hist));
   });
+  Object.entries(data.opsData || {}).forEach(([id, list]) => {
+    localStorage.setItem(opsKey(id), JSON.stringify(list));
+  });
   localStorage.setItem(META_KEY, JSON.stringify({ portfolios, currentPortId, nextId }));
   rows = loadRows(currentPortId);
+  ops  = loadOps(currentPortId);
   return true;
 }
 
@@ -1530,6 +2053,7 @@ function schedSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveRows();
+    saveOpsData(currentPortId, ops);
     saveMeta();
     schedulePush();
   }, 600);
@@ -1554,6 +2078,7 @@ function initPortfolios() {
         currentPortId = data.currentPortId || portfolios[0].id;
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
         rows = loadRows(currentPortId);
+        ops  = loadOps(currentPortId);
         return true;
       }
     }
@@ -1620,6 +2145,7 @@ function switchPortfolio(id) {
   saveRows();
   currentPortId = id;
   rows = loadRows(id);
+  ops  = loadOps(id);
   saveMeta();
   setNewMoneyInput();
   renderTabs();
@@ -1641,10 +2167,12 @@ function deletePortfolio(id) {
   if (portfolios.length === 1) { alert('Debes tener al menos una cartera.'); return; }
   if (!confirm(`¿Eliminar la cartera "${port.name}"? Se borrarán todos sus datos.`)) return;
   localStorage.removeItem(rowsKey(id));
+  localStorage.removeItem(opsKey(id));
   portfolios = portfolios.filter(p => p.id !== id);
   if (currentPortId === id) {
     currentPortId = portfolios[0].id;
     rows = loadRows(currentPortId);
+    ops  = loadOps(currentPortId);
   }
   saveMeta();
   renderTabs();
@@ -1739,6 +2267,7 @@ function render() {
   updateStats();
   calcRebalance();
   drawCharts();
+  renderOps();
   renderHistory();
   renderGlobalPosition();
 }
@@ -1954,7 +2483,13 @@ function fxHintText(row) {
 }
 
 function getRowPriceEur(row)    { return toEur(parseFloat(row.price)    || 0, rowCurrency(row)); }
-function getRowAvgPriceEur(row) { return toEur(parseFloat(row.avgPrice) || 0, rowCurrency(row)); }
+// Si el activo tiene operaciones registradas, avgPriceEur guarda el coste real
+// en euros (con comisiones y cambio del día de compra) y manda sobre avgPrice.
+function getRowAvgPriceEur(row) {
+  const real = parseFloat(row.avgPriceEur) || 0;
+  if (real > 0) return real;
+  return toEur(parseFloat(row.avgPrice) || 0, rowCurrency(row));
+}
 
 // Si el usuario tiene títulos + precio, el valor se calcula automáticamente
 function getRowValue(row) {
@@ -2158,8 +2693,10 @@ function renderTable() {
             <span class="asset-stat ${devClass}">Desv: <strong>${(dev >= 0 ? '+' : '') + dev.toFixed(1)}%</strong></span>
             ${(() => { const p = getRowPnl(row); return p ? `<span class="asset-stat">P&L: ${formatPnl(p)}</span>` : ''; })()}
           </div>
-          <div class="asset-delete">
-            <button class="btn btn-danger" style="font-size:13px;padding:4px 10px;" onclick="deleteRow(${row.id})">Eliminar activo</button>
+          <div class="asset-delete" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;color:var(--green);" onclick="newOpFor(${row.id},'buy')">+ Compra</button>
+            <button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;color:var(--red);" onclick="newOpFor(${row.id},'sell')">− Venta</button>
+            <button class="btn btn-danger" style="font-size:13px;padding:4px 10px;margin-left:auto;" onclick="deleteRow(${row.id})">Eliminar activo</button>
           </div>
         </div>
       </div>`;
@@ -2186,6 +2723,9 @@ function updateRow(id, field, value) {
     return;
   }
   row[field] = (field === 'name' || field === 'ticker') ? value : parseNum(value);
+  // Tocar el precio medio a mano descarta el coste real calculado desde las
+  // operaciones: manda lo que escriba el usuario.
+  if (field === 'avgPrice') delete row.avgPriceEur;
   if (field === 'titulos' || field === 'price' || field === 'value' || field === 'target' || field === 'avgPrice') {
     // Actualización dirigida y ligera: NO reconstruimos la tabla (eso destruiría
     // el input que el usuario está editando y le haría perder el foco).
