@@ -539,7 +539,6 @@
     }
     .month-badge.has-data { background: #1a2a1a; color: var(--green); }
 
-    .hist-expand { cursor: pointer; color: var(--accent); font-size: 11px; text-decoration: underline; white-space: nowrap; }
     .hist-detail { background: var(--surface2); }
     .hist-detail td { font-size: 12px; color: var(--muted); padding: 5px 10px; }
 
@@ -868,6 +867,10 @@
 <div class="card" id="ops-card">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px;">
     <div class="card-title" style="margin:0">Operaciones</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <select id="tax-year" class="cur-sel" style="width:auto;padding:5px 8px;font-weight:400;" title="Ejercicio fiscal a exportar"></select>
+      <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;" onclick="exportTaxExcel()">Excel IRPF</button>
+    </div>
   </div>
   <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
     Sube las capturas de Revolut: compras, ventas y dividendos. Actualizan solos los títulos y el precio medio del activo, y se vuelcan al Excel del IRPF.
@@ -875,25 +878,12 @@
   <div id="ops-content"></div>
 </div>
 
-<!-- ── Histórico ── -->
-<div class="card" id="history-card">
-  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
-    <div class="card-title" style="margin:0">Histórico</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;" onclick="saveMonthSnapshot()">+ Snapshot</button>
-      <select id="tax-year" class="cur-sel" style="width:auto;padding:5px 8px;font-weight:400;" title="Ejercicio fiscal a exportar"></select>
-      <button class="btn btn-primary" style="font-size:11px;padding:5px 10px;" onclick="exportTaxExcel()">Excel IRPF</button>
-    </div>
-  </div>
-  <div id="history-content"></div>
-</div>
 
 <script>
 // ══════════════════════════════════════════════════════════════════════
 // HISTÓRICO MENSUAL
 // ══════════════════════════════════════════════════════════════════════
 
-const HIST_START = { year: 2026, month: 6 }; // Junio 2026
 const MONTHS_ES  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
                      'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
@@ -910,41 +900,41 @@ function saveHistoryData(portId, snapshots) {
   localStorage.setItem(histKey(portId), JSON.stringify(snapshots));
 }
 
-// Genera secuencia de {year, month} desde HIST_START hasta hoy
-function monthSequence() {
-  const seq   = [];
-  const now   = new Date();
-  let   y = HIST_START.year, m = HIST_START.month;
-  while (y < now.getFullYear() || (y === now.getFullYear() && m <= now.getMonth() + 1)) {
-    seq.push({ year: y, month: m });
-    m++;
-    if (m > 12) { m = 1; y++; }
-  }
-  return seq;
-}
-
-function saveMonthSnapshot() {
+// El histórico se guarda solo: en cada arranque se refresca la foto del mes en
+// curso de cada cartera. Al cambiar de mes, la del mes anterior queda
+// congelada con su último estado y arranca una nueva.
+function autoSnapshot() {
   const now   = new Date();
   const year  = now.getFullYear();
   const month = now.getMonth() + 1;
-  const label = `${MONTHS_ES[month-1]} ${year}`;
 
-  const snapshots = loadHistory(currentPortId);
-  const existing  = snapshots.find(s => s.year === year && s.month === month);
+  portfolios.forEach(p => {
+    const portRows = p.id === currentPortId
+      ? rows
+      : (() => { try { const raw = localStorage.getItem(rowsKey(p.id)); return raw ? (JSON.parse(raw).rows || []) : []; } catch { return []; } })();
+    if (!portRows.length) return;
 
-  if (existing) {
-    if (!confirm(`Ya existe un snapshot de ${label}.\n¿Sobreescribir con los datos actuales?`)) return;
-    snapshots.splice(snapshots.indexOf(existing), 1);
-  }
+    const snapshots = loadHistory(p.id);
+    const idx  = snapshots.findIndex(s => s.year === year && s.month === month);
+    const snap = buildSnapshot(p, portRows, year, month);
+    if (idx >= 0) snapshots[idx] = { ...snap, id: snapshots[idx].id };
+    else          snapshots.push(snap);
+    snapshots.sort((a, b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
+    saveHistoryData(p.id, snapshots);
+  });
+}
 
-  const total = getTotal();
-  const snap  = {
+function buildSnapshot(port, portRows, year, month) {
+  const total = portRows.reduce((s, r) => s + getRowValue(r), 0);
+  return {
     id:            Date.now(),
-    year, month, label,
-    portfolioName: portfolios.find(p => p.id === currentPortId)?.name || '',
+    year, month,
+    label:         `${MONTHS_ES[month-1]} ${year}`,
+    portfolioName: port.name || '',
     totalValue:    total,
     savedAt:       Date.now(),
-    assets: rows.map(r => ({
+    auto:          true,
+    assets: portRows.map(r => ({
       ticker:    r.ticker  || '',
       name:      r.name    || '',
       titulos:   parseFloat(r.titulos) || 0,
@@ -958,129 +948,6 @@ function saveMonthSnapshot() {
       pctActual: total > 0 ? getRowValue(r) / total * 100 : 0
     }))
   };
-
-  snapshots.push(snap);
-  snapshots.sort((a,b) => a.year !== b.year ? a.year - b.year : a.month - b.month);
-  saveHistoryData(currentPortId, snapshots);
-  renderHistory();
-  showSaveIndicator(`Snapshot ${label} guardado ✓`);
-}
-
-function deleteSnapshot(portId, snapId) {
-  const snaps = loadHistory(portId).filter(s => s.id !== snapId);
-  saveHistoryData(portId, snaps);
-  renderHistory();
-}
-
-function toggleHistDetail(rowId) {
-  const el = document.getElementById('hist-detail-' + rowId);
-  if (!el) return;
-  el.style.display = el.style.display === 'none' ? 'table-row' : 'none';
-}
-
-function renderHistory() {
-  const container = document.getElementById('history-content');
-  if (!container) return;
-
-  const snapshots = loadHistory(currentPortId);
-  const snapMap   = {};
-  snapshots.forEach(s => { snapMap[`${s.year}-${s.month}`] = s; });
-
-  const seq = monthSequence();
-  if (seq.length === 0) {
-    container.innerHTML = '<div class="empty-state">No hay meses disponibles aún.</div>';
-    return;
-  }
-
-  let html = `<div class="table-wrap"><table class="hist-table" style="width:100%;min-width:480px">
-    <thead><tr>
-      <th>Mes</th>
-      <th style="text-align:right">Valor total</th>
-      <th style="text-align:right">Variación</th>
-      <th style="text-align:center">Activos</th>
-      <th></th>
-    </tr></thead><tbody>`;
-
-  let prevValue = null;
-
-  // Mostrar de más reciente a más antiguo
-  [...seq].reverse().forEach(({ year, month }) => {
-    const key  = `${year}-${month}`;
-    const snap = snapMap[key];
-    const label = `${MONTHS_ES[month-1]} ${year}`;
-
-    if (!snap) {
-      html += `<tr class="no-data">
-        <td><span class="month-badge">${label}</span></td>
-        <td colspan="4" style="color:var(--border);font-size:12px;">Sin datos</td>
-      </tr>`;
-      return;
-    }
-
-    // Calcular variación
-    let trendHtml = '<span class="trend-flat">—</span>';
-    // Buscar snapshot anterior
-    const prevKey = month > 1
-      ? `${year}-${month-1}`
-      : `${year-1}-12`;
-    const prevSnap = snapMap[prevKey];
-    if (prevSnap) {
-      const diff = snap.totalValue - prevSnap.totalValue;
-      const pct  = prevSnap.totalValue > 0 ? diff / prevSnap.totalValue * 100 : 0;
-      const cls  = diff > 0 ? 'trend-up' : diff < 0 ? 'trend-down' : 'trend-flat';
-      const sign = diff >= 0 ? '+' : '';
-      trendHtml  = `<span class="${cls}">${sign}${fmt(diff)} € (${sign}${pct.toFixed(1)}%)</span>`;
-    }
-
-    const detailId = `${year}-${month}-${currentPortId}`;
-
-    html += `<tr>
-      <td><span class="month-badge has-data">${label}</span></td>
-      <td class="num" style="text-align:right;font-weight:600">${fmt(snap.totalValue)} €</td>
-      <td style="text-align:right">${trendHtml}</td>
-      <td style="text-align:center;color:var(--muted)">${snap.assets.length}</td>
-      <td style="white-space:nowrap;text-align:right">
-        <span class="hist-expand" onclick="toggleHistDetail('${detailId}')">detalle</span>
-        &nbsp;
-        <button class="btn btn-danger" style="font-size:13px;padding:1px 5px;"
-          onclick="if(confirm('¿Eliminar snapshot de ${label}?'))deleteSnapshot('${currentPortId}',${snap.id})"
-          title="Eliminar">×</button>
-      </td>
-    </tr>
-    <tr id="hist-detail-${detailId}" style="display:none" class="hist-detail">
-      <td colspan="5" style="padding:0">
-        <table style="width:100%;border-collapse:collapse">
-          <tr style="background:var(--surface)">
-            <th style="padding:5px 12px;font-size:10px;color:var(--muted);text-align:left">Símbolo</th>
-            <th style="padding:5px 12px;font-size:10px;color:var(--muted);text-align:left">Activo</th>
-            <th style="padding:5px 12px;font-size:10px;color:var(--muted);text-align:right">Títulos</th>
-            <th style="padding:5px 12px;font-size:10px;color:var(--muted);text-align:right">Precio</th>
-            <th style="padding:5px 12px;font-size:10px;color:var(--muted);text-align:right">Valor</th>
-            <th style="padding:5px 12px;font-size:10px;color:var(--muted);text-align:right">% Real</th>
-            <th style="padding:5px 12px;font-size:10px;color:var(--muted);text-align:right">% Obj.</th>
-          </tr>
-          ${snap.assets.map(a => `
-          <tr>
-            <td style="padding:5px 12px;font-family:monospace;font-size:11px">${esc(a.ticker||'—')}</td>
-            <td style="padding:5px 12px;font-size:12px">${esc(a.name||'—')}</td>
-            <td style="padding:5px 12px;text-align:right;font-size:12px">${a.titulos||'—'}</td>
-            <td style="padding:5px 12px;text-align:right;font-size:12px">${a.price ? fmtDec(a.price)+' '+curSymbol(a.currency) : '—'}</td>
-            <td style="padding:5px 12px;text-align:right;font-size:12px;font-weight:600">${fmt(a.value)} €</td>
-            <td style="padding:5px 12px;text-align:right;font-size:12px">${a.pctActual.toFixed(1)}%</td>
-            <td style="padding:5px 12px;text-align:right;font-size:12px;color:var(--accent)">${a.target}%</td>
-          </tr>`).join('')}
-        </table>
-      </td>
-    </tr>`;
-  });
-
-  html += '</tbody></table></div>';
-
-  if (snapshots.length === 0) {
-    html += '<div class="empty-state" style="margin-top:12px">Pulsa «+ Guardar mes actual» para guardar el snapshot de este mes.</div>';
-  }
-
-  container.innerHTML = html;
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -1455,41 +1322,132 @@ function parseRevolutTrade(raw) {
 function normalizeMoney(line) {
   return String(line)
     .replace(/\bu\s*s+\s*\$\s?/gi, '$')
-    .replace(/\bu\s*s+\s*(?=[\d,])/gi, '$');
+    // Sin el «$» (el OCR se lo come) solo si lo que sigue es un importe y no
+    // un ISIN: «US91282CFW64» empieza igual que «US150» pero no es dinero.
+    .replace(/\bu\s*s+\s*(?=\d[\d.,]*(?![A-Za-z0-9]))/gi, '$');
 }
 
 // Importes de una línea ya normalizada, en orden de aparición. «$0» sale a
-// menudo como «$o»: se cuenta como cero, no como dato ilegible.
+// menudo como «$o»: se cuenta como cero, no como dato ilegible. Y el punto
+// decimal se lee a veces como espacio («US$16 43» = 16,43).
 function moneyTokens(line) {
   const out = [];
-  const re = /(-?)([€$])\s?([\d][\d.,]*|[oO])/g;
+  const re = /(-?)([€$])\s?([\d][\d.,]*(?:\s\d{2}(?![\d.,]))?|[oO])/g;
   let m;
   while ((m = re.exec(line))) {
-    out.push({ neg: m[1] === '-', cur: m[2] === '€' ? 'EUR' : 'USD', value: /^[oO]$/.test(m[3]) ? 0 : parseEnNum(m[3]) });
+    const raw = String(m[3]).replace(/(\d)\s(\d{2})$/, '$1.$2');
+    out.push({ neg: m[1] === '-', cur: m[2] === '€' ? 'EUR' : 'USD',
+               raw, value: /^[oO]$/.test(raw) ? 0 : parseEnNum(raw) });
   }
   return out;
 }
 
-// Ajusta un número al que el OCR pudo comerse el punto decimal. Solo se toca
-// si NO traía separador: cuando el OCR sí lo leyó, se respeta tal cual (perder
-// un dígito del importe es más común que inventarse un punto en la cantidad).
-function refineNumber(raw, approx) {
-  const value = parseEnNum(raw);
-  const hadSep = /[.,]/.test(String(raw || ''));
-  if (!(approx > 0)) return { value, fixed: false, verified: false };
-  const cuadra = v => v > 0 && Math.abs(v - approx) / approx < 0.02;
-  if (cuadra(value)) return { value, fixed: false, verified: true };
-  if (!hadSep) {
-    const rebuilt = reconstructDecimal(raw, approx);
-    if (rebuilt != null) return { value: rebuilt, fixed: true, verified: true };
+// ¿El número trae un separador DECIMAL de fiar? Una coma con más de dos cifras
+// detrás es separador de miles («1,92173» es 1.921,73 con el punto perdido),
+// así que no cuenta como decimal.
+function hasDecimalSep(raw) {
+  const s = String(raw || '');
+  return /\.\d/.test(s) || /,\d{1,2}$/.test(s);
+}
+
+// Todas las lecturas posibles de una cifra moviendo el punto decimal.
+function scaleCandidates(raw, maxDec) {
+  const clean = String(raw || '').replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  if (!clean) return [];
+  const out = [];
+  for (let dec = 0; dec <= clean.length + 6; dec++) {
+    if (maxDec != null && dec > maxDec) break;
+    const txt = dec <= clean.length
+      ? (clean.slice(0, clean.length - dec) || '0') + '.' + clean.slice(clean.length - dec)
+      : '0.' + '0'.repeat(dec - clean.length) + clean;
+    const v = parseFloat(txt);
+    if (v > 0) out.push(v);
   }
-  return { value, fixed: false, verified: false };   // se respeta lo leído
+  return out;
+}
+
+// Resuelve una fila cuadrando títulos × precio con el importe de la fila.
+// El OCR pierde puntos decimales por todas partes, pero las tres cifras están
+// ligadas, así que se buscan las lecturas que encajan entre sí. Se prefiere
+// SIEMPRE la combinación que menos cambia lo leído, y si hay más de una
+// solución posible se devuelve sin verificar para que la revise el usuario.
+function solveRow(qtyRaw, priceRaw, valueRaw, feeEur, isSell) {
+  const read = { q: parseEnNum(qtyRaw), p: parseEnNum(priceRaw), v: parseEnNum(valueRaw) };
+  // En compras el importe de la fila incluye la comisión; en ventas ya se la
+  // han descontado. Se compara siempre contra el bruto (títulos × precio).
+  const grossOf = v => isSell ? v + feeEur : v - feeEur;
+
+  const qCands = hasDecimalSep(qtyRaw)   ? [read.q] : scaleCandidates(qtyRaw);
+  const pCands = hasDecimalSep(priceRaw) ? [read.p] : scaleCandidates(priceRaw, 4);
+  const vCands = hasDecimalSep(valueRaw) ? [read.v] : scaleCandidates(valueRaw, 2);
+  if (!qCands.length || !pCands.length || !vCands.length) {
+    return { titulos: read.q, price: read.p, value: read.v, verified: false, fixed: false };
+  }
+
+  let best = null;
+  qCands.forEach(q => pCands.forEach(p => vCands.forEach(v => {
+    const gross = grossOf(v);
+    if (!(gross > 0) || !(q > 0) || !(p > 0)) return;
+    const err = Math.abs(q * p - gross) / gross;
+    if (err >= 0.02) return;
+    const changes = (q !== read.q ? 1 : 0) + (p !== read.p ? 1 : 0) + (v !== read.v ? 1 : 0);
+    if (!best || changes < best.changes || (changes === best.changes && err < best.err)) {
+      best = { q, p, v, err, changes, ambiguous: false };
+    } else if (changes === best.changes && Math.abs(q - best.q) / best.q > 1e-6) {
+      best.ambiguous = true;   // dos lecturas distintas encajan igual de bien
+    }
+  })));
+
+  if (!best) return { titulos: read.q, price: read.p, value: read.v, verified: false, fixed: false };
+  return { titulos: best.q, price: best.p, value: best.v,
+           verified: !best.ambiguous, fixed: best.changes > 0 };
+}
+
+// El símbolo puede ser un ticker corto o un ISIN de 12 caracteres, y el OCR
+// mezcla mayúsculas y minúsculas («SuUpPv»). Si al colapsar letras repetidas
+// coincide con un símbolo ya conocido, se usa ese.
+function knownSymbols() {
+  const s = new Set();
+  rows.forEach(r => { if (r.ticker) s.add(r.ticker.toUpperCase()); });
+  ops.forEach(o => { if (o.ticker) s.add(o.ticker.toUpperCase()); });
+  return [...s];
+}
+
+// ¿Son dos lecturas del mismo símbolo? O bien coinciden al colapsar letras
+// repetidas (SuUpPv/SUPV), o son códigos largos que difieren en un carácter
+// (US91282CFW64 / US91282CFWE64), que es el error típico del OCR en un ISIN.
+function sameSymbol(a, b) {
+  if (a === b) return true;
+  const col = s => s.replace(/([A-Z0-9])\1+/g, '$1');
+  if (col(a) === col(b)) return true;
+  return a.length >= 8 && b.length >= 8 && editDistance(a, b) <= 1;
+}
+
+function editDistance(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return 99;
+  const dp = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return dp[a.length][b.length];
+}
+
+function cleanSymbol(raw, known) {
+  const up = String(raw || '').toUpperCase().trim();
+  if (!up) return '';
+  if (known.includes(up)) return up;
+  const collapsed = up.replace(/([A-Z0-9])\1+/g, '$1');
+  const hit = known.find(k => k === collapsed || k.replace(/([A-Z0-9])\1+/g, '$1') === collapsed);
+  return hit || up;
 }
 
 function parseRevolutStatement(raw) {
   const text  = String(raw || '').replace(/ /g, ' ');
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const rowsOut = [];
+  const skipped = [];        // líneas con pinta de movimiento que no se pudieron leer
+  const known = knownSymbols();
   let sectionCur = '';
 
   lines.forEach(line => {
@@ -1497,24 +1455,31 @@ function parseRevolutStatement(raw) {
     if (sec) { sectionCur = sec[1].toUpperCase(); return; }
 
     const norm = normalizeMoney(line);
-    const head = norm.match(/^(\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:GMT|UTC|CET)?\s*(.*)$/);
-    if (!head) return;
+    // La hora se lee a veces sin los dos puntos («1714.15» por «17:14:15»), así
+    // que se acepta cualquier separador: descartar la fila por eso hacía
+    // desaparecer operaciones enteras sin avisar.
+    const head = norm.match(/^(\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})\s+\d{1,2}[:.,\s]?\d{2}(?:[:.,\s]?\d{2})?\s*(?:GMT|UTC|CET|BST)?\s*(.*)$/);
+    if (!head) {
+      if (/^\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}\b/.test(norm)) skipped.push(line);
+      return;
+    }
 
     const date = parseEnDate(head[1]);
     const rest = head[2];
-    if (!date) return;
+    if (!date) { skipped.push(line); return; }
 
     if (/cash\s*(top\s*-?\s*up|withdraw)/i.test(rest)) return;   // movimientos de efectivo
 
     const money = moneyTokens(rest);
     const curOf = i => (money[i] ? money[i].cur : (sectionCur === 'EUR' ? 'EUR' : sectionCur === 'USD' ? 'USD' : 'EUR'));
+    const symRe = /^([A-Za-z][A-Za-z0-9.\-]{0,13})\s+/;   // ticker corto o ISIN
 
-    // ── Dividendo ──
-    if (/dividend/i.test(rest)) {
-      const tk = (rest.match(/^([A-Z][A-Z0-9.\-]{0,5})\s+/) || [])[1] || '';
-      if (!money.length) return;
+    // ── Rendimientos: dividendos y cupones de bonos ──
+    if (/dividend|coupon|interest/i.test(rest)) {
+      const tk = (rest.match(symRe) || [])[1] || '';
+      if (!money.length) { skipped.push(line); return; }
       rowsOut.push({
-        date, type: 'dividend', ticker: tk.toUpperCase(), name: '',
+        date, type: 'dividend', ticker: cleanSymbol(tk, known), name: '',
         amount: money[0].value, currency: curOf(0), titulos: 0, price: 0, fee: 0,
         status: money[0].value > 0 ? 'ok' : 'incomplete'
       });
@@ -1522,50 +1487,55 @@ function parseRevolutStatement(raw) {
     }
 
     // ── Compra / venta ──
-    if (!/trade/i.test(rest)) return;
     const sideM = rest.match(/\b(Buy|Sell)\b/i);
-    if (!sideM) return;
+    if (!/trade/i.test(rest) || !sideM) { skipped.push(line); return; }
 
     const pre  = rest.slice(0, sideM.index);
     const post = rest.slice(sideM.index + sideM[0].length);
 
-    const tk = (pre.match(/^([A-Z][A-Z0-9.\-]{0,5})\s+/) || [])[1] || '';
+    const tk = (pre.match(symRe) || [])[1] || '';
     // En la parte previa al Buy/Sell: primero la cantidad, después el precio.
     const preMoney = moneyTokens(pre);
-    const qtyRaw   = (pre.replace(/^[A-Z][A-Z0-9.\-]{0,5}\s+/, '')
-                         .match(/(?:Trade[^\d]*)([\d][\d.,]*)/) || [])[1] || '';
-    const priceRaw = preMoney.length ? String(preMoney[preMoney.length - 1].value) : '';
+    const qtyRaw   = (pre.replace(symRe, '').match(/(?:Trade[^\d]*)([\d][\d.,]*)/) || [])[1] || '';
+    const priceRaw = preMoney.length ? preMoney[preMoney.length - 1].raw : '';
     const postMoney = moneyTokens(post);
 
     const valueTok = postMoney[0];
-    const value    = valueTok ? Math.abs(valueTok.value) : 0;
+    const valueRaw = valueTok ? String(valueTok.raw).replace('-', '') : '';
     const fee      = (postMoney[1]?.value || 0) + (postMoney[2]?.value || 0);
     // Manda la moneda del precio; si la fila no trae importes legibles, la de
     // la cabecera de sección («USD Transactions» / «EUR Transactions»).
-    const currency = (preMoney[0]?.cur) || (value > 0 ? valueTok.cur : null)
+    const currency = (preMoney[0]?.cur) || (valueTok ? valueTok.cur : null)
                   || (sectionCur === 'USD' ? 'USD' : sectionCur === 'EUR' ? 'EUR' : 'USD');
 
-    let price   = parseEnNum(priceRaw);
-    let titulos = parseEnNum(qtyRaw);
-    let fixed = false, verified = false;
+    const isSell = /sell/i.test(sideM[1]);
+    const sol = solveRow(qtyRaw, priceRaw, valueRaw, fee, isSell);
 
-    if (value > 0 && titulos > 0) {
-      const p = refineNumber(priceRaw, value / titulos);   // «$19120» → 191.20
-      price = p.value; fixed = fixed || p.fixed;
-    }
-    if (value > 0 && price > 0) {
-      const q = refineNumber(qtyRaw, value / price);       // «469214615» → 4.69214615
-      titulos = q.value; fixed = fixed || q.fixed; verified = q.verified;
-    }
-
-    const status = !(titulos > 0) || !(price > 0) ? 'incomplete' : (verified ? 'ok' : 'check');
+    const status = !(sol.titulos > 0) || !(sol.price > 0) ? 'incomplete' : (sol.verified ? 'ok' : 'check');
     rowsOut.push({
-      date, type: /sell/i.test(sideM[1]) ? 'sell' : 'buy',
-      ticker: tk.toUpperCase(), name: '', titulos, price, currency, fee, value,
-      fixed, status
+      date, type: isSell ? 'sell' : 'buy',
+      ticker: cleanSymbol(tk, known), name: '',
+      titulos: sol.titulos, price: sol.price, currency, fee, value: sol.value,
+      fixed: sol.fixed, status
     });
   });
 
+  // Segunda pasada: los símbolos que el OCR ha escrito de dos maneras
+  // («SUPV» y «SuUpPv», «US91282CFW64» y «US91282CFWE64») se unifican en uno.
+  // Gana el que más veces aparece; a igualdad, el más corto.
+  const docSyms = {};
+  rowsOut.forEach(r => { if (r.ticker) docSyms[r.ticker] = (docSyms[r.ticker] || 0) + 1; });
+  const syms = Object.keys(docSyms);
+  const canon = {};
+  syms.forEach(s => {
+    const grupo = syms.filter(o => sameSymbol(o, s));
+    const mejor = grupo
+      .sort((a, b) => (docSyms[b] - docSyms[a]) || (a.length - b.length) || a.localeCompare(b))[0];
+    canon[s] = known.includes(s) ? s : mejor;
+  });
+  rowsOut.forEach(r => { if (r.ticker && canon[r.ticker]) r.ticker = canon[r.ticker]; });
+
+  rowsOut.skipped = skipped;
   return rowsOut;
 }
 
@@ -1653,7 +1623,10 @@ function findDuplicateOp(cand) {
       : Math.abs((parseFloat(o.titulos) || 0) - cand.titulos) < 1e-6));
 }
 
+let importSkipped = [];
+
 function showImportPreview(list) {
+  importSkipped = (list && list.skipped) || [];
   pendingImport = list.map((r, i) => ({
     ...r, idx: i,
     reviewed: false,                       // se marca a mano tras comprobarla
@@ -1760,6 +1733,12 @@ function renderImportPreview() {
       ${chk  ? `<br>· ${chk} no cuadran con el importe de la fila: repásalas.` : ''}
       ${inc  ? `<br>· ${inc} están incompletas (el OCR no pudo leer el precio): complétalas y se activarán.` : ''}
     </div>
+    ${importSkipped.length ? `
+    <div class="alert alert-warn" style="font-size:11px;margin-bottom:10px;">
+      ⚠ <strong>${importSkipped.length} línea(s) del extracto no he podido leerlas</strong> y no aparecen en la lista.
+      Compruébalas en la captura y añádelas a mano si son operaciones:
+      <div style="font-family:monospace;font-size:10px;opacity:.85;margin-top:6px;white-space:pre-wrap">${importSkipped.map(l => esc(l)).join('\n')}</div>
+    </div>` : ''}
     <div class="table-wrap"><table class="hist-table imp-table" style="width:100%;min-width:820px">
       <thead><tr>
         <th></th><th style="text-align:left">Fecha</th><th style="text-align:left">Tipo</th>
@@ -1884,6 +1863,7 @@ function persistOps() {
   saveOpsData(currentPortId, ops);
   syncRowsFromOps();
   saveRows();
+  autoSnapshot();   // la foto del mes refleja la cartera ya actualizada
   schedSave();
   render();
 }
@@ -2968,6 +2948,7 @@ window.addEventListener('load', () => {
   if (!loaded) createDefaultPortfolios();
   setNewMoneyInput();
   renderTabs();
+  autoSnapshot();          // el histórico se mantiene solo
   render();
   setTimeout(resizeCharts, 50);
   initChartInteractivity();
@@ -3008,7 +2989,6 @@ function render() {
   calcRebalance();
   drawCharts();
   renderOps();
-  renderHistory();
   fillTaxYears();
   renderGlobalPosition();
 }
