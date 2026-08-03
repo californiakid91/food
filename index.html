@@ -180,6 +180,43 @@
     }
     .fx-hint:empty { display: none; }
 
+    /* Subida de captura (OCR) */
+    .ocr-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .ocr-status {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+    .ocr-status:empty { display: none; }
+    .ocr-status.ocr-ok   { color: var(--green); }
+    .ocr-status.ocr-warn { color: var(--yellow); }
+
+    /* Chip de "revisado" en la tabla de operaciones */
+    .review-chip {
+      background: transparent;
+      border: 1px solid var(--green);
+      border-radius: 999px;
+      color: var(--green);
+      cursor: pointer;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 9px;
+      white-space: nowrap;
+    }
+    .review-chip.pending {
+      border-color: var(--yellow);
+      color: var(--yellow);
+      background: rgba(243, 156, 18, 0.12);
+    }
+
     /* Formulario de alta de operaciones */
     .op-form {
       display: grid;
@@ -1191,6 +1228,269 @@ async function fetchFxOn(date) {
   } catch { return null; }
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// LECTURA DE CAPTURAS (Trade Confirmation de Revolut) VÍA OCR
+// ══════════════════════════════════════════════════════════════════════
+// El OCR corre entero en el móvil (Tesseract.js): la captura no sale nunca
+// del dispositivo. El motor se descarga la primera vez y queda en la caché
+// del service worker.
+
+const TESSERACT_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = TESSERACT_CDN;
+    s.onload  = () => window.Tesseract ? resolve(window.Tesseract) : reject(new Error('Tesseract no disponible'));
+    s.onerror = () => reject(new Error('No se pudo descargar el motor de lectura'));
+    document.head.appendChild(s);
+  });
+}
+
+// Escala y pasa a gris con contraste: el texto de estas confirmaciones es
+// pequeño y el OCR mejora mucho con la imagen ampliada.
+function preprocessImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale  = Math.min(3, Math.max(1, 2000 / img.width));
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const px = data.data;
+      for (let i = 0; i < px.length; i += 4) {
+        const g = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+        const v = g < 128 ? Math.max(0, g - 40) : Math.min(255, g + 40);  // contraste
+        px[i] = px[i + 1] = px[i + 2] = v;
+      }
+      ctx.putImageData(data, 0, 0);
+      resolve(canvas);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo abrir la imagen')); };
+    img.src = url;
+  });
+}
+
+// Números en formato anglosajón: 1,234.56 → 1234.56
+function parseEnNum(txt) {
+  if (txt == null) return 0;
+  const clean = String(txt).replace(/[^\d.,]/g, '').replace(/,/g, '');
+  return parseFloat(clean) || 0;
+}
+
+// El OCR se come a menudo el punto decimal de las cantidades con muchos
+// decimales (1.47640788 → 147640788). Sabiendo el valor aproximado (importe
+// total ÷ precio unitario) se puede recolocar el punto sin perder decimales.
+function reconstructDecimal(digits, approx) {
+  const clean = String(digits || '').replace(/\D/g, '');
+  if (!clean || !(approx > 0)) return null;
+  let best = null, bestErr = Infinity;
+  for (let i = 1; i <= clean.length; i++) {
+    const v = parseFloat(clean.slice(0, i) + '.' + clean.slice(i));
+    if (!(v > 0)) continue;
+    const err = Math.abs(v - approx) / approx;
+    if (err < bestErr) { bestErr = err; best = v; }
+  }
+  return bestErr < 0.02 ? best : null;
+}
+
+// Un ISIN son 2 letras de país + 9 alfanuméricos + dígito de control. El OCR
+// confunde 0/O y 1/I, y el número de cuenta de Revolut casa el mismo patrón.
+function normalizeIsin(cand) {
+  if (!cand) return '';
+  const head = cand.slice(0, 2);
+  const body = cand.slice(2);
+  const digits = (body.match(/\d/g) || []).length;
+  return digits >= 7 ? head + body.replace(/O/g, '0').replace(/I/g, '1') : cand;
+}
+
+const OCR_MONTHS = { jan:'01', feb:'02', mar:'03', apr:'04', may:'05', jun:'06',
+                     jul:'07', aug:'08', sep:'09', oct:'10', nov:'11', dec:'12' };
+
+function parseEnDate(txt) {
+  const m = String(txt || '').match(/(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})/);
+  if (!m) return '';
+  const mon = OCR_MONTHS[m[2].toLowerCase()];
+  return mon ? `${m[3]}-${mon}-${m[1].padStart(2, '0')}` : '';
+}
+
+// Extrae los datos de una Trade Confirmation a partir del texto reconocido.
+// Se busca por patrones, no por posición, para aguantar que el OCR parta
+// líneas o se coma algún separador.
+function parseRevolutTrade(raw) {
+  const text  = String(raw || '').replace(/ /g, ' ');
+  const flat  = text.replace(/\s+/g, ' ');
+  const out   = { ticker:'', name:'', isin:'', type:'', titulos:0, price:0, currency:'EUR', fee:0, date:'', total:0 };
+
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // ISIN: se busca en la línea de la operación (la que lleva Buy/Sell) para no
+  // confundirlo con el número de cuenta, que casa el mismo patrón.
+  const isinRe = /(?:^|[^A-Z0-9-])([A-Z]{2}[A-Z0-9]{9}[\dO])(?![A-Z0-9])/g;
+  const isinIn = str => { isinRe.lastIndex = 0; const m = isinRe.exec(str || ''); return m ? m[1] : ''; };
+  const dealLines = lines.filter(l => /\b(Buy|Sell|Bought|Sold)\b/i.test(l));
+  for (const l of dealLines) { const c = isinIn(l); if (c) { out.isin = normalizeIsin(c); break; } }
+  if (!out.isin) {
+    const near = lines.find(l => /ISIN/i.test(l) && isinIn(l));
+    const cand = near ? isinIn(near) : isinIn(flat.replace(/REV-[A-Z0-9]+/gi, ' '));
+    if (cand) out.isin = normalizeIsin(cand);
+  }
+
+  // Fecha de ejecución (la fiscalmente relevante): la que lleva hora al lado.
+  const exec = flat.match(/(\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})\s+\d{1,2}:\d{2}/);
+  if (exec) out.date = parseEnDate(exec[1]);
+  if (!out.date) {
+    const conf = flat.match(/Confirmation\s+date\s*:?\s*(\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})/i);
+    if (conf) out.date = parseEnDate(conf[1]);
+  }
+
+  // Línea de datos: … Buy 1.47640788 €169.33 €250 …
+  const deal = flat.match(/\b(Buy|Sell|Bought|Sold)\b\s+([\d.,]+)\s*([€$£]|EUR|USD|GBP)?\s*([\d.,]+)\s*([€$£]|EUR|USD|GBP)?\s*([\d.,]+)?/i);
+  let rawQty = '';
+  if (deal) {
+    out.type    = /sell|sold/i.test(deal[1]) ? 'sell' : 'buy';
+    rawQty      = deal[2];
+    out.titulos = parseEnNum(deal[2]);
+    out.price   = parseEnNum(deal[4]);
+    out.total   = parseEnNum(deal[6]);
+    const symbol = deal[3] || deal[5] || '';
+    out.currency = /\$|USD/i.test(symbol) ? 'USD' : 'EUR';
+  } else {
+    const t = flat.match(/\b(Buy|Sell|Bought|Sold)\b/i);
+    if (t) out.type = /sell|sold/i.test(t[1]) ? 'sell' : 'buy';
+    const q = flat.match(/Quantity\s*:?\s*([\d.,]+)/i);
+    if (q) { rawQty = q[1]; out.titulos = parseEnNum(q[1]); }
+    const p = flat.match(/Unit\s*Price\s*:?\s*([€$£]|EUR|USD|GBP)?\s*([\d.,]+)/i);
+    if (p) { out.price = parseEnNum(p[2]); out.currency = /\$|USD/i.test(p[1] || '') ? 'USD' : 'EUR'; }
+  }
+
+  // Cantidad × precio debe dar el importe total. Si no cuadra, casi siempre es
+  // porque se perdió el punto decimal de la cantidad: se recoloca.
+  if (out.total > 0 && out.price > 0) {
+    const approx = out.total / out.price;
+    if (!(out.titulos > 0) || Math.abs(out.titulos - approx) / approx > 0.02) {
+      const fixed = reconstructDecimal(rawQty || out.titulos, approx);
+      out.titulos = fixed != null ? fixed : approx;
+      out.qtyFixed = true;   // se reconstruyó: merece un vistazo
+    }
+  }
+
+  // Comisiones: primero el total cobrado, si no la comisión suelta.
+  const fee = flat.match(/Total\s*Fee\s*charged\s*:?\s*([€$£]|EUR|USD|GBP)?\s*([\d.,]+)/i)
+           || flat.match(/Commission\s*:?\s*([€$£]|EUR|USD|GBP)?\s*([\d.,]+)/i);
+  if (fee) out.fee = parseEnNum(fee[2]);
+
+  // Símbolo y nombre: la línea que contiene el ISIN o la del tipo de orden.
+  const dataLine = dealLines.find(l => isinIn(l))
+                || lines.find(l => /\b(Buy|Sell|Bought|Sold)\b/i.test(l) && /[\d.,]{3,}/.test(l));
+  if (dataLine) {
+    const m = dataLine.match(/^([A-Z0-9.\-]{1,8})\s+(.+?)\s+(?:[A-Z]{2}[A-Z0-9]{9}\d|\b(?:Buy|Sell|Bought|Sold)\b)/i);
+    if (m) { out.ticker = m[1].toUpperCase(); out.name = m[2].trim(); }
+  }
+
+  // Coherencia: si el total no cuadra con títulos × precio, avisamos.
+  out.mismatch = out.total > 0 && out.titulos > 0 && out.price > 0
+    && Math.abs(out.titulos * out.price - out.total) > Math.max(0.5, out.total * 0.02);
+
+  return out;
+}
+
+let ocrBusy = false;
+
+async function onScreenshotPicked(input) {
+  const file = input.files && input.files[0];
+  input.value = '';   // permite volver a subir la misma captura
+  if (!file || ocrBusy) return;
+
+  const status = document.getElementById('ocr-status');
+  const show = (html, cls) => { if (status) { status.className = 'ocr-status' + (cls ? ' ' + cls : ''); status.innerHTML = html; } };
+
+  ocrBusy = true;
+  show('Preparando la imagen…');
+  try {
+    const canvas = await preprocessImage(file);
+    show('Descargando el motor de lectura (solo la primera vez)…');
+    const T = await loadTesseract();
+    show('Leyendo la captura… 0%');
+    const { data } = await T.recognize(canvas, 'eng', {
+      logger: m => { if (m.status === 'recognizing text') show(`Leyendo la captura… ${Math.round(m.progress * 100)}%`); }
+    });
+
+    const d = parseRevolutTrade(data.text || '');
+    lastOcrText = data.text || '';
+
+    if (!d.titulos || !d.price) {
+      show(`No he podido leer los datos con seguridad. Rellena a mano lo que falte.
+            <button class="btn btn-ghost" style="font-size:11px;padding:2px 8px;margin-left:8px;" onclick="showOcrText()">Ver texto leído</button>`, 'ocr-warn');
+    }
+    applyOcrToForm(d);
+
+    if (d.titulos && d.price) {
+      const avisos = [];
+      if (d.mismatch) avisos.push('el importe total no cuadra con títulos × precio');
+      if (d.qtyFixed) avisos.push('he reconstruido los decimales de los títulos a partir del importe total');
+      if (!d.date)    avisos.push('no he encontrado la fecha');
+      show(`Leído: <strong>${d.type === 'sell' ? 'Venta' : 'Compra'} de ${d.titulos} ${esc(d.ticker || d.name || '')}</strong>
+            a ${fmtDec(d.price)} ${curSymbol(d.currency)}${d.date ? ' el ' + fmtDate(d.date) : ''}.
+            Comprueba los campos y pulsa «+ Apuntar».
+            ${avisos.length ? `<br><span style="color:var(--yellow)">⚠ Revisa: ${avisos.join(' y ')}.</span>` : ''}
+            <button class="btn btn-ghost" style="font-size:11px;padding:2px 8px;margin-left:8px;" onclick="showOcrText()">Ver texto leído</button>`,
+            avisos.length ? 'ocr-warn' : 'ocr-ok');
+    }
+  } catch (e) {
+    show(`No se pudo leer la captura: ${esc(e.message)}. ${navigator.onLine ? '' : 'Necesitas conexión la primera vez para descargar el motor de lectura.'}`, 'ocr-warn');
+  } finally {
+    ocrBusy = false;
+  }
+}
+
+let lastOcrText = '';
+function showOcrText() {
+  if (!lastOcrText) return;
+  alert('Texto reconocido en la captura:\n\n' + lastOcrText.slice(0, 3000));
+}
+
+// Vuelca lo leído al formulario. El activo se empareja por ticker o nombre
+// con los de la cartera; si no está, se usa el campo libre.
+function applyOcrToForm(d) {
+  const get = id => document.getElementById(id);
+  if (d.date)  get('op-date').value = d.date;
+  if (d.type)  get('op-type').value = d.type;
+
+  const key   = (d.ticker || d.name || '').trim().toUpperCase();
+  const match = rows.find(r => rowAssetKey(r) === key)
+             || rows.find(r => key && (r.ticker || '').toUpperCase() === (d.ticker || '').toUpperCase() && d.ticker)
+             || rows.find(r => d.name && (r.name || '').toUpperCase() === d.name.toUpperCase());
+
+  if (match) {
+    get('op-asset').value = String(match.id);
+    onOpAssetChange();
+  } else if (key) {
+    get('op-asset').value = '__other__';
+    onOpAssetChange();
+    get('op-other').value = d.ticker || d.name;
+  }
+
+  if (d.titulos) get('op-titulos').value = String(d.titulos);
+  if (d.price)   get('op-price').value   = String(d.price);
+  get('op-currency').value = d.currency === 'USD' ? 'USD' : 'EUR';
+  get('op-fee').value = d.fee ? String(d.fee) : '';
+  if (d.isin) pendingIsin = d.isin;
+
+  // Operación importada de una captura: nace SIN revisar.
+  const chk = get('op-reviewed');
+  if (chk) chk.checked = false;
+}
+
+let pendingIsin = '';
+
 // ── Alta de operación ──
 async function addOp() {
   const get = id => document.getElementById(id);
@@ -1218,7 +1518,13 @@ async function addOp() {
   if (titulos <= 0) { alert('Los títulos deben ser mayores que 0.'); return; }
   if (price   <= 0) { alert('El precio debe ser mayor que 0.'); return; }
 
-  const op = { id: genOpId(), date, type, ticker, name, titulos, price, currency, fee, fx: null, fxApprox: false };
+  // Alta manual = ya revisada. Las importadas de una captura nacen sin revisar
+  // y se pueden marcar más tarde desde la tabla.
+  const reviewed = document.getElementById('op-reviewed')?.checked !== false;
+
+  const op = { id: genOpId(), date, type, ticker, name, titulos, price, currency, fee,
+               fx: null, fxApprox: false, reviewed, isin: pendingIsin || '' };
+  pendingIsin = '';
 
   if (currency === 'USD') {
     const hist = await fetchFxOn(date);
@@ -1233,6 +1539,20 @@ async function addOp() {
   get('op-titulos').value = '';
   get('op-price').value   = '';
   get('op-fee').value     = '';
+  const chk = document.getElementById('op-reviewed');
+  if (chk) chk.checked = true;
+  const status = document.getElementById('ocr-status');
+  if (status) { status.className = 'ocr-status'; status.innerHTML = ''; }
+}
+
+// Marca/desmarca una operación como revisada.
+function toggleOpReviewed(id) {
+  const op = ops.find(o => o.id === id);
+  if (!op) return;
+  op.reviewed = !op.reviewed;
+  saveOpsData(currentPortId, ops);
+  schedSave();
+  renderOps();
 }
 
 function deleteOp(id) {
@@ -1271,6 +1591,15 @@ function renderOps() {
   ).join('');
 
   let html = `
+    <div class="ocr-bar">
+      <label class="btn btn-ghost" style="font-size:12px;padding:6px 14px;cursor:pointer;">
+        📷 Subir captura
+        <input type="file" accept="image/*" style="display:none" onchange="onScreenshotPicked(this)">
+      </label>
+      <span style="font-size:11px;color:var(--muted)">Lee el «Trade Confirmation» de Revolut y rellena el formulario. La imagen no sale del móvil.</span>
+    </div>
+    <div id="ocr-status" class="ocr-status"></div>
+
     <div class="op-form">
       <div class="op-field"><label>Fecha</label>
         <input type="date" id="op-date" value="${todayISO()}"></div>
@@ -1298,6 +1627,10 @@ function renderOps() {
       <div class="op-field"><label>Comisión</label>
         <input class="num-in" type="text" inputmode="decimal" id="op-fee" placeholder="0.00"></div>
       <div class="op-field op-field-btn">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;user-select:none;margin-bottom:6px;"
+          title="Desmárcalo si la apuntas sin comprobar los datos: quedará pendiente de revisar">
+          <input type="checkbox" id="op-reviewed" checked style="cursor:pointer;"> Revisada
+        </label>
         <button class="btn btn-primary" style="font-size:12px;padding:6px 14px;" onclick="addOp()">+ Apuntar</button></div>
     </div>`;
 
@@ -1318,6 +1651,7 @@ function renderOps() {
     if (opsYearFilter === 'all' || String(s.op.date || '').startsWith(opsYearFilter)) { ganancia += s.gainEur; hasSales = true; }
   }));
 
+  const pendientes = shown.filter(o => o.reviewed === false).length;
   const gainCls = ganancia >= 0 ? 'pnl-positive' : 'pnl-negative';
   html += `
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0 10px;">
@@ -1328,9 +1662,10 @@ function renderOps() {
       <span class="asset-stat">Comprado: <strong>${fmtDec(invertido)} €</strong></span>
       <span class="asset-stat">Vendido: <strong>${fmtDec(cobrado)} €</strong></span>
       ${hasSales ? `<span class="asset-stat">Ganancia realizada: <strong class="${gainCls}">${ganancia >= 0 ? '+' : ''}${fmtDec(ganancia)} €</strong></span>` : ''}
+      ${pendientes ? `<span class="asset-stat" style="color:var(--yellow)">⚠ ${pendientes} sin revisar</span>` : ''}
     </div>
 
-    <div class="table-wrap"><table class="hist-table" style="width:100%;min-width:640px">
+    <div class="table-wrap"><table class="hist-table" style="width:100%;min-width:720px">
       <thead><tr>
         <th style="text-align:left">Fecha</th>
         <th style="text-align:left">Tipo</th>
@@ -1339,6 +1674,7 @@ function renderOps() {
         <th style="text-align:right">Precio</th>
         <th style="text-align:right">Comisión</th>
         <th style="text-align:right">Importe (€)</th>
+        <th style="text-align:center">Revisado</th>
         <th></th>
       </tr></thead><tbody>`;
 
@@ -1347,8 +1683,9 @@ function renderOps() {
     const sym    = curSymbol(o.currency);
     const fxTxt  = o.currency === 'USD'
       ? `<div style="font-size:10px;color:var(--muted)">1 € = ${opFx(o).toFixed(4)} $${o.fxApprox ? ' (aprox.)' : ''}</div>` : '';
+    const pend = o.reviewed === false;
     html += `
-      <tr>
+      <tr${pend ? ' style="background:rgba(243,156,18,0.07)"' : ''}>
         <td style="padding:5px 10px;font-size:12px">${fmtDate(o.date)}</td>
         <td style="padding:5px 10px"><span class="badge ${isSell ? 'badge-high' : 'badge-ok'}">${isSell ? 'Venta' : 'Compra'}</span></td>
         <td style="padding:5px 10px;font-size:12px">${esc(o.ticker || o.name || '—')}</td>
@@ -1356,6 +1693,12 @@ function renderOps() {
         <td style="padding:5px 10px;text-align:right;font-size:12px">${fmtDec(o.price)} ${sym}${fxTxt}</td>
         <td style="padding:5px 10px;text-align:right;font-size:12px">${o.fee ? fmtDec(o.fee) + ' ' + sym : '—'}</td>
         <td style="padding:5px 10px;text-align:right;font-size:12px;font-weight:600">${isSell ? '+' : '−'}${fmtDec(opNetEur(o))} €</td>
+        <td style="padding:5px 10px;text-align:center">
+          <button class="review-chip${pend ? ' pending' : ''}" onclick="toggleOpReviewed('${o.id}')"
+            title="${pend ? 'Pendiente de revisar: pulsa cuando hayas comprobado los datos' : 'Revisada: pulsa para volver a marcarla como pendiente'}">
+            ${pend ? 'No' : '✓ Sí'}
+          </button>
+        </td>
         <td style="padding:5px 10px;text-align:right">
           <button class="btn btn-danger" style="font-size:12px;padding:1px 6px;" onclick="deleteOp('${o.id}')" title="Eliminar">×</button>
         </td>
@@ -1582,40 +1925,51 @@ function exportTaxExcel() {
             La comisión se suma al coste en las compras y se resta del importe en las ventas.
           </td>
         </tr>
+        ${yearOps.some(o => o.reviewed === false) ? `
+        <tr>
+          <td colspan="14" style="color:#b00;font-size:9pt;padding:4px 10px;font-weight:bold">
+            ⚠ Hay ${yearOps.filter(o => o.reviewed === false).length} operación(es) marcadas como PENDIENTE de revisar
+            (importadas de una captura y aún sin comprobar). Repásalas antes de presentar la declaración.
+          </td>
+        </tr>` : ''}
         <tr style="background:#f0f0f0;font-weight:bold">
           <td style="padding:5px 8px">Fecha</td>
           <td style="padding:5px 8px">Tipo</td>
           <td style="padding:5px 8px">Símbolo</td>
           <td style="padding:5px 8px">Activo</td>
+          <td style="padding:5px 8px">ISIN</td>
           <td style="padding:5px 8px;text-align:right">Títulos</td>
           <td style="padding:5px 8px;text-align:right">Precio/ud.</td>
           <td style="padding:5px 8px">Moneda</td>
           <td style="padding:5px 8px;text-align:right">Cambio (1 € = $)</td>
           <td style="padding:5px 8px;text-align:right">Comisión (€)</td>
           <td style="padding:5px 8px;text-align:right">Importe total (€)</td>
+          <td style="padding:5px 8px">Revisado</td>
         </tr>
         ${yearOps.length === 0
-          ? `<tr><td colspan="10" style="padding:6px 10px;color:#888">Sin operaciones registradas en ${year}</td></tr>`
+          ? `<tr><td colspan="12" style="padding:6px 10px;color:#888">Sin operaciones registradas en ${year}</td></tr>`
           : yearOps.map(o => `
           <tr>
             <td style="padding:4px 8px">${fmtDate(o.date)}</td>
             <td style="padding:4px 8px;color:${o.type === 'sell' ? '#b00' : '#070'}">${o.type === 'sell' ? 'Venta' : 'Compra'}</td>
             <td style="padding:4px 8px;font-family:monospace">${esc(o.ticker || '')}</td>
             <td style="padding:4px 8px">${esc(o.name || '')}</td>
+            <td style="padding:4px 8px;font-family:monospace">${esc(o.isin || '')}</td>
             <td style="padding:4px 8px;text-align:right">${o.titulos}</td>
             <td style="padding:4px 8px;text-align:right">${fmtDec(o.price)}</td>
             <td style="padding:4px 8px">${o.currency || 'EUR'}</td>
             <td style="padding:4px 8px;text-align:right">${o.currency === 'USD' ? opFx(o).toFixed(4) + (o.fxApprox ? ' (aprox.)' : '') : '—'}</td>
             <td style="padding:4px 8px;text-align:right">${o.fee ? fmtDec(opFeeEur(o)) : '—'}</td>
             <td style="padding:4px 8px;text-align:right;font-weight:bold">${o.type === 'sell' ? '+' : '−'}${fmtDec(opNetEur(o))}</td>
+            <td style="padding:4px 8px;color:${o.reviewed === false ? '#b00' : '#070'}">${o.reviewed === false ? 'PENDIENTE' : 'Sí'}</td>
           </tr>`).join('')}
         ${yearOps.length === 0 ? '' : `
         <tr style="font-weight:bold;background:#f8f8f8">
-          <td colspan="9" style="padding:4px 8px">TOTAL COMPRADO EN ${year}</td>
+          <td colspan="11" style="padding:4px 8px">TOTAL COMPRADO EN ${year}</td>
           <td style="padding:4px 8px;text-align:right">${fmtDec(yearOps.filter(o => o.type !== 'sell').reduce((s, o) => s + opNetEur(o), 0))} €</td>
         </tr>
         <tr style="font-weight:bold;background:#f8f8f8">
-          <td colspan="9" style="padding:4px 8px">TOTAL VENDIDO EN ${year}</td>
+          <td colspan="11" style="padding:4px 8px">TOTAL VENDIDO EN ${year}</td>
           <td style="padding:4px 8px;text-align:right">${fmtDec(yearOps.filter(o => o.type === 'sell').reduce((s, o) => s + opNetEur(o), 0))} €</td>
         </tr>`}
 

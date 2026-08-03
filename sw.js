@@ -13,6 +13,12 @@ const CROSS_ORIGIN = [
 ];
 const CROSS_HOSTS = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
+// Motor de OCR (Tesseract) y sus datos de idioma: son decenas de MB y se
+// descargan la primera vez que se sube una captura. Van en su propia caché
+// para no rehacer esa descarga en cada despliegue de la app.
+const OCR_CACHE = 'food-ocr-v1';
+const OCR_HOSTS = ['cdn.jsdelivr.net', 'unpkg.com', 'tessdata.projectnaptha.com'];
+
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE).then(async (c) => {
@@ -28,7 +34,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== OCR_CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -42,6 +48,16 @@ self.addEventListener('fetch', (e) => {
   // Otros orígenes: cache-first SOLO para Firebase SDK y fuentes (offline-capable).
   // Firestore/Auth (APIs en tiempo real) y demás orígenes van directos a la red.
   if (url.origin !== self.location.origin) {
+    if (OCR_HOSTS.includes(url.hostname)) {
+      e.respondWith(
+        caches.match(req, { cacheName: OCR_CACHE }).then((cached) => cached || fetch(req).then((resp) => {
+          const copy = resp.clone();
+          caches.open(OCR_CACHE).then((c) => c.put(req, copy));
+          return resp;
+        }).catch(() => cached))
+      );
+      return;
+    }
     if (CROSS_HOSTS.includes(url.hostname)) {
       e.respondWith(
         caches.match(req).then((cached) => cached || fetch(req).then((resp) => {
