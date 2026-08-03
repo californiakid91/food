@@ -906,6 +906,7 @@
     <div class="card-title" style="margin:0">Histórico</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px;" onclick="saveMonthSnapshot()">+ Snapshot</button>
+      <select id="tax-year" class="cur-sel" style="width:auto;padding:5px 8px;font-weight:400;" title="Ejercicio fiscal a exportar"></select>
       <button class="btn btn-primary" style="font-size:11px;padding:5px 10px;" onclick="exportTaxExcel()">Excel IRPF</button>
     </div>
   </div>
@@ -1199,6 +1200,17 @@ function computeFifo(opList) {
     }
   });
   return byAsset;
+}
+
+// Foto de los lotes vivos justo ANTES de una fecha: es la cartera fiscal con
+// la que se abre (o se cierra) un ejercicio. Cada lote conserva su fecha de
+// compra y su coste, que es lo que consumirá una venta futura por FIFO.
+function fifoLotsAt(opList, cutoffISO) {
+  const agg = computeFifo(opList.filter(o => String(o.date || '') < cutoffISO));
+  return Object.values(agg)
+    .map(a => ({ key: a.key, ticker: a.ticker, name: a.name, lots: a.lots.filter(l => l.qty > 1e-9), ...fifoPosition(a) }))
+    .filter(a => a.qty > 1e-9)
+    .sort((x, y) => (x.ticker || x.key).localeCompare(y.ticker || y.key));
 }
 
 // Posición viva de un activo según sus lotes FIFO pendientes.
@@ -2096,8 +2108,27 @@ function newOpFor(rowId, type) {
 // EXCEL PARA DECLARACIÓN DE LA RENTA (España, IRPF)
 // ══════════════════════════════════════════════════════════════════════
 
-function exportTaxExcel() {
-  const year = new Date().getFullYear();
+// Rellena el desplegable de ejercicios: los años con operaciones o snapshots,
+// más el actual. La renta de un año se presenta al siguiente, así que hace
+// falta poder exportar ejercicios cerrados, no solo el que está en curso.
+function fillTaxYears() {
+  const sel = document.getElementById('tax-year');
+  if (!sel) return;
+  const years = new Set([new Date().getFullYear()]);
+  portfolios.forEach(p => {
+    const list = p.id === currentPortId ? ops : loadOps(p.id);
+    list.forEach(o => { const y = parseInt(String(o.date || '').slice(0, 4), 10); if (y) years.add(y); });
+    loadHistory(p.id).forEach(s => { if (s.year) years.add(s.year); });
+  });
+  const sorted  = [...years].sort((a, b) => b - a);
+  const current = sel.value ? parseInt(sel.value, 10) : null;
+  sel.innerHTML = sorted.map(y => `<option value="${y}"${y === current ? ' selected' : ''}>${y}</option>`).join('');
+  if (current && sorted.includes(current)) sel.value = String(current);
+}
+
+function exportTaxExcel(yearArg) {
+  const sel  = document.getElementById('tax-year');
+  const year = yearArg || (sel && parseInt(sel.value, 10)) || new Date().getFullYear();
   const allMonths = MONTHS_ES.map((name, i) => ({ name, month: i + 1 }));
 
   let sheetsHtml = '';
@@ -2134,6 +2165,51 @@ function exportTaxExcel() {
     }));
     yearSales.sort((a, b) => String(a.op.date).localeCompare(String(b.op.date)));
 
+    // Cartera fiscal con la que se abre y se cierra el ejercicio: los lotes de
+    // compra vivos, cada uno con su fecha y su coste. La de cierre es
+    // exactamente el punto de partida del año siguiente.
+    const apertura = fifoLotsAt(portOps, `${year}-01-01`);
+    const cierre   = fifoLotsAt(portOps, `${year + 1}-01-01`);
+
+    const lotesTabla = (lista, titulo, nota) => `
+        <tr>
+          <td colspan="14" style="background:#2e3350;color:#e8eaf0;font-weight:bold;padding:6px 10px">${titulo}</td>
+        </tr>
+        <tr>
+          <td colspan="14" style="color:#888;font-size:9pt;padding:4px 10px;font-style:italic">${nota}</td>
+        </tr>
+        <tr style="background:#f0f0f0;font-weight:bold">
+          <td style="padding:5px 8px">Símbolo</td>
+          <td style="padding:5px 8px">Activo</td>
+          <td style="padding:5px 8px">Fecha de compra</td>
+          <td style="padding:5px 8px;text-align:right">Títulos pendientes</td>
+          <td style="padding:5px 8px;text-align:right">Coste/ud. (€)</td>
+          <td style="padding:5px 8px;text-align:right">Coste del lote (€)</td>
+        </tr>
+        ${lista.length === 0
+          ? '<tr><td colspan="6" style="padding:6px 10px;color:#888">Sin títulos en cartera en esa fecha</td></tr>'
+          : lista.map(a => `
+            ${a.lots.map((l, i) => `
+            <tr>
+              <td style="padding:4px 8px;font-family:monospace">${i === 0 ? esc(a.ticker || a.key) : ''}</td>
+              <td style="padding:4px 8px">${i === 0 ? esc(a.name || '') : ''}</td>
+              <td style="padding:4px 8px">${fmtDate(l.date)}</td>
+              <td style="padding:4px 8px;text-align:right">${parseFloat(l.qty.toFixed(8))}</td>
+              <td style="padding:4px 8px;text-align:right">${fmtDec(l.unitCostEur)}</td>
+              <td style="padding:4px 8px;text-align:right">${fmtDec(l.qty * l.unitCostEur)}</td>
+            </tr>`).join('')}
+            <tr style="background:#fafafa">
+              <td colspan="3" style="padding:4px 8px;font-style:italic">Total ${esc(a.ticker || a.key)} (${a.lots.length} lote${a.lots.length === 1 ? '' : 's'})</td>
+              <td style="padding:4px 8px;text-align:right;font-weight:bold">${parseFloat(a.qty.toFixed(8))}</td>
+              <td style="padding:4px 8px;text-align:right">${fmtDec(a.unitCostEur)}</td>
+              <td style="padding:4px 8px;text-align:right;font-weight:bold">${fmtDec(a.costEur)}</td>
+            </tr>`).join('')}
+        ${lista.length === 0 ? '' : `
+        <tr style="font-weight:bold;background:#f0f0f0">
+          <td colspan="5" style="padding:4px 8px">COSTE TOTAL DE LA CARTERA</td>
+          <td style="padding:4px 8px;text-align:right">${fmtDec(lista.reduce((s, a) => s + a.costEur, 0))} €</td>
+        </tr>`}`;
+
     // Coste real de adquisición (FIFO) de lo que sigue en cartera
     Object.values(fifo).forEach(a => {
       const cb = costBasis[a.ticker] || costBasis[a.name] || costBasis[a.key];
@@ -2152,6 +2228,14 @@ function exportTaxExcel() {
           </td>
         </tr>
         <tr><td colspan="14" style="height:10px;border:none"></td></tr>
+
+        <!-- SECCIÓN 0: Cartera con la que se abre el ejercicio -->
+        ${lotesTabla(apertura,
+          `0. Cartera fiscal a 1 de enero de ${year} (lotes pendientes de vender)`,
+          `Así empiezas el ejercicio. Son las compras que quedaban vivas a 31/12/${year - 1} con su fecha y su coste
+           en euros: cualquier venta de ${year} consume estos lotes empezando por el más antiguo (FIFO).`)}
+
+        <tr><td colspan="14" style="height:14px;border:none"></td></tr>
 
         <!-- SECCIÓN 1: Evolución mensual -->
         <tr>
@@ -2424,6 +2508,14 @@ function exportTaxExcel() {
           <td style="padding:4px 8px;text-align:right">${fmtDec(yearDivs.reduce((s, o) => s + opNetEur(o), 0))} €</td>
           <td></td>
         </tr>`}
+
+        <tr><td colspan="14" style="height:14px;border:none"></td></tr>
+
+        <!-- SECCIÓN 7: Cartera con la que se cierra el ejercicio -->
+        ${lotesTabla(cierre,
+          `7. Cartera fiscal a 31 de diciembre de ${year} (arrastre a ${year + 1})`,
+          `Así cierras el ejercicio y así empiezas ${year + 1}: estos lotes, con estas fechas y estos costes,
+           son los que consumirán tus ventas futuras por orden de antigüedad.`)}
 
         <tr><td colspan="14" style="height:20px;border:none"></td></tr>
         <tr>
@@ -3025,6 +3117,7 @@ function render() {
   drawCharts();
   renderOps();
   renderHistory();
+  fillTaxYears();
   renderGlobalPosition();
 }
 
