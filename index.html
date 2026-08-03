@@ -1539,6 +1539,150 @@ function parseRevolutStatement(raw) {
   return rowsOut;
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// CAPTURA DE POSICIÓN (pantalla de un valor en Revolut)
+// ══════════════════════════════════════════════════════════════════════
+// Rellena los campos visibles del activo (precio, títulos, precio medio).
+// NO toca las operaciones: el FIFO y el Excel del IRPF se calculan siempre
+// desde las compras y ventas reales, que son el dato bueno.
+
+// Número escrito en español (1.234,56) o en inglés (1,234.56): manda el
+// último separador que aparezca.
+function parseLooseNum(raw) {
+  let s = String(raw || '').replace(/[^\d.,]/g, '');
+  if (!s) return 0;
+  const c = s.lastIndexOf(','), d = s.lastIndexOf('.');
+  if (c > -1 && d > -1) {
+    s = c > d ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  } else if (c > -1) {
+    s = /^\d{1,3}(,\d{3})+$/.test(s) ? s.replace(/,/g, '') : s.replace(/,/g, '.');
+  } else if (d > -1) {
+    if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  }
+  return parseFloat(s) || 0;
+}
+
+function parseRevolutPosition(raw) {
+  const lines = String(raw || '').replace(/ /g, ' ').split('\n').map(l => l.trim()).filter(Boolean);
+  const out = { titulos: 0, value: 0, avgPrice: 0, pnl: 0, pnlPct: 0, currency: 'EUR', price: 0, verified: false };
+
+  // Devuelve el primer número de la primera línea que case la etiqueta.
+  const pick = re => {
+    const l = lines.find(x => re.test(x));
+    if (!l) return null;
+    const m = l.match(/([+-]?\d[\d.,]*)\s*([€$])?/);
+    if (!m) return null;
+    return { value: parseLooseNum(m[1]), neg: /^-/.test(m[1].trim()), cur: m[2] === '$' ? 'USD' : m[2] === '€' ? 'EUR' : null, line: l };
+  };
+
+  const q   = pick(/(n[uú]mero\s+de\s+)?acciones|shares|participaciones?\s*$|quantity/i);
+  const val = pick(/^valor\b|^value\b|market\s*value/i);
+  const avg = pick(/precio\s+medio|average\s+(open\s+)?price|coste\s+medio/i);
+  const pnl = pick(/ganancias?\s+sin\s+formalizar|unreali[sz]ed|p&l|resultado/i);
+
+  if (q)   out.titulos  = q.value;
+  if (val) { out.value = Math.abs(val.value); if (val.cur) out.currency = val.cur; }
+  if (avg) { out.avgPrice = avg.value; if (!val?.cur && avg.cur) out.currency = avg.cur; }
+  if (pnl) {
+    out.pnl = pnl.value * (/[-−]\s*\d/.test(pnl.line) ? -1 : 1);
+    const p = pnl.line.match(/([\d.,]+)\s*%/);
+    if (p) out.pnlPct = parseLooseNum(p[1]);
+  }
+
+  // El precio actual no viene escrito: sale de dividir el valor entre los
+  // títulos, que es exactamente lo que muestra el bróker.
+  if (out.value > 0 && out.titulos > 0) out.price = Math.round((out.value / out.titulos) * 100) / 100;
+
+  // Comprobación cruzada: valor − títulos × precio medio debe dar la ganancia.
+  if (out.value > 0 && out.titulos > 0 && out.avgPrice > 0) {
+    const esperado = out.value - out.titulos * out.avgPrice;
+    const margen   = Math.max(0.05, Math.abs(out.value) * 0.01);
+    out.verified = !out.pnl || Math.abs(esperado - out.pnl) <= margen;
+  }
+  return out;
+}
+
+// ¿Este activo tiene compras/ventas registradas? Si las tiene, sus títulos y
+// su precio medio los manda el FIFO y la captura no los toca.
+function rowHasOps(row) {
+  const k = rowAssetKey(row);
+  return !!k && ops.some(o => o.type !== 'dividend' && opAssetKey(o) === k);
+}
+
+let pendingPosition = {};
+
+async function onPositionScreenshot(input, rowId) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file || ocrBusy) return;
+
+  const st = document.getElementById('pos-status-' + rowId);
+  const show = (html, cls) => { if (st) { st.className = 'ocr-status' + (cls ? ' ' + cls : ''); st.innerHTML = html; } };
+
+  ocrBusy = true;
+  show('Preparando la imagen…');
+  try {
+    const canvas = await preprocessImage(file);
+    show('Descargando el motor de lectura (solo la primera vez)…');
+    const T = await loadTesseract();
+    show('Leyendo la captura… 0%');
+    const { data } = await T.recognize(canvas, 'spa+eng', {
+      logger: m => { if (m.status === 'recognizing text') show(`Leyendo la captura… ${Math.round(m.progress * 100)}%`); }
+    });
+    lastOcrText = data.text || '';
+
+    const d = parseRevolutPosition(lastOcrText);
+    if (!d.titulos && !d.value && !d.avgPrice) {
+      show(`No he encontrado los datos de la posición en esta captura.
+            <button class="btn btn-ghost" style="font-size:11px;padding:2px 8px;margin-left:8px;" onclick="showOcrText()">Ver texto leído</button>`, 'ocr-warn');
+      return;
+    }
+
+    pendingPosition[rowId] = d;
+    const row   = rows.find(r => r.id === rowId);
+    const conOps = row ? rowHasOps(row) : false;
+    const sym   = curSymbol(d.currency);
+
+    show(`Leído de la captura:
+      <div style="margin:6px 0 8px;line-height:1.7">
+        ${d.price     ? `· Precio actual: <strong>${fmtDec(d.price)} ${sym}</strong> <span style="opacity:.7">(${fmtDec(d.value)} ${sym} ÷ ${d.titulos})</span><br>` : ''}
+        ${d.titulos   ? `· Títulos: <strong>${d.titulos}</strong><br>` : ''}
+        ${d.avgPrice  ? `· Precio medio: <strong>${fmtDec(d.avgPrice)} ${sym}</strong><br>` : ''}
+        ${d.pnl       ? `· Ganancia latente: <strong>${d.pnl > 0 ? '+' : ''}${fmtDec(d.pnl)} ${sym}</strong>${d.pnlPct ? ` (${fmtDec(d.pnlPct)} %)` : ''}` : ''}
+      </div>
+      ${!d.verified ? '<div style="color:var(--yellow)">⚠ Los números no cuadran entre sí (valor − títulos × precio medio ≠ ganancia): compruébalos.</div>' : ''}
+      ${conOps ? `<div style="color:var(--muted);margin-bottom:6px">Este activo ya tiene operaciones registradas: los títulos y el precio medio los calcula el FIFO desde tus compras y ventas, así que <strong>solo se actualizará el precio</strong>.</div>` : ''}
+      <button class="btn btn-primary" style="font-size:11px;padding:4px 12px;" onclick="applyPosition(${rowId})">${conOps ? 'Actualizar precio' : 'Aplicar a este activo'}</button>
+      <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="showOcrText()">Ver texto leído</button>`,
+      d.verified ? 'ocr-ok' : 'ocr-warn');
+  } catch (e) {
+    show(`No se pudo leer la captura: ${esc(e.message)}.`, 'ocr-warn');
+  } finally {
+    ocrBusy = false;
+  }
+}
+
+function applyPosition(rowId) {
+  const d   = pendingPosition[rowId];
+  const row = rows.find(r => r.id === rowId);
+  if (!d || !row) return;
+
+  if (d.currency) row.currency = d.currency;
+  if (d.price > 0) row.price = d.price;
+
+  // Los títulos y el coste medio solo se escriben si no hay operaciones: las
+  // compras y ventas reales mandan siempre sobre lo que muestre la pantalla.
+  if (!rowHasOps(row)) {
+    if (d.titulos > 0)  row.titulos = d.titulos;
+    if (d.avgPrice > 0) { row.avgPrice = d.avgPrice; delete row.avgPriceEur; }
+  }
+
+  delete pendingPosition[rowId];
+  schedSave();
+  render();
+  showSaveIndicator('Activo actualizado ✓');
+}
+
 let ocrBusy = false;
 
 async function onScreenshotPicked(input) {
@@ -3359,6 +3503,14 @@ function renderTable() {
         </div>
         ${tgt > 0 ? onTargetBarHtml(actual, tgt, color, row.id) : ''}
         <div class="asset-body">
+          <div class="ocr-bar" style="margin-bottom:12px;">
+            <label class="btn btn-ghost" style="font-size:12px;padding:5px 12px;cursor:pointer;" onclick="event.stopPropagation()">
+              📷 Rellenar desde captura
+              <input type="file" accept="image/*" style="display:none" onchange="onPositionScreenshot(this,${row.id})">
+            </label>
+            <span style="font-size:11px;color:var(--muted)">Tu posición en Revolut. No toca las operaciones ni el IRPF.</span>
+          </div>
+          <div class="ocr-status" id="pos-status-${row.id}"></div>
           <div class="asset-fields">
             <div class="asset-field">
               <label>Símbolo</label>
