@@ -1136,11 +1136,18 @@ function fmtDate(iso) { const [y, m, d] = String(iso || '').split('-'); return y
 
 // ── Conversión a euros de una operación ──
 function opFx(op)       { return op.currency === 'USD' ? (parseFloat(op.fx) || fxRate()) : 1; }
-function opGrossEur(op) { return ((parseFloat(op.titulos) || 0) * (parseFloat(op.price) || 0)) / opFx(op); }
+function opGrossEur(op) {
+  // Un dividendo no tiene títulos ni precio: lleva su importe cobrado.
+  if (op.type === 'dividend') return (parseFloat(op.amount) || 0) / opFx(op);
+  return ((parseFloat(op.titulos) || 0) * (parseFloat(op.price) || 0)) / opFx(op);
+}
 function opFeeEur(op)   { return (parseFloat(op.fee) || 0) / opFx(op); }
 // Compra: lo que realmente sale del bolsillo (precio + comisión).
 // Venta: lo que realmente entra (precio − comisión). Así lo admite Hacienda.
-function opNetEur(op)   { return op.type === 'sell' ? opGrossEur(op) - opFeeEur(op) : opGrossEur(op) + opFeeEur(op); }
+function opNetEur(op)   {
+  if (op.type === 'dividend') return opGrossEur(op) - opFeeEur(op);   // neto cobrado
+  return op.type === 'sell' ? opGrossEur(op) - opFeeEur(op) : opGrossEur(op) + opFeeEur(op);
+}
 
 function opAssetKey(op) { return String(op.ticker || op.name || '').trim().toUpperCase(); }
 function rowAssetKey(r) { return String(r.ticker || r.name || '').trim().toUpperCase(); }
@@ -1154,6 +1161,9 @@ function computeFifo(opList) {
     String(a.date || '').localeCompare(String(b.date || '')) || String(a.id).localeCompare(String(b.id)));
 
   sorted.forEach(op => {
+    // Los dividendos son rendimientos del capital, no alteran la posición ni
+    // la ganancia patrimonial: quedan fuera del FIFO.
+    if (op.type === 'dividend') return;
     const k = opAssetKey(op);
     if (!k) return;
     if (!byAsset[k]) byAsset[k] = { key: k, ticker: op.ticker || '', name: op.name || '', lots: [], sales: [], buys: [] };
@@ -1448,6 +1458,130 @@ function parseRevolutTrade(raw) {
   return out;
 }
 
+// ── Extractos de transacciones (listado de muchas operaciones) ──────────
+// Formato: Date | Symbol | Type | Quantity | Price | Side | Value | Fees | Commission
+// Se ignoran «Cash top-up» y «Cash withdrawal»: son entradas y salidas de
+// dinero de la cuenta, no compras ni ventas.
+
+// El OCR escribe US$ de mil formas (US$, Us$, USS$, Uss, uss$). Se unifica a $
+// solo cuando va seguido de importe, para no destrozar tickers como OUST.
+function normalizeMoney(line) {
+  return String(line)
+    .replace(/\bu\s*s+\s*\$\s?/gi, '$')
+    .replace(/\bu\s*s+\s*(?=[\d,])/gi, '$');
+}
+
+// Importes de una línea ya normalizada, en orden de aparición. «$0» sale a
+// menudo como «$o»: se cuenta como cero, no como dato ilegible.
+function moneyTokens(line) {
+  const out = [];
+  const re = /(-?)([€$])\s?([\d][\d.,]*|[oO])/g;
+  let m;
+  while ((m = re.exec(line))) {
+    out.push({ neg: m[1] === '-', cur: m[2] === '€' ? 'EUR' : 'USD', value: /^[oO]$/.test(m[3]) ? 0 : parseEnNum(m[3]) });
+  }
+  return out;
+}
+
+// Ajusta un número al que el OCR pudo comerse el punto decimal. Solo se toca
+// si NO traía separador: cuando el OCR sí lo leyó, se respeta tal cual (perder
+// un dígito del importe es más común que inventarse un punto en la cantidad).
+function refineNumber(raw, approx) {
+  const value = parseEnNum(raw);
+  const hadSep = /[.,]/.test(String(raw || ''));
+  if (!(approx > 0)) return { value, fixed: false, verified: false };
+  const cuadra = v => v > 0 && Math.abs(v - approx) / approx < 0.02;
+  if (cuadra(value)) return { value, fixed: false, verified: true };
+  if (!hadSep) {
+    const rebuilt = reconstructDecimal(raw, approx);
+    if (rebuilt != null) return { value: rebuilt, fixed: true, verified: true };
+  }
+  return { value, fixed: false, verified: false };   // se respeta lo leído
+}
+
+function parseRevolutStatement(raw) {
+  const text  = String(raw || '').replace(/ /g, ' ');
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const rowsOut = [];
+  let sectionCur = '';
+
+  lines.forEach(line => {
+    const sec = line.match(/\b(USD|EUR|GBP)\s+Transactions\b/i);
+    if (sec) { sectionCur = sec[1].toUpperCase(); return; }
+
+    const norm = normalizeMoney(line);
+    const head = norm.match(/^(\d{1,2}\s+[A-Za-z]{3,}\s+\d{4})\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:GMT|UTC|CET)?\s*(.*)$/);
+    if (!head) return;
+
+    const date = parseEnDate(head[1]);
+    const rest = head[2];
+    if (!date) return;
+
+    if (/cash\s*(top\s*-?\s*up|withdraw)/i.test(rest)) return;   // movimientos de efectivo
+
+    const money = moneyTokens(rest);
+    const curOf = i => (money[i] ? money[i].cur : (sectionCur === 'EUR' ? 'EUR' : sectionCur === 'USD' ? 'USD' : 'EUR'));
+
+    // ── Dividendo ──
+    if (/dividend/i.test(rest)) {
+      const tk = (rest.match(/^([A-Z][A-Z0-9.\-]{0,5})\s+/) || [])[1] || '';
+      if (!money.length) return;
+      rowsOut.push({
+        date, type: 'dividend', ticker: tk.toUpperCase(), name: '',
+        amount: money[0].value, currency: curOf(0), titulos: 0, price: 0, fee: 0,
+        status: money[0].value > 0 ? 'ok' : 'incomplete'
+      });
+      return;
+    }
+
+    // ── Compra / venta ──
+    if (!/trade/i.test(rest)) return;
+    const sideM = rest.match(/\b(Buy|Sell)\b/i);
+    if (!sideM) return;
+
+    const pre  = rest.slice(0, sideM.index);
+    const post = rest.slice(sideM.index + sideM[0].length);
+
+    const tk = (pre.match(/^([A-Z][A-Z0-9.\-]{0,5})\s+/) || [])[1] || '';
+    // En la parte previa al Buy/Sell: primero la cantidad, después el precio.
+    const preMoney = moneyTokens(pre);
+    const qtyRaw   = (pre.replace(/^[A-Z][A-Z0-9.\-]{0,5}\s+/, '')
+                         .match(/(?:Trade[^\d]*)([\d][\d.,]*)/) || [])[1] || '';
+    const priceRaw = preMoney.length ? String(preMoney[preMoney.length - 1].value) : '';
+    const postMoney = moneyTokens(post);
+
+    const valueTok = postMoney[0];
+    const value    = valueTok ? Math.abs(valueTok.value) : 0;
+    const fee      = (postMoney[1]?.value || 0) + (postMoney[2]?.value || 0);
+    // Manda la moneda del precio; si la fila no trae importes legibles, la de
+    // la cabecera de sección («USD Transactions» / «EUR Transactions»).
+    const currency = (preMoney[0]?.cur) || (value > 0 ? valueTok.cur : null)
+                  || (sectionCur === 'USD' ? 'USD' : sectionCur === 'EUR' ? 'EUR' : 'USD');
+
+    let price   = parseEnNum(priceRaw);
+    let titulos = parseEnNum(qtyRaw);
+    let fixed = false, verified = false;
+
+    if (value > 0 && titulos > 0) {
+      const p = refineNumber(priceRaw, value / titulos);   // «$19120» → 191.20
+      price = p.value; fixed = fixed || p.fixed;
+    }
+    if (value > 0 && price > 0) {
+      const q = refineNumber(qtyRaw, value / price);       // «469214615» → 4.69214615
+      titulos = q.value; fixed = fixed || q.fixed; verified = q.verified;
+    }
+
+    const status = !(titulos > 0) || !(price > 0) ? 'incomplete' : (verified ? 'ok' : 'check');
+    rowsOut.push({
+      date, type: /sell/i.test(sideM[1]) ? 'sell' : 'buy',
+      ticker: tk.toUpperCase(), name: '', titulos, price, currency, fee, value,
+      fixed, status
+    });
+  });
+
+  return rowsOut;
+}
+
 let ocrBusy = false;
 
 async function onScreenshotPicked(input) {
@@ -1469,8 +1603,19 @@ async function onScreenshotPicked(input) {
       logger: m => { if (m.status === 'recognizing text') show(`Leyendo la captura… ${Math.round(m.progress * 100)}%`); }
     });
 
-    const d = parseRevolutTrade(data.text || '');
     lastOcrText = data.text || '';
+
+    // Un extracto trae muchas filas con fecha+hora; una confirmación, una sola
+    // operación. Se elige el lector por lo que realmente contiene la imagen.
+    const stmt = parseRevolutStatement(lastOcrText);
+    if (stmt.length >= 2 || /Transactions\b/i.test(lastOcrText)) {
+      if (stmt.length) { showImportPreview(stmt); return; }
+      show(`He reconocido un extracto de transacciones pero no he podido leer ninguna operación.
+            <button class="btn btn-ghost" style="font-size:11px;padding:2px 8px;margin-left:8px;" onclick="showOcrText()">Ver texto leído</button>`, 'ocr-warn');
+      return;
+    }
+
+    const d = parseRevolutTrade(lastOcrText);
 
     if (!d.titulos || !d.price) {
       show(`No he podido leer los datos con seguridad. Rellena a mano lo que falte.
@@ -1497,6 +1642,144 @@ async function onScreenshotPicked(input) {
   } finally {
     ocrBusy = false;
   }
+}
+
+// ── Importación en bloque desde un extracto ────────────────────────────
+let pendingImport = [];
+
+// ¿Esta operación ya está apuntada? (misma fecha, activo, tipo e importe)
+function findDuplicateOp(cand) {
+  return ops.find(o =>
+    o.date === cand.date &&
+    o.type === cand.type &&
+    (o.ticker || '').toUpperCase() === (cand.ticker || '').toUpperCase() &&
+    (cand.type === 'dividend'
+      ? Math.abs((parseFloat(o.amount) || 0) - cand.amount) < 0.005
+      : Math.abs((parseFloat(o.titulos) || 0) - cand.titulos) < 1e-6));
+}
+
+function showImportPreview(list) {
+  pendingImport = list.map((r, i) => ({
+    ...r, idx: i,
+    dup: !!findDuplicateOp(r),
+    include: r.status !== 'incomplete' && !findDuplicateOp(r)
+  }));
+  renderImportPreview();
+}
+
+function toggleImportRow(i) {
+  const r = pendingImport.find(x => x.idx === i);
+  if (r) { r.include = !r.include; renderImportPreview(); }
+}
+
+function toggleImportAll(on) {
+  pendingImport.forEach(r => { if (r.status !== 'incomplete' && !r.dup) r.include = on; });
+  renderImportPreview();
+}
+
+function cancelImport() { pendingImport = []; renderImportPreview(); }
+
+function renderImportPreview() {
+  const box = document.getElementById('ocr-import');
+  if (!box) return;
+  if (!pendingImport.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+
+  box.style.display = '';
+  const sel   = pendingImport.filter(r => r.include).length;
+  const dups  = pendingImport.filter(r => r.dup).length;
+  const inc   = pendingImport.filter(r => r.status === 'incomplete').length;
+  const chk   = pendingImport.filter(r => r.status === 'check').length;
+
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:600;">${pendingImport.length} movimientos leídos del extracto</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="toggleImportAll(true)">Marcar todo</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="toggleImportAll(false)">Desmarcar</button>
+        <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="cancelImport()">Cancelar</button>
+        <button class="btn btn-primary" style="font-size:11px;padding:4px 12px;" onclick="importSelectedOps()" ${sel ? '' : 'disabled'}>Importar ${sel}</button>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">
+      Los ingresos y retiradas de efectivo (top-up / withdrawal) se han descartado: no son compras ni ventas.
+      ${dups ? `<br>· ${dups} ya estaban apuntadas y se han desmarcado.` : ''}
+      ${chk  ? `<br>· ${chk} no cuadran con el importe de la fila: revísalas antes de importar.` : ''}
+      ${inc  ? `<br>· ${inc} están incompletas (el OCR no pudo leer el precio): tendrás que apuntarlas a mano.` : ''}
+    </div>
+    <div class="table-wrap"><table class="hist-table" style="width:100%;min-width:640px">
+      <thead><tr>
+        <th></th><th style="text-align:left">Fecha</th><th style="text-align:left">Tipo</th>
+        <th style="text-align:left">Activo</th><th style="text-align:right">Títulos</th>
+        <th style="text-align:right">Precio</th><th style="text-align:right">Comisión</th>
+        <th style="text-align:left">Estado</th>
+      </tr></thead><tbody>
+      ${pendingImport.map(r => {
+        const sym  = curSymbol(r.currency);
+        const tipo = r.type === 'dividend' ? 'Dividendo' : r.type === 'sell' ? 'Venta' : 'Compra';
+        const estado = r.dup ? '<span style="color:var(--muted)">Ya apuntada</span>'
+                     : r.status === 'incomplete' ? '<span style="color:var(--red)">Falta el precio</span>'
+                     : r.status === 'check' ? '<span style="color:var(--yellow)">Revisar</span>'
+                     : '<span style="color:var(--green)">OK</span>';
+        return `<tr style="${r.include ? '' : 'opacity:.5'}">
+          <td style="padding:4px 8px;text-align:center">
+            <input type="checkbox" ${r.include ? 'checked' : ''} ${r.status === 'incomplete' ? 'disabled' : ''}
+              onchange="toggleImportRow(${r.idx})" style="cursor:pointer">
+          </td>
+          <td style="padding:4px 8px;font-size:12px">${fmtDate(r.date)}</td>
+          <td style="padding:4px 8px;font-size:12px">${tipo}</td>
+          <td style="padding:4px 8px;font-size:12px;font-family:monospace">${esc(r.ticker || '—')}</td>
+          <td style="padding:4px 8px;text-align:right;font-size:12px">${r.type === 'dividend' ? '—' : r.titulos}</td>
+          <td style="padding:4px 8px;text-align:right;font-size:12px">${r.type === 'dividend' ? fmtDec(r.amount) + ' ' + sym : (r.price ? fmtDec(r.price) + ' ' + sym : '—')}</td>
+          <td style="padding:4px 8px;text-align:right;font-size:12px">${r.fee ? fmtDec(r.fee) + ' ' + sym : '—'}</td>
+          <td style="padding:4px 8px;font-size:11px">${estado}</td>
+        </tr>`;
+      }).join('')}
+      </tbody></table></div>`;
+}
+
+// Tipos de cambio por fecha: una consulta por día distinto, no por operación.
+const fxByDate = {};
+async function fxOnDate(date) {
+  if (fxByDate[date] !== undefined) return fxByDate[date];
+  const r = await fetchFxOn(date);
+  fxByDate[date] = r;
+  return r;
+}
+
+async function importSelectedOps() {
+  const sel = pendingImport.filter(r => r.include);
+  if (!sel.length) return;
+  const status = document.getElementById('ocr-status');
+  const show = (html, cls) => { if (status) { status.className = 'ocr-status' + (cls ? ' ' + cls : ''); status.innerHTML = html; } };
+
+  // Cambio del día de cada operación en dólares (obligatorio para la renta).
+  const fechasUsd = [...new Set(sel.filter(r => r.currency === 'USD').map(r => r.date))];
+  let aprox = 0;
+  for (let i = 0; i < fechasUsd.length; i++) {
+    show(`Buscando el tipo de cambio de cada fecha… ${i + 1}/${fechasUsd.length}`);
+    if (!(await fxOnDate(fechasUsd[i]))) aprox++;
+  }
+
+  sel.forEach(r => {
+    const fx = r.currency === 'USD' ? (fxByDate[r.date] || fxRate()) : null;
+    ops.push({
+      id: genOpId(), date: r.date, type: r.type,
+      ticker: r.ticker || '', name: r.name || '',
+      titulos: r.type === 'dividend' ? 0 : r.titulos,
+      price:   r.type === 'dividend' ? 0 : r.price,
+      amount:  r.type === 'dividend' ? r.amount : 0,
+      currency: r.currency, fee: r.fee || 0,
+      fx, fxApprox: r.currency === 'USD' && !fxByDate[r.date],
+      reviewed: false, isin: ''
+    });
+  });
+
+  const n = sel.length;
+  pendingImport = [];
+  persistOps();
+  show(`Importadas <strong>${n} operaciones</strong>, todas marcadas como pendientes de revisar.
+        ${aprox ? `<br><span style="color:var(--yellow)">⚠ En ${aprox} fecha(s) no pude consultar el cambio oficial y he usado el de hoy: revísalas.</span>` : ''}`,
+       aprox ? 'ocr-warn' : 'ocr-ok');
 }
 
 let lastOcrText = '';
@@ -1563,14 +1846,18 @@ async function addOp() {
     name   = row.name || '';
   }
 
-  if (titulos <= 0) { alert('Los títulos deben ser mayores que 0.'); return; }
-  if (price   <= 0) { alert('El precio debe ser mayor que 0.'); return; }
+  if (type !== 'dividend' && titulos <= 0) { alert('Los títulos deben ser mayores que 0.'); return; }
+  if (price <= 0) { alert(type === 'dividend' ? 'El importe debe ser mayor que 0.' : 'El precio debe ser mayor que 0.'); return; }
 
   // Alta manual = ya revisada. Las importadas de una captura nacen sin revisar
   // y se pueden marcar más tarde desde la tabla.
   const reviewed = document.getElementById('op-reviewed')?.checked !== false;
 
-  const op = { id: genOpId(), date, type, ticker, name, titulos, price, currency, fee,
+  const op = { id: genOpId(), date, type, ticker, name,
+               titulos: type === 'dividend' ? 0 : titulos,
+               price:   type === 'dividend' ? 0 : price,
+               amount:  type === 'dividend' ? price : 0,
+               currency, fee,
                fx: null, fxApprox: false, reviewed, isin: pendingIsin || '' };
   pendingIsin = '';
 
@@ -1647,14 +1934,16 @@ function renderOps() {
       <span style="font-size:11px;color:var(--muted)">Lee el «Trade Confirmation» de Revolut y rellena el formulario. La imagen no sale del móvil.</span>
     </div>
     <div id="ocr-status" class="ocr-status"></div>
+    <div id="ocr-import" style="display:none;margin-bottom:14px;"></div>
 
     <div class="op-form">
       <div class="op-field"><label>Fecha</label>
         <input type="date" id="op-date" value="${todayISO()}"></div>
       <div class="op-field"><label>Tipo</label>
-        <select id="op-type">
+        <select id="op-type" onchange="onOpTypeChange()">
           <option value="buy">Compra</option>
           <option value="sell">Venta</option>
+          <option value="dividend">Dividendo</option>
         </select></div>
       <div class="op-field op-field-wide"><label>Activo</label>
         <select id="op-asset" onchange="onOpAssetChange()">
@@ -1663,9 +1952,9 @@ function renderOps() {
         </select></div>
       <div class="op-field op-field-wide" id="op-other-wrap" style="display:none"><label>Nombre / ticker</label>
         <input type="text" id="op-other" placeholder="Ej. CEG"></div>
-      <div class="op-field"><label>Títulos</label>
+      <div class="op-field" id="op-titulos-wrap"><label>Títulos</label>
         <input class="num-in" type="text" inputmode="decimal" id="op-titulos" placeholder="0"></div>
-      <div class="op-field"><label>Precio/ud.</label>
+      <div class="op-field"><label id="op-price-label">Precio/ud.</label>
         <input class="num-in" type="text" inputmode="decimal" id="op-price" placeholder="0.00"></div>
       <div class="op-field op-field-cur"><label>Moneda</label>
         <select id="op-currency" class="cur-sel" style="width:100%">
@@ -1688,13 +1977,18 @@ function renderOps() {
       Cada compra o venta que registres actualiza sola los títulos y el precio medio del activo, y sale en el Excel del IRPF.
     </div>`;
     container.innerHTML = html;
+    renderImportPreview();
     return;
   }
 
   // Resumen del periodo mostrado
   const agg = computeFifo(ops);
-  let invertido = 0, cobrado = 0, ganancia = 0, hasSales = false;
-  shown.forEach(o => { if (o.type === 'buy') invertido += opNetEur(o); else cobrado += opNetEur(o); });
+  let invertido = 0, cobrado = 0, ganancia = 0, dividendos = 0, hasSales = false;
+  shown.forEach(o => {
+    if (o.type === 'dividend')   dividendos += opNetEur(o);
+    else if (o.type === 'buy')   invertido  += opNetEur(o);
+    else                         cobrado    += opNetEur(o);
+  });
   Object.values(agg).forEach(a => a.sales.forEach(s => {
     if (opsYearFilter === 'all' || String(s.op.date || '').startsWith(opsYearFilter)) { ganancia += s.gainEur; hasSales = true; }
   }));
@@ -1710,6 +2004,7 @@ function renderOps() {
       <span class="asset-stat">Comprado: <strong>${fmtDec(invertido)} €</strong></span>
       <span class="asset-stat">Vendido: <strong>${fmtDec(cobrado)} €</strong></span>
       ${hasSales ? `<span class="asset-stat">Ganancia realizada: <strong class="${gainCls}">${ganancia >= 0 ? '+' : ''}${fmtDec(ganancia)} €</strong></span>` : ''}
+      ${dividendos ? `<span class="asset-stat">Dividendos: <strong>${fmtDec(dividendos)} €</strong></span>` : ''}
       ${pendientes ? `<span class="asset-stat" style="color:var(--yellow)">⚠ ${pendientes} sin revisar</span>` : ''}
     </div>
 
@@ -1728,6 +2023,7 @@ function renderOps() {
 
   shown.forEach(o => {
     const isSell = o.type === 'sell';
+    const isDiv  = o.type === 'dividend';
     const sym    = curSymbol(o.currency);
     const fxTxt  = o.currency === 'USD'
       ? `<div style="font-size:10px;color:var(--muted)">1 € = ${opFx(o).toFixed(4)} $${o.fxApprox ? ' (aprox.)' : ''}</div>` : '';
@@ -1735,12 +2031,12 @@ function renderOps() {
     html += `
       <tr${pend ? ' style="background:rgba(243,156,18,0.07)"' : ''}>
         <td style="padding:5px 10px;font-size:12px">${fmtDate(o.date)}</td>
-        <td style="padding:5px 10px"><span class="badge ${isSell ? 'badge-high' : 'badge-ok'}">${isSell ? 'Venta' : 'Compra'}</span></td>
+        <td style="padding:5px 10px"><span class="badge ${isDiv ? 'badge-low' : isSell ? 'badge-high' : 'badge-ok'}">${isDiv ? 'Dividendo' : isSell ? 'Venta' : 'Compra'}</span></td>
         <td style="padding:5px 10px;font-size:12px">${esc(o.ticker || o.name || '—')}</td>
-        <td style="padding:5px 10px;text-align:right;font-size:12px">${o.titulos}</td>
-        <td style="padding:5px 10px;text-align:right;font-size:12px">${fmtDec(o.price)} ${sym}${fxTxt}</td>
+        <td style="padding:5px 10px;text-align:right;font-size:12px">${isDiv ? '—' : o.titulos}</td>
+        <td style="padding:5px 10px;text-align:right;font-size:12px">${fmtDec(isDiv ? (parseFloat(o.amount) || 0) : o.price)} ${sym}${fxTxt}</td>
         <td style="padding:5px 10px;text-align:right;font-size:12px">${o.fee ? fmtDec(o.fee) + ' ' + sym : '—'}</td>
-        <td style="padding:5px 10px;text-align:right;font-size:12px;font-weight:600">${isSell ? '+' : '−'}${fmtDec(opNetEur(o))} €</td>
+        <td style="padding:5px 10px;text-align:right;font-size:12px;font-weight:600">${isSell || isDiv ? '+' : '−'}${fmtDec(opNetEur(o))} €</td>
         <td style="padding:5px 10px;text-align:center">
           <button class="review-chip${pend ? ' pending' : ''}" onclick="toggleOpReviewed('${o.id}')"
             title="${pend ? 'Pendiente de revisar: pulsa cuando hayas comprobado los datos' : 'Revisada: pulsa para volver a marcarla como pendiente'}">
@@ -1755,6 +2051,16 @@ function renderOps() {
 
   html += '</tbody></table></div>';
   container.innerHTML = html;
+  renderImportPreview();
+}
+
+// Un dividendo no tiene títulos: se cobra un importe y punto.
+function onOpTypeChange() {
+  const isDiv = document.getElementById('op-type')?.value === 'dividend';
+  const wrap  = document.getElementById('op-titulos-wrap');
+  const label = document.getElementById('op-price-label');
+  if (wrap)  wrap.style.display = isDiv ? 'none' : '';
+  if (label) label.textContent  = isDiv ? 'Importe' : 'Precio/ud.';
 }
 
 function onOpAssetChange() {
@@ -1817,9 +2123,11 @@ function exportTaxExcel() {
     // Operaciones de esta cartera + reparto FIFO (base de las secciones 4 y 5)
     const portOps  = port.id === currentPortId ? ops : loadOps(port.id);
     const fifo     = computeFifo(portOps);
-    const yearOps  = portOps
+    const yearAll  = portOps
       .filter(o => String(o.date || '').startsWith(String(year)))
       .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const yearOps  = yearAll.filter(o => o.type !== 'dividend');
+    const yearDivs = yearAll.filter(o => o.type === 'dividend');
     const yearSales = [];
     Object.values(fifo).forEach(a => a.sales.forEach(s => {
       if (String(s.op.date || '').startsWith(String(year))) yearSales.push({ ...s, asset: a });
@@ -2068,6 +2376,52 @@ function exportTaxExcel() {
           <td style="padding:4px 8px;text-align:right;color:${yearSales.reduce((s, v) => s + v.gainEur, 0) >= 0 ? 'green' : 'red'}">
             ${(yearSales.reduce((s, v) => s + v.gainEur, 0) >= 0 ? '+' : '') + fmtDec(yearSales.reduce((s, v) => s + v.gainEur, 0))} €
           </td>
+          <td></td>
+        </tr>`}
+
+        <tr><td colspan="14" style="height:14px;border:none"></td></tr>
+
+        <!-- SECCIÓN 6: Dividendos (rendimientos del capital mobiliario) -->
+        <tr>
+          <td colspan="14" style="background:#2e3350;color:#e8eaf0;font-weight:bold;padding:6px 10px">
+            6. Dividendos cobrados en ${year} (rendimientos del capital mobiliario)
+          </td>
+        </tr>
+        <tr>
+          <td colspan="14" style="color:#888;font-size:9pt;padding:4px 10px;font-style:italic">
+            Los dividendos NO son ganancias patrimoniales: tributan como rendimientos del capital mobiliario
+            y van en su propio apartado de la declaración, aunque a la misma escala del ahorro.
+            Si el pagador es extranjero, comprueba la retención practicada en origen para aplicar la
+            deducción por doble imposición internacional.
+          </td>
+        </tr>
+        <tr style="background:#f0f0f0;font-weight:bold">
+          <td style="padding:5px 8px">Fecha</td>
+          <td style="padding:5px 8px">Símbolo</td>
+          <td style="padding:5px 8px">Activo</td>
+          <td style="padding:5px 8px;text-align:right">Importe</td>
+          <td style="padding:5px 8px">Moneda</td>
+          <td style="padding:5px 8px;text-align:right">Cambio (1 € = $)</td>
+          <td style="padding:5px 8px;text-align:right">Importe (€)</td>
+          <td style="padding:5px 8px">Revisado</td>
+        </tr>
+        ${yearDivs.length === 0
+          ? `<tr><td colspan="8" style="padding:6px 10px;color:#888">Sin dividendos registrados en ${year}</td></tr>`
+          : yearDivs.map(o => `
+          <tr>
+            <td style="padding:4px 8px">${fmtDate(o.date)}</td>
+            <td style="padding:4px 8px;font-family:monospace">${esc(o.ticker || '')}</td>
+            <td style="padding:4px 8px">${esc(o.name || '')}</td>
+            <td style="padding:4px 8px;text-align:right">${fmtDec(parseFloat(o.amount) || 0)}</td>
+            <td style="padding:4px 8px">${o.currency || 'EUR'}</td>
+            <td style="padding:4px 8px;text-align:right">${o.currency === 'USD' ? opFx(o).toFixed(4) + (o.fxApprox ? ' (aprox.)' : '') : '—'}</td>
+            <td style="padding:4px 8px;text-align:right;font-weight:bold">${fmtDec(opNetEur(o))}</td>
+            <td style="padding:4px 8px;color:${o.reviewed === false ? '#b00' : '#070'}">${o.reviewed === false ? 'PENDIENTE' : 'Sí'}</td>
+          </tr>`).join('')}
+        ${yearDivs.length === 0 ? '' : `
+        <tr style="font-weight:bold;background:#f8f8f8">
+          <td colspan="6" style="padding:4px 8px">TOTAL DIVIDENDOS ${year}</td>
+          <td style="padding:4px 8px;text-align:right">${fmtDec(yearDivs.reduce((s, o) => s + opNetEur(o), 0))} €</td>
           <td></td>
         </tr>`}
 
