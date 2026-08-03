@@ -217,50 +217,25 @@
       background: rgba(243, 156, 18, 0.12);
     }
 
-    /* Formulario de alta de operaciones */
-    .op-form {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-      gap: 10px;
-      align-items: end;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-    }
-    .op-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-    .op-field > label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
-    .op-field input, .op-field select { width: 100%; }
-    .op-field select:not(.cur-sel) {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
+    /* Celdas editables de la previsualización de importación */
+    .imp-in {
+      background: transparent;
+      border: 1px solid transparent;
+      border-bottom: 1px dashed var(--border);
+      border-radius: 4px;
       color: var(--text);
       font-family: var(--font);
-      font-size: 13px;
-      padding: 5px 8px;
-      min-height: 32px;
+      font-size: 12px;
+      padding: 3px 5px;
+      width: 100%;
+      min-width: 60px;
       outline: none;
     }
-    .op-field input[type="date"] {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 13px;
-      padding: 5px 8px;
-      min-height: 32px;
-      outline: none;
-    }
-    .op-field-wide { grid-column: span 2; }
-    .op-field-cur  { max-width: 90px; }
-    .op-field-btn  { justify-content: flex-end; }
-    @media (max-width: 640px) {
-      .op-form { grid-template-columns: repeat(2, 1fr); }
-      .op-field-wide, .op-field-btn { grid-column: span 2; }
-      .op-field-cur { max-width: none; }
-    }
+    .imp-in:hover  { border-color: var(--border); background: var(--surface2); }
+    .imp-in:focus  { border-color: var(--accent); background: var(--surface2); }
+    .imp-table td  { vertical-align: middle; }
+    .imp-table input[type="date"].imp-in { min-width: 120px; }
+
 
     .col-ticker { width: 75px; }
     .col-name   { width: 140px; }
@@ -895,7 +870,7 @@
     <div class="card-title" style="margin:0">Operaciones</div>
   </div>
   <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
-    Apunta cada compra y cada venta. Actualizan solas los títulos y el precio medio del activo, y se vuelcan al Excel del IRPF.
+    Sube las capturas de Revolut: compras, ventas y dividendos. Actualizan solos los títulos y el precio medio del activo, y se vuelcan al Excel del IRPF.
   </div>
   <div id="ops-content"></div>
 </div>
@@ -1627,28 +1602,36 @@ async function onScreenshotPicked(input) {
       return;
     }
 
+    // Confirmación suelta: se ofrece igual que el extracto, como una sola fila
+    // editable, para que todo se revise y se importe por el mismo sitio.
     const d = parseRevolutTrade(lastOcrText);
 
-    if (!d.titulos || !d.price) {
-      show(`No he podido leer los datos con seguridad. Rellena a mano lo que falte.
+    if (!d.titulos && !d.price) {
+      show(`No he podido leer los datos de la captura.
             <button class="btn btn-ghost" style="font-size:11px;padding:2px 8px;margin-left:8px;" onclick="showOcrText()">Ver texto leído</button>`, 'ocr-warn');
+      return;
     }
-    applyOcrToForm(d);
 
-    if (d.titulos && d.price) {
-      const avisos = [];
-      if (d.mismatch)       avisos.push('el importe total no cuadra con títulos × precio');
-      if (d.qtyFixed)       avisos.push('he reconstruido los decimales de los títulos a partir del importe total');
-      if (d.qtySuspicious)  avisos.push('<strong>los títulos parecen haber perdido los decimales</strong> y no he podido comprobarlos contra el importe total: verifícalos en la captura');
-      else if (d.qtyUnverified) avisos.push('no he podido contrastar los títulos con el importe total: compruébalos');
-      if (!d.date)          avisos.push('no he encontrado la fecha');
-      show(`Leído: <strong>${d.type === 'sell' ? 'Venta' : 'Compra'} de ${d.titulos} ${esc(d.ticker || d.name || '')}</strong>
-            a ${fmtDec(d.price)} ${curSymbol(d.currency)}${d.date ? ' el ' + fmtDate(d.date) : ''}.
-            Comprueba los campos y pulsa «+ Apuntar».
-            ${avisos.length ? `<br><span style="color:var(--yellow)">⚠ Revisa: ${avisos.join(' y ')}.</span>` : ''}
-            <button class="btn btn-ghost" style="font-size:11px;padding:2px 8px;margin-left:8px;" onclick="showOcrText()">Ver texto leído</button>`,
-            avisos.length ? 'ocr-warn' : 'ocr-ok');
-    }
+    const avisos = [];
+    if (d.mismatch)       avisos.push('el importe total no cuadra con títulos × precio');
+    if (d.qtyFixed)       avisos.push('he reconstruido los decimales de los títulos a partir del importe total');
+    if (d.qtySuspicious)  avisos.push('<strong>los títulos parecen haber perdido los decimales</strong>: verifícalos en la captura');
+    else if (d.qtyUnverified) avisos.push('no he podido contrastar los títulos con el importe total');
+    if (!d.date)          avisos.push('no he encontrado la fecha');
+
+    showImportPreview([{
+      date: d.date || todayISO(),
+      type: d.type || 'buy',
+      ticker: d.ticker || '', name: d.name || '', isin: d.isin || '',
+      titulos: d.titulos, price: d.price, amount: 0,
+      currency: d.currency, fee: d.fee || 0, value: d.total || 0,
+      status: (d.titulos > 0 && d.price > 0) ? (avisos.length ? 'check' : 'ok') : 'incomplete'
+    }]);
+
+    show(`Confirmación leída. Repasa los datos, corrige lo que haga falta e impórtala.
+          ${avisos.length ? `<br><span style="color:var(--yellow)">⚠ Ojo: ${avisos.join('; ')}.</span>` : ''}
+          <button class="btn btn-ghost" style="font-size:11px;padding:2px 8px;margin-left:8px;" onclick="showOcrText()">Ver texto leído</button>`,
+         avisos.length ? 'ocr-warn' : 'ocr-ok');
   } catch (e) {
     show(`No se pudo leer la captura: ${esc(e.message)}. ${navigator.onLine ? '' : 'Necesitas conexión la primera vez para descargar el motor de lectura.'}`, 'ocr-warn');
   } finally {
@@ -1673,6 +1656,7 @@ function findDuplicateOp(cand) {
 function showImportPreview(list) {
   pendingImport = list.map((r, i) => ({
     ...r, idx: i,
+    reviewed: false,                       // se marca a mano tras comprobarla
     dup: !!findDuplicateOp(r),
     include: r.status !== 'incomplete' && !findDuplicateOp(r)
   }));
@@ -1681,7 +1665,64 @@ function showImportPreview(list) {
 
 function toggleImportRow(i) {
   const r = pendingImport.find(x => x.idx === i);
-  if (r) { r.include = !r.include; renderImportPreview(); }
+  if (!r) return;
+  r.include = !r.include;
+  const tr = document.getElementById('imp-row-' + i);
+  if (tr) tr.style.opacity = r.include ? '' : '.5';
+  refreshImportCount();
+}
+
+// Marca la fila como ya comprobada: se importará con el visto puesto.
+function toggleImportReviewed(i) {
+  const r = pendingImport.find(x => x.idx === i);
+  if (!r) return;
+  r.reviewed = !r.reviewed;
+  const el = document.getElementById('imp-rev-' + i);
+  if (el) {
+    el.className = 'review-chip' + (r.reviewed ? '' : ' pending');
+    el.textContent = r.reviewed ? '✓ Sí' : 'No';
+  }
+}
+
+// Edición en caliente de una celda. No se redibuja la tabla (se perdería el
+// foco mientras escribes): solo se actualizan el estado y el contador.
+function updateImportField(i, field, value) {
+  const r = pendingImport.find(x => x.idx === i);
+  if (!r) return;
+
+  if (field === 'ticker')        r.ticker = String(value).toUpperCase().trim();
+  else if (field === 'date')     r.date = value;
+  else if (field === 'currency') r.currency = value === 'USD' ? 'USD' : 'EUR';
+  else if (field === 'type')     { r.type = value; renderImportPreview(); return; }
+  else                           r[field] = parseNum(value);
+
+  const completa = r.type === 'dividend' ? r.amount > 0 : (r.titulos > 0 && r.price > 0);
+  r.status  = completa ? 'edited' : 'incomplete';
+  r.include = completa && !r.dup;
+
+  const st = document.getElementById('imp-status-' + i);
+  if (st) st.innerHTML = importStatusHtml(r);
+  const cb = document.getElementById('imp-inc-' + i);
+  if (cb) { cb.checked = r.include; cb.disabled = !completa; }
+  const tr = document.getElementById('imp-row-' + i);
+  if (tr) tr.style.opacity = r.include ? '' : '.5';
+  refreshImportCount();
+}
+
+function importStatusHtml(r) {
+  if (r.dup) return '<span style="color:var(--muted)">Ya apuntada</span>';
+  if (r.status === 'incomplete') return '<span style="color:var(--red)">Falta el precio</span>';
+  if (r.status === 'edited')     return '<span style="color:var(--accent2)">Editada</span>';
+  if (r.status === 'check')      return '<span style="color:var(--yellow)">Revisar</span>';
+  return '<span style="color:var(--green)">OK</span>';
+}
+
+function refreshImportCount() {
+  const btn = document.getElementById('imp-btn');
+  if (!btn) return;
+  const n = pendingImport.filter(r => r.include).length;
+  btn.textContent = 'Importar ' + n;
+  btn.disabled = !n;
 }
 
 function toggleImportAll(on) {
@@ -1709,41 +1750,61 @@ function renderImportPreview() {
         <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="toggleImportAll(true)">Marcar todo</button>
         <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="toggleImportAll(false)">Desmarcar</button>
         <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="cancelImport()">Cancelar</button>
-        <button class="btn btn-primary" style="font-size:11px;padding:4px 12px;" onclick="importSelectedOps()" ${sel ? '' : 'disabled'}>Importar ${sel}</button>
+        <button class="btn btn-primary" id="imp-btn" style="font-size:11px;padding:4px 12px;" onclick="importSelectedOps()" ${sel ? '' : 'disabled'}>Importar ${sel}</button>
       </div>
     </div>
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">
+      Toca cualquier dato para corregirlo, y marca «Revisado» en las que ya hayas comprobado.
       Los ingresos y retiradas de efectivo (top-up / withdrawal) se han descartado: no son compras ni ventas.
       ${dups ? `<br>· ${dups} ya estaban apuntadas y se han desmarcado.` : ''}
-      ${chk  ? `<br>· ${chk} no cuadran con el importe de la fila: revísalas antes de importar.` : ''}
-      ${inc  ? `<br>· ${inc} están incompletas (el OCR no pudo leer el precio): tendrás que apuntarlas a mano.` : ''}
+      ${chk  ? `<br>· ${chk} no cuadran con el importe de la fila: repásalas.` : ''}
+      ${inc  ? `<br>· ${inc} están incompletas (el OCR no pudo leer el precio): complétalas y se activarán.` : ''}
     </div>
-    <div class="table-wrap"><table class="hist-table" style="width:100%;min-width:640px">
+    <div class="table-wrap"><table class="hist-table imp-table" style="width:100%;min-width:820px">
       <thead><tr>
         <th></th><th style="text-align:left">Fecha</th><th style="text-align:left">Tipo</th>
         <th style="text-align:left">Activo</th><th style="text-align:right">Títulos</th>
-        <th style="text-align:right">Precio</th><th style="text-align:right">Comisión</th>
-        <th style="text-align:left">Estado</th>
+        <th style="text-align:right">Precio / Importe</th><th style="text-align:center">Mon.</th>
+        <th style="text-align:right">Comisión</th>
+        <th style="text-align:left">Estado</th><th style="text-align:center">Revisado</th>
       </tr></thead><tbody>
       ${pendingImport.map(r => {
-        const sym  = curSymbol(r.currency);
-        const tipo = r.type === 'dividend' ? 'Dividendo' : r.type === 'sell' ? 'Venta' : 'Compra';
-        const estado = r.dup ? '<span style="color:var(--muted)">Ya apuntada</span>'
-                     : r.status === 'incomplete' ? '<span style="color:var(--red)">Falta el precio</span>'
-                     : r.status === 'check' ? '<span style="color:var(--yellow)">Revisar</span>'
-                     : '<span style="color:var(--green)">OK</span>';
-        return `<tr style="${r.include ? '' : 'opacity:.5'}">
-          <td style="padding:4px 8px;text-align:center">
-            <input type="checkbox" ${r.include ? 'checked' : ''} ${r.status === 'incomplete' ? 'disabled' : ''}
+        const isDiv = r.type === 'dividend';
+        return `<tr id="imp-row-${r.idx}" style="${r.include ? '' : 'opacity:.5'}">
+          <td style="padding:4px 6px;text-align:center">
+            <input type="checkbox" id="imp-inc-${r.idx}" ${r.include ? 'checked' : ''} ${r.status === 'incomplete' ? 'disabled' : ''}
               onchange="toggleImportRow(${r.idx})" style="cursor:pointer">
           </td>
-          <td style="padding:4px 8px;font-size:12px">${fmtDate(r.date)}</td>
-          <td style="padding:4px 8px;font-size:12px">${tipo}</td>
-          <td style="padding:4px 8px;font-size:12px;font-family:monospace">${esc(r.ticker || '—')}</td>
-          <td style="padding:4px 8px;text-align:right;font-size:12px">${r.type === 'dividend' ? '—' : r.titulos}</td>
-          <td style="padding:4px 8px;text-align:right;font-size:12px">${r.type === 'dividend' ? fmtDec(r.amount) + ' ' + sym : (r.price ? fmtDec(r.price) + ' ' + sym : '—')}</td>
-          <td style="padding:4px 8px;text-align:right;font-size:12px">${r.fee ? fmtDec(r.fee) + ' ' + sym : '—'}</td>
-          <td style="padding:4px 8px;font-size:11px">${estado}</td>
+          <td style="padding:2px 4px">
+            <input class="imp-in" type="date" value="${r.date || ''}" onchange="updateImportField(${r.idx},'date',this.value)"></td>
+          <td style="padding:2px 4px">
+            <select class="imp-in" onchange="updateImportField(${r.idx},'type',this.value)">
+              <option value="buy"${r.type === 'buy' ? ' selected' : ''}>Compra</option>
+              <option value="sell"${r.type === 'sell' ? ' selected' : ''}>Venta</option>
+              <option value="dividend"${isDiv ? ' selected' : ''}>Dividendo</option>
+            </select></td>
+          <td style="padding:2px 4px">
+            <input class="imp-in" type="text" style="font-family:monospace" value="${esc(r.ticker || '')}" placeholder="TICKER"
+              oninput="updateImportField(${r.idx},'ticker',this.value)"></td>
+          <td style="padding:2px 4px">
+            ${isDiv ? '<span style="color:var(--border)">—</span>'
+                    : `<input class="imp-in num-in" type="text" inputmode="decimal" value="${r.titulos || ''}"
+                         oninput="updateImportField(${r.idx},'titulos',this.value)">`}</td>
+          <td style="padding:2px 4px">
+            <input class="imp-in num-in" type="text" inputmode="decimal" value="${(isDiv ? r.amount : r.price) || ''}"
+              oninput="updateImportField(${r.idx},'${isDiv ? 'amount' : 'price'}',this.value)"></td>
+          <td style="padding:2px 4px">
+            <select class="imp-in" style="text-align:center" onchange="updateImportField(${r.idx},'currency',this.value)">
+              <option value="EUR"${r.currency === 'EUR' ? ' selected' : ''}>€</option>
+              <option value="USD"${r.currency === 'USD' ? ' selected' : ''}>$</option>
+            </select></td>
+          <td style="padding:2px 4px">
+            <input class="imp-in num-in" type="text" inputmode="decimal" value="${r.fee || ''}" placeholder="0"
+              oninput="updateImportField(${r.idx},'fee',this.value)"></td>
+          <td style="padding:4px 8px;font-size:11px" id="imp-status-${r.idx}">${importStatusHtml(r)}</td>
+          <td style="padding:4px 6px;text-align:center">
+            <button class="review-chip${r.reviewed ? '' : ' pending'}" id="imp-rev-${r.idx}"
+              onclick="toggleImportReviewed(${r.idx})">${r.reviewed ? '✓ Sí' : 'No'}</button></td>
         </tr>`;
       }).join('')}
       </tbody></table></div>`;
@@ -1782,7 +1843,7 @@ async function importSelectedOps() {
       amount:  r.type === 'dividend' ? r.amount : 0,
       currency: r.currency, fee: r.fee || 0,
       fx, fxApprox: r.currency === 'USD' && !fxByDate[r.date],
-      reviewed: false, isin: ''
+      reviewed: !!r.reviewed, isin: r.isin || ''
     });
   });
 
@@ -1798,98 +1859,6 @@ let lastOcrText = '';
 function showOcrText() {
   if (!lastOcrText) return;
   alert('Texto reconocido en la captura:\n\n' + lastOcrText.slice(0, 3000));
-}
-
-// Vuelca lo leído al formulario. El activo se empareja por ticker o nombre
-// con los de la cartera; si no está, se usa el campo libre.
-function applyOcrToForm(d) {
-  const get = id => document.getElementById(id);
-  if (d.date)  get('op-date').value = d.date;
-  if (d.type)  get('op-type').value = d.type;
-
-  const key   = (d.ticker || d.name || '').trim().toUpperCase();
-  const match = rows.find(r => rowAssetKey(r) === key)
-             || rows.find(r => key && (r.ticker || '').toUpperCase() === (d.ticker || '').toUpperCase() && d.ticker)
-             || rows.find(r => d.name && (r.name || '').toUpperCase() === d.name.toUpperCase());
-
-  if (match) {
-    get('op-asset').value = String(match.id);
-    onOpAssetChange();
-  } else if (key) {
-    get('op-asset').value = '__other__';
-    onOpAssetChange();
-    get('op-other').value = d.ticker || d.name;
-  }
-
-  if (d.titulos) get('op-titulos').value = String(d.titulos);
-  if (d.price)   get('op-price').value   = String(d.price);
-  get('op-currency').value = d.currency === 'USD' ? 'USD' : 'EUR';
-  get('op-fee').value = d.fee ? String(d.fee) : '';
-  if (d.isin) pendingIsin = d.isin;
-
-  // Operación importada de una captura: nace SIN revisar.
-  const chk = get('op-reviewed');
-  if (chk) chk.checked = false;
-}
-
-let pendingIsin = '';
-
-// ── Alta de operación ──
-async function addOp() {
-  const get = id => document.getElementById(id);
-  const date    = get('op-date').value || todayISO();
-  const type    = get('op-type').value === 'sell' ? 'sell' : 'buy';
-  const sel     = get('op-asset').value;
-  const titulos = parseNum(get('op-titulos').value);
-  const price   = parseNum(get('op-price').value);
-  const fee     = parseNum(get('op-fee').value);
-  const currency = get('op-currency').value === 'USD' ? 'USD' : 'EUR';
-
-  let ticker = '', name = '';
-  if (sel === '__other__') {
-    const free = get('op-other').value.trim();
-    if (!free) { alert('Escribe el nombre o ticker del activo.'); return; }
-    ticker = free.toUpperCase();
-    name   = free;
-  } else {
-    const row = rows.find(r => String(r.id) === sel);
-    if (!row) { alert('Elige un activo.'); return; }
-    ticker = (row.ticker || '').toUpperCase();
-    name   = row.name || '';
-  }
-
-  if (type !== 'dividend' && titulos <= 0) { alert('Los títulos deben ser mayores que 0.'); return; }
-  if (price <= 0) { alert(type === 'dividend' ? 'El importe debe ser mayor que 0.' : 'El precio debe ser mayor que 0.'); return; }
-
-  // Alta manual = ya revisada. Las importadas de una captura nacen sin revisar
-  // y se pueden marcar más tarde desde la tabla.
-  const reviewed = document.getElementById('op-reviewed')?.checked !== false;
-
-  const op = { id: genOpId(), date, type, ticker, name,
-               titulos: type === 'dividend' ? 0 : titulos,
-               price:   type === 'dividend' ? 0 : price,
-               amount:  type === 'dividend' ? price : 0,
-               currency, fee,
-               fx: null, fxApprox: false, reviewed, isin: pendingIsin || '' };
-  pendingIsin = '';
-
-  if (currency === 'USD') {
-    const hist = await fetchFxOn(date);
-    op.fx = hist || fxRate();
-    op.fxApprox = !hist;   // sin red: se usó el cambio de hoy, revisable
-  }
-
-  ops.push(op);
-  persistOps();
-
-  // Limpiar solo los campos variables: la fecha y el activo suelen repetirse.
-  get('op-titulos').value = '';
-  get('op-price').value   = '';
-  get('op-fee').value     = '';
-  const chk = document.getElementById('op-reviewed');
-  if (chk) chk.checked = true;
-  const status = document.getElementById('ocr-status');
-  if (status) { status.className = 'ocr-status'; status.innerHTML = ''; }
 }
 
 // Marca/desmarca una operación como revisada.
@@ -1933,60 +1902,21 @@ function renderOps() {
     .filter(o => opsYearFilter === 'all' || String(o.date || '').startsWith(opsYearFilter))
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.id).localeCompare(String(a.id)));
 
-  const assetOptions = rows.map(r =>
-    `<option value="${r.id}" data-cur="${rowCurrency(r)}" data-price="${parseFloat(r.price) || ''}">${esc((r.ticker ? r.ticker.toUpperCase() + ' · ' : '') + (r.name || 'Sin nombre'))}</option>`
-  ).join('');
-
   let html = `
     <div class="ocr-bar">
-      <label class="btn btn-ghost" style="font-size:12px;padding:6px 14px;cursor:pointer;">
+      <label class="btn btn-primary" style="font-size:12px;padding:6px 14px;cursor:pointer;">
         📷 Subir captura
         <input type="file" accept="image/*" style="display:none" onchange="onScreenshotPicked(this)">
       </label>
-      <span style="font-size:11px;color:var(--muted)">Lee el «Trade Confirmation» de Revolut y rellena el formulario. La imagen no sale del móvil.</span>
+      <span style="font-size:11px;color:var(--muted)">Extracto de transacciones o confirmación suelta. La imagen no sale del móvil.</span>
     </div>
     <div id="ocr-status" class="ocr-status"></div>
-    <div id="ocr-import" style="display:none;margin-bottom:14px;"></div>
-
-    <div class="op-form">
-      <div class="op-field"><label>Fecha</label>
-        <input type="date" id="op-date" value="${todayISO()}"></div>
-      <div class="op-field"><label>Tipo</label>
-        <select id="op-type" onchange="onOpTypeChange()">
-          <option value="buy">Compra</option>
-          <option value="sell">Venta</option>
-          <option value="dividend">Dividendo</option>
-        </select></div>
-      <div class="op-field op-field-wide"><label>Activo</label>
-        <select id="op-asset" onchange="onOpAssetChange()">
-          ${assetOptions}
-          <option value="__other__">— Otro (escribir) —</option>
-        </select></div>
-      <div class="op-field op-field-wide" id="op-other-wrap" style="display:none"><label>Nombre / ticker</label>
-        <input type="text" id="op-other" placeholder="Ej. CEG"></div>
-      <div class="op-field" id="op-titulos-wrap"><label>Títulos</label>
-        <input class="num-in" type="text" inputmode="decimal" id="op-titulos" placeholder="0"></div>
-      <div class="op-field"><label id="op-price-label">Precio/ud.</label>
-        <input class="num-in" type="text" inputmode="decimal" id="op-price" placeholder="0.00"></div>
-      <div class="op-field op-field-cur"><label>Moneda</label>
-        <select id="op-currency" class="cur-sel" style="width:100%">
-          <option value="EUR">€</option>
-          <option value="USD">$</option>
-        </select></div>
-      <div class="op-field"><label>Comisión</label>
-        <input class="num-in" type="text" inputmode="decimal" id="op-fee" placeholder="0.00"></div>
-      <div class="op-field op-field-btn">
-        <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;user-select:none;margin-bottom:6px;"
-          title="Desmárcalo si la apuntas sin comprobar los datos: quedará pendiente de revisar">
-          <input type="checkbox" id="op-reviewed" checked style="cursor:pointer;"> Revisada
-        </label>
-        <button class="btn btn-primary" style="font-size:12px;padding:6px 14px;" onclick="addOp()">+ Apuntar</button></div>
-    </div>`;
+    <div id="ocr-import" style="display:none;margin-bottom:14px;"></div>`;
 
   if (ops.length === 0) {
     html += `<div class="empty-state" style="margin-top:14px">
       Aún no has apuntado ninguna operación.<br>
-      Cada compra o venta que registres actualiza sola los títulos y el precio medio del activo, y sale en el Excel del IRPF.
+      Sube una captura del extracto de Revolut: podrás revisar y corregir cada fila antes de importarla.
     </div>`;
     container.innerHTML = html;
     renderImportPreview();
@@ -2064,44 +1994,6 @@ function renderOps() {
   html += '</tbody></table></div>';
   container.innerHTML = html;
   renderImportPreview();
-}
-
-// Un dividendo no tiene títulos: se cobra un importe y punto.
-function onOpTypeChange() {
-  const isDiv = document.getElementById('op-type')?.value === 'dividend';
-  const wrap  = document.getElementById('op-titulos-wrap');
-  const label = document.getElementById('op-price-label');
-  if (wrap)  wrap.style.display = isDiv ? 'none' : '';
-  if (label) label.textContent  = isDiv ? 'Importe' : 'Precio/ud.';
-}
-
-function onOpAssetChange() {
-  const sel  = document.getElementById('op-asset');
-  const wrap = document.getElementById('op-other-wrap');
-  if (!sel || !wrap) return;
-  const other = sel.value === '__other__';
-  wrap.style.display = other ? '' : 'none';
-  if (other) return;
-  // Prellenar moneda y precio con los del activo elegido.
-  const opt = sel.options[sel.selectedIndex];
-  const cur = opt?.dataset.cur;
-  if (cur) document.getElementById('op-currency').value = cur;
-  const price = opt?.dataset.price;
-  const priceIn = document.getElementById('op-price');
-  if (price && priceIn && !priceIn.value) priceIn.value = price;
-}
-
-// Abre la tarjeta de operaciones con un activo ya seleccionado.
-function newOpFor(rowId, type) {
-  const card = document.getElementById('ops-card');
-  const sel  = document.getElementById('op-asset');
-  if (!card || !sel) return;
-  sel.value = String(rowId);
-  onOpAssetChange();
-  const typeSel = document.getElementById('op-type');
-  if (typeSel) typeSel.value = type === 'sell' ? 'sell' : 'buy';
-  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  setTimeout(() => document.getElementById('op-titulos')?.focus(), 400);
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -3542,10 +3434,8 @@ function renderTable() {
             <span class="asset-stat ${devClass}">Desv: <strong>${(dev >= 0 ? '+' : '') + dev.toFixed(1)}%</strong></span>
             ${(() => { const p = getRowPnl(row); return p ? `<span class="asset-stat">P&L: ${formatPnl(p)}</span>` : ''; })()}
           </div>
-          <div class="asset-delete" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;color:var(--green);" onclick="newOpFor(${row.id},'buy')">+ Compra</button>
-            <button class="btn btn-ghost" style="font-size:12px;padding:4px 10px;color:var(--red);" onclick="newOpFor(${row.id},'sell')">− Venta</button>
-            <button class="btn btn-danger" style="font-size:13px;padding:4px 10px;margin-left:auto;" onclick="deleteRow(${row.id})">Eliminar activo</button>
+          <div class="asset-delete">
+            <button class="btn btn-danger" style="font-size:13px;padding:4px 10px;" onclick="deleteRow(${row.id})">Eliminar activo</button>
           </div>
         </div>
       </div>`;
