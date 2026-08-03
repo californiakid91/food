@@ -154,6 +154,32 @@
     input[type="number"] { text-align: right; }
     .num-in { text-align: right; }
 
+    /* Selector de moneda junto al precio del activo */
+    .cur-sel {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 5px 4px;
+      min-height: 32px;
+      width: 46px;
+      text-align: center;
+      outline: none;
+      cursor: pointer;
+    }
+    .cur-sel:focus { border-color: var(--accent); }
+
+    .fx-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px;
+      min-height: 0;
+    }
+    .fx-hint:empty { display: none; }
+
     .col-ticker { width: 75px; }
     .col-name   { width: 140px; }
     .col-precio { width: 100px; }
@@ -853,7 +879,10 @@ function saveMonthSnapshot() {
       ticker:    r.ticker  || '',
       name:      r.name    || '',
       titulos:   parseFloat(r.titulos) || 0,
-      price:     parseFloat(r.price)   || 0,
+      price:     parseFloat(r.price)   || 0,     // en la moneda del activo
+      currency:  rowCurrency(r),
+      fxRate:    rowCurrency(r) === 'USD' ? fxRate() : null,
+      priceEur:  getRowPriceEur(r),
       avgPrice:  parseFloat(r.avgPrice) || 0,
       value:     getRowValue(r),
       target:    parseFloat(r.target)  || 0,
@@ -966,7 +995,7 @@ function renderHistory() {
             <td style="padding:5px 12px;font-family:monospace;font-size:11px">${esc(a.ticker||'—')}</td>
             <td style="padding:5px 12px;font-size:12px">${esc(a.name||'—')}</td>
             <td style="padding:5px 12px;text-align:right;font-size:12px">${a.titulos||'—'}</td>
-            <td style="padding:5px 12px;text-align:right;font-size:12px">${a.price ? fmtDec(a.price)+' €' : '—'}</td>
+            <td style="padding:5px 12px;text-align:right;font-size:12px">${a.price ? fmtDec(a.price)+' '+curSymbol(a.currency) : '—'}</td>
             <td style="padding:5px 12px;text-align:right;font-size:12px;font-weight:600">${fmt(a.value)} €</td>
             <td style="padding:5px 12px;text-align:right;font-size:12px">${a.pctActual.toFixed(1)}%</td>
             <td style="padding:5px 12px;text-align:right;font-size:12px;color:var(--accent)">${a.target}%</td>
@@ -1008,7 +1037,7 @@ function exportTaxExcel() {
         if (!costBasis[key]) costBasis[key] = { ticker: a.ticker, name: a.name, titulos: 0, totalCost: 0 };
         // Tomar los títulos del último snapshot del activo
         costBasis[key].titulos   = a.titulos;
-        costBasis[key].lastPrice = a.price;
+        costBasis[key].lastPrice = a.priceEur != null ? a.priceEur : a.price;  // Hacienda: siempre en €
         costBasis[key].lastValue = a.value;
       });
     });
@@ -1084,7 +1113,7 @@ function exportTaxExcel() {
             <td style="padding:4px 8px;font-family:monospace">${esc(a.ticker||'')}</td>
             <td style="padding:4px 8px">${esc(a.name||'')}</td>
             <td style="padding:4px 8px;text-align:right">${a.titulos || '—'}</td>
-            <td style="padding:4px 8px;text-align:right">${a.price ? fmtDec(a.price) : '—'}</td>
+            <td style="padding:4px 8px;text-align:right">${a.priceEur != null ? fmtDec(a.priceEur) : (a.price ? fmtDec(a.price) : '—')}</td>
             <td style="padding:4px 8px;text-align:right;font-weight:bold">${fmt(a.value)}</td>
             <td style="padding:4px 8px;text-align:right">${a.pctActual.toFixed(2)}%</td>
             <td style="padding:4px 8px;text-align:right;color:#3060c0">${a.target}%</td>
@@ -1176,15 +1205,43 @@ const TAB_COLORS = [
 ];
 
 // ── Tipo de cambio EUR/USD ────────────────────────────────────────────
-let eurUsd = null;
+// eurUsd = cuántos dólares vale 1 €. Se cachea en localStorage para que los
+// activos cotizados en $ sigan convirtiéndose a € sin conexión (modo avión).
+const FX_KEY      = 'food-eurusd';
+const FX_FALLBACK = 1.08;   // último recurso: nunca se pudo consultar la tasa
+let eurUsd   = null;
+let eurUsdAt = null;        // timestamp de la cotización en uso
+let eurUsdLive = false;     // true si viene de la red en esta sesión
+
+(function loadCachedFx() {
+  try {
+    const d = JSON.parse(localStorage.getItem(FX_KEY) || 'null');
+    if (d && d.rate > 0) { eurUsd = d.rate; eurUsdAt = d.at || null; }
+  } catch (e) {}
+})();
 
 async function fetchEurUsd() {
   try {
     const r = await fetch('https://api.frankfurter.dev/v1/latest?from=EUR&to=USD', { signal: AbortSignal.timeout(5000) });
     const d = await r.json();
-    eurUsd = d.rates?.USD || null;
-    if (eurUsd && document.getElementById('rebalance-result')) calcRebalance();
-  } catch { eurUsd = null; }
+    const rate = d.rates?.USD || 0;
+    if (rate > 0) {
+      const changed = rate !== eurUsd;
+      eurUsd = rate; eurUsdAt = Date.now(); eurUsdLive = true;
+      try { localStorage.setItem(FX_KEY, JSON.stringify({ rate, at: eurUsdAt })); } catch (e) {}
+      if (changed) onFxUpdated();
+    }
+  } catch (e) { /* sin red: se mantiene la tasa cacheada */ }
+}
+
+// Tasa efectiva usada para convertir: cacheada > fallback.
+function fxRate()    { return eurUsd || FX_FALLBACK; }
+function fxIsExact() { return !!eurUsd; }
+
+function onFxUpdated() {
+  try {
+    if (typeof rows !== 'undefined' && document.getElementById('rebalance-result')) render();
+  } catch (e) {}
 }
 
 fetchEurUsd();
@@ -1655,7 +1712,7 @@ window.addEventListener('load', () => {
 });
 
 function addRow() {
-  rows.push({ id: genId(), name: '', value: 0, target: 0, avgPrice: 0 });
+  rows.push({ id: genId(), name: '', value: 0, target: 0, avgPrice: 0, currency: 'EUR' });
   schedSave();
   render();
   setTimeout(() => {
@@ -1781,7 +1838,7 @@ function renderGlobalPosition() {
         const pnlData = getRowPnl(r);
         if (pnlData) {
           totalPnlVal += pnlData.pnl;
-          totalCostVal += (parseFloat(r.avgPrice) || 0) * (parseFloat(r.titulos) || 0);
+          totalCostVal += getRowAvgPriceEur(r) * (parseFloat(r.titulos) || 0);
           hasPnlData = true;
         }
       });
@@ -1877,10 +1934,32 @@ function drawGlobalSpark(selected) {
   ctx.fill();
 }
 
+// ── Moneda del activo ────────────────────────────────────────────────
+// Cada activo guarda su precio (y su precio medio) en su propia moneda:
+// 'EUR' por defecto, 'USD' para los que cotizan en dólares. Todo lo que sale
+// hacia el resto de la app (valor, P&L, rebalanceo) va SIEMPRE en euros.
+function rowCurrency(row) { return row.currency === 'USD' ? 'USD' : 'EUR'; }
+function curSymbol(cur)   { return cur === 'USD' ? '$' : '€'; }
+
+function toEur(amount, cur) {
+  if (!amount) return 0;
+  return cur === 'USD' ? amount / fxRate() : amount;
+}
+
+// Texto de ayuda bajo el precio: solo se muestra en activos en dólares.
+function fxHintText(row) {
+  const price = parseFloat(row.price) || 0;
+  if (rowCurrency(row) !== 'USD' || price <= 0) return '';
+  return `≈ ${fmtDec(getRowPriceEur(row))} € · 1 € = ${fxRate().toFixed(4)} $${fxIsExact() ? '' : ' (estimado)'}`;
+}
+
+function getRowPriceEur(row)    { return toEur(parseFloat(row.price)    || 0, rowCurrency(row)); }
+function getRowAvgPriceEur(row) { return toEur(parseFloat(row.avgPrice) || 0, rowCurrency(row)); }
+
 // Si el usuario tiene títulos + precio, el valor se calcula automáticamente
 function getRowValue(row) {
   const t = parseFloat(row.titulos) || 0;
-  const p = parseFloat(row.price)   || 0;
+  const p = getRowPriceEur(row);
   if (t > 0 && p > 0) return t * p;
   return parseFloat(row.value) || 0;
 }
@@ -1988,6 +2067,10 @@ function renderTable() {
   let html = '';
   rows.forEach((row, i) => {
     const price   = parseFloat(row.price)   || 0;
+    const cur      = rowCurrency(row);
+    const sym      = curSymbol(cur);
+    const priceEur = getRowPriceEur(row);
+    const fxHint  = `<div class="fx-hint" id="fx-hint-${row.id}">${fxHintText(row)}</div>`;
     const titulos = parseFloat(row.titulos) || 0;
     const isAuto  = titulos > 0 && price > 0;
     const val     = getRowValue(row);
@@ -2032,9 +2115,16 @@ function renderTable() {
                 oninput="updateRow(${row.id},'name',this.value)" onclick="event.stopPropagation()">
             </div>
             <div class="asset-field">
-              <label>Precio (€)</label>
-              <input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${price||''}" placeholder="0.00"
-                oninput="updateRow(${row.id},'price',this.value)" onclick="event.stopPropagation()">
+              <label>Precio (${sym})</label>
+              <div style="display:flex;gap:4px;align-items:center;">
+                <input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${price||''}" placeholder="0.00"
+                  style="flex:1" oninput="updateRow(${row.id},'price',this.value)" onclick="event.stopPropagation()">
+                <select class="cur-sel" onchange="updateRow(${row.id},'currency',this.value)" onclick="event.stopPropagation()" title="Moneda de cotización">
+                  <option value="EUR"${cur === 'EUR' ? ' selected' : ''}>€</option>
+                  <option value="USD"${cur === 'USD' ? ' selected' : ''}>$</option>
+                </select>
+              </div>
+              ${fxHint}
             </div>
             <div class="asset-field">
               <label>Títulos</label>
@@ -2044,7 +2134,7 @@ function renderTable() {
             <div class="asset-field" id="valor-field-${row.id}">
               <label>Valor (€)</label>
               ${isAuto
-                ? `<div class="valor-auto">${fmtDec(val)} € <span style="font-size:11px;color:var(--border)">(${titulos} × ${fmtDec(price)})</span></div>`
+                ? `<div class="valor-auto">${fmtDec(val)} € <span style="font-size:11px;color:var(--border)">(${titulos} × ${fmtDec(priceEur)} €)</span></div>`
                 : `<input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${val || ''}" placeholder="0"
                      oninput="updateRow(${row.id},'value',this.value)" onclick="event.stopPropagation()">`}
             </div>
@@ -2057,7 +2147,7 @@ function renderTable() {
               </div>
             </div>
             <div class="asset-field">
-              <label>Precio medio (€)</label>
+              <label>Precio medio (${sym})</label>
               <input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${parseFloat(row.avgPrice) || ''}" placeholder="0.00"
                 oninput="updateRow(${row.id},'avgPrice',this.value)" onclick="event.stopPropagation()">
             </div>
@@ -2087,6 +2177,14 @@ let derivedTimer;
 function updateRow(id, field, value) {
   const row = rows.find(r => r.id === id);
   if (!row) return;
+  if (field === 'currency') {
+    // Cambio de moneda: reconstruimos la fila entera (no hay ningún input con
+    // el foco, es un <select>) para refrescar etiquetas, hint y derivados.
+    row.currency = value === 'USD' ? 'USD' : 'EUR';
+    render();
+    schedSave();
+    return;
+  }
   row[field] = (field === 'name' || field === 'ticker') ? value : parseNum(value);
   if (field === 'titulos' || field === 'price' || field === 'value' || field === 'target' || field === 'avgPrice') {
     // Actualización dirigida y ligera: NO reconstruimos la tabla (eso destruiría
@@ -2108,9 +2206,11 @@ function refreshRowDerived(id, editedField) {
   const row = rows.find(r => r.id === id);
   if (!el || !row) return;
 
-  const total   = getTotal();
-  const price   = parseFloat(row.price)   || 0;
-  const titulos = parseFloat(row.titulos) || 0;
+  const total    = getTotal();
+  const price    = parseFloat(row.price)   || 0;
+  const cur      = rowCurrency(row);
+  const priceEur = getRowPriceEur(row);
+  const titulos  = parseFloat(row.titulos) || 0;
   const isAuto  = titulos > 0 && price > 0;
   const val     = getRowValue(row);
   const tgt     = parseFloat(row.target)  || 0;
@@ -2134,6 +2234,10 @@ function refreshRowDerived(id, editedField) {
   if (pctEl) { pctEl.className = 'asset-pct ' + devClass; pctEl.textContent = tgt > 0 ? actual.toFixed(1) + '%' : ''; }
   const badgeEl = el.querySelector('.asset-badge');
   if (badgeEl) badgeEl.innerHTML = badge;
+
+  // Equivalencia en € del precio en dólares.
+  const fxEl = document.getElementById('fx-hint-' + id);
+  if (fxEl) fxEl.textContent = fxHintText(row);
 
   // Barra "on target" bajo la cabecera.
   const idx = rows.findIndex(r => r.id === id);
@@ -2159,7 +2263,7 @@ function refreshRowDerived(id, editedField) {
     if (valorField) {
       valorField.innerHTML = `<label>Valor (€)</label>
         ${isAuto
-          ? `<div class="valor-auto">${fmtDec(val)} € <span style="font-size:11px;color:var(--border)">(${titulos} × ${fmtDec(price)})</span></div>`
+          ? `<div class="valor-auto">${fmtDec(val)} € <span style="font-size:11px;color:var(--border)">(${titulos} × ${fmtDec(priceEur)} €)</span></div>`
           : `<input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${val || ''}" placeholder="0"
                oninput="updateRow(${id},'value',this.value)" onclick="event.stopPropagation()">`}`;
     }
@@ -2227,7 +2331,7 @@ function calcRebalance() {
   // ── Paso 1: necesidad ideal de cada activo (solo positivo = solo compra) ──
   const results = rows.map((row, i) => {
     const val      = getRowValue(row);
-    const price    = parseFloat(row.price)  || 0;
+    const price    = getRowPriceEur(row);   // siempre en €, aunque cotice en $
     const tgt      = (parseFloat(row.target) || 0) / 100;
     const targetVal = newTotal * tgt;
     const idealBuy  = Math.max(0, targetVal - val);
@@ -2258,7 +2362,9 @@ function calcRebalance() {
       Cartera actual: <strong>${fmt(total)} €</strong> &nbsp;|&nbsp;
       Aportación${auto ? ' mínima' : ''}: <strong>${fmt(newMoney)} €</strong> &nbsp;|&nbsp;
       Total estimado: <strong>${fmt(total + totalSpent)} €</strong>
-      ${eurUsd ? `&nbsp;|&nbsp; <span style="font-size:12px;opacity:0.8">1 € = ${eurUsd.toFixed(4)} $</span>` : ''}
+      ${rows.some(r => rowCurrency(r) === 'USD')
+        ? `&nbsp;|&nbsp; <span style="font-size:12px;opacity:0.8">1 € = ${fxRate().toFixed(4)} $${fxIsExact() ? (eurUsdLive ? '' : ' (última guardada)') : ' (estimado, sin conexión)'}</span>`
+        : (eurUsd ? `&nbsp;|&nbsp; <span style="font-size:12px;opacity:0.8">1 € = ${eurUsd.toFixed(4)} $</span>` : '')}
     </div>
     <div class="table-wrap">
       <table class="result-table">
@@ -2283,7 +2389,7 @@ function calcRebalance() {
     if (allocated < 0.5) {
       investHtml = '<span class="muted">—</span>';
     } else {
-      const usdPart = eurUsd ? `<br><span style="color:var(--muted);font-size:11px">~${fmtDec(allocated * eurUsd)} $</span>` : '';
+      const usdPart = eurUsd ? `<br><span style="color:var(--muted);font-size:11px">~${fmtDec(allocated * fxRate())} $</span>` : '';
       investHtml = `<span class="green" style="font-weight:600">+${fmtDec(allocated)} €</span>${usdPart}`;
     }
 
@@ -2704,8 +2810,10 @@ function toggleTheme() {
 // ══════════════════════════════════════════════════════════════════════
 
 function getRowPnl(row) {
-  const price = parseFloat(row.price) || 0;
-  const avgPrice = parseFloat(row.avgPrice) || 0;
+  // Precio y precio medio comparten moneda: se convierten ambos a € para que
+  // la plusvalía salga en euros aunque el activo cotice en dólares.
+  const price = getRowPriceEur(row);
+  const avgPrice = getRowAvgPriceEur(row);
   const titulos = parseFloat(row.titulos) || 0;
   if (avgPrice <= 0 || price <= 0 || titulos <= 0) return null;
   const pnl = (price - avgPrice) * titulos;
@@ -2747,7 +2855,7 @@ function getTotalPnl() {
     const pnlData = getRowPnl(r);
     if (pnlData) {
       totalPnl += pnlData.pnl;
-      totalCost += (parseFloat(r.avgPrice) || 0) * (parseFloat(r.titulos) || 0);
+      totalCost += getRowAvgPriceEur(r) * (parseFloat(r.titulos) || 0);
       hasPnl = true;
     }
   });
