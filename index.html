@@ -805,15 +805,19 @@
 <div class="stats" id="stats">
   <div class="stat"><span class="stat-label">Valor</span><span class="stat-value" id="stat-total">—</span></div>
   <div class="stat"><span class="stat-label">Activos</span><span class="stat-value" id="stat-count">—</span></div>
-  <div class="stat"><span class="stat-label">% Asignado</span><span class="stat-value" id="stat-obj">—</span></div>
-  <div class="stat"><span class="stat-label">Desv. máx.</span><span class="stat-value" id="stat-maxdev">—</span></div>
+  <div class="stat" id="stat-obj-box"><span class="stat-label">% Asignado</span><span class="stat-value" id="stat-obj">—</span></div>
+  <div class="stat" id="stat-maxdev-box"><span class="stat-label">Desv. máx.</span><span class="stat-value" id="stat-maxdev">—</span></div>
 </div>
 
 <!-- ── Lista de activos ── -->
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
     <div class="card-title" id="port-card-title" style="margin:0">Cartera</div>
-    <div style="display:flex;gap:8px;align-items:center;">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;user-select:none;"
+        title="Desactívalo en carteras que no quieras rebalancear: se ocultan los % objetivo y el rebalanceo">
+        <input type="checkbox" id="use-targets" onchange="onUseTargetsToggle(this.checked)" style="cursor:pointer;"> Con % objetivo
+      </label>
       <button class="btn btn-primary" style="font-size:12px;padding:5px 14px;min-height:auto;" onclick="addRow()">+ Activo</button>
     </div>
   </div>
@@ -838,7 +842,7 @@
       <canvas id="pie-canvas" width="260" height="260"></canvas>
       <div class="chart-legend" id="pie-legend"></div>
     </div>
-    <div>
+    <div id="bar-chart-wrap">
       <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:10px;">Actual vs Objetivo</div>
       <canvas id="bar-canvas" width="380" height="260"></canvas>
     </div>
@@ -846,7 +850,7 @@
 </div>
 
 <!-- ── Rebalanceo ── -->
-<div class="card">
+<div class="card" id="rebalance-card">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
     <div class="card-title" style="margin:0">Rebalanceo</div>
     <div class="field" style="gap:3px;">
@@ -3242,6 +3246,7 @@ function deletePortfolioActive() {
 function render() {
   const port = portfolios.find(p => p.id === currentPortId);
   document.getElementById('port-card-title').textContent = port ? port.name : 'Cartera';
+  applyTargetsVisibility();
   renderTable();
   updateStats();
   calcRebalance();
@@ -3526,7 +3531,7 @@ function confirmTarget(id) {
   refreshRowDerived(id, 'target');
   const totalObj = rows.reduce((s, r) => s + (parseFloat(r.target) || 0), 0);
   document.getElementById('obj-warning').style.display =
-    (rows.length > 0 && Math.abs(totalObj - 100) > 0.01) ? 'block' : 'none';
+    (usesTargets() && rows.length > 0 && Math.abs(totalObj - 100) > 0.01) ? 'block' : 'none';
   updateStats();
   calcRebalance();
   drawCharts();
@@ -3575,7 +3580,7 @@ function renderTable() {
   const totalObj = rows.reduce((s, r) => s + (parseFloat(r.target) || 0), 0);
 
   document.getElementById('obj-warning').style.display =
-    (rows.length > 0 && Math.abs(totalObj - 100) > 0.01) ? 'block' : 'none';
+    (usesTargets() && rows.length > 0 && Math.abs(totalObj - 100) > 0.01) ? 'block' : 'none';
 
   if (rows.length === 0) {
     container.innerHTML = `
@@ -3604,8 +3609,10 @@ function renderTable() {
     const color   = PALETTE[i % PALETTE.length];
     const isOpen  = openAssetId === row.id;
 
+    const conObjetivo = usesTargets();
     let badge = '';
-    if (Math.abs(dev) < 1)  badge = '<span class="badge badge-ok">OK</span>';
+    if (!conObjetivo)        badge = '';
+    else if (Math.abs(dev) < 1)  badge = '<span class="badge badge-ok">OK</span>';
     else if (dev > 0)        badge = '<span class="badge badge-high">Alto</span>';
     else                     badge = '<span class="badge badge-low">Bajo</span>';
 
@@ -3621,11 +3628,11 @@ function renderTable() {
           <span class="asset-name">${esc(row.name || (ticker ? '' : 'Sin nombre'))}</span>
           <span class="asset-value">${val > 0 ? fmt(val) + ' €' : ''}</span>
           <span class="asset-pnl">${(() => { const p = getRowPnl(row); return p ? formatPnl(p) : ''; })()}</span>
-          <span class="asset-pct ${devClass}">${tgt > 0 ? actual.toFixed(1) + '%' : ''}</span>
+          <span class="asset-pct ${devClass}">${conObjetivo && tgt > 0 ? actual.toFixed(1) + '%' : ''}</span>
           <span class="asset-badge">${badge}</span>
           <span class="asset-chevron">&#9654;</span>
         </div>
-        ${tgt > 0 ? onTargetBarHtml(actual, tgt, color, row.id) : ''}
+        ${conObjetivo && tgt > 0 ? onTargetBarHtml(actual, tgt, color, row.id) : ''}
         <div class="asset-body">
           <div class="ocr-bar" style="margin-bottom:12px;">
             <label class="btn btn-ghost" style="font-size:12px;padding:5px 12px;cursor:pointer;" onclick="event.stopPropagation()">
@@ -3670,7 +3677,7 @@ function renderTable() {
                 : `<input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${val || ''}" placeholder="0"
                      oninput="updateRow(${row.id},'value',this.value)" onclick="event.stopPropagation()">`}
             </div>
-            <div class="asset-field" id="target-field-${row.id}">
+            <div class="asset-field" id="target-field-${row.id}" style="${conObjetivo ? '' : 'display:none'}">
               <label>% Objetivo</label>
               <div style="display:flex;gap:4px;align-items:center;">
                 <input id="target-input-${row.id}" class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${tgt || ''}" placeholder="0"
@@ -3686,8 +3693,8 @@ function renderTable() {
           </div>
           <div class="asset-stats" id="stats-field-${row.id}">
             <span class="asset-stat">Actual: <strong>${actual.toFixed(1)}%</strong></span>
-            <span class="asset-stat">Objetivo: <strong>${tgt}%</strong></span>
-            <span class="asset-stat ${devClass}">Desv: <strong>${(dev >= 0 ? '+' : '') + dev.toFixed(1)}%</strong></span>
+            ${conObjetivo ? `<span class="asset-stat">Objetivo: <strong>${tgt}%</strong></span>
+            <span class="asset-stat ${devClass}">Desv: <strong>${(dev >= 0 ? '+' : '') + dev.toFixed(1)}%</strong></span>` : ''}
             ${(() => { const p = getRowPnl(row); return p ? `<span class="asset-stat">P&L: ${formatPnl(p)}</span>` : ''; })()}
           </div>
           <div class="asset-delete">
@@ -3753,8 +3760,10 @@ function refreshRowDerived(id, editedField) {
   const dev     = actual - tgt;
   const devClass = dev > 1 ? 'red' : dev < -1 ? 'green' : 'muted';
 
+  const conObjetivo = usesTargets();
   let badge = '';
-  if (Math.abs(dev) < 1) badge = '<span class="badge badge-ok">OK</span>';
+  if (!conObjetivo)      badge = '';
+  else if (Math.abs(dev) < 1) badge = '<span class="badge badge-ok">OK</span>';
   else if (dev > 0)      badge = '<span class="badge badge-high">Alto</span>';
   else                   badge = '<span class="badge badge-low">Bajo</span>';
 
@@ -3766,7 +3775,7 @@ function refreshRowDerived(id, editedField) {
   const pnlEl = el.querySelector('.asset-pnl');
   if (pnlEl) pnlEl.innerHTML = pnl ? formatPnl(pnl) : '';
   const pctEl = el.querySelector('.asset-pct');
-  if (pctEl) { pctEl.className = 'asset-pct ' + devClass; pctEl.textContent = tgt > 0 ? actual.toFixed(1) + '%' : ''; }
+  if (pctEl) { pctEl.className = 'asset-pct ' + devClass; pctEl.textContent = conObjetivo && tgt > 0 ? actual.toFixed(1) + '%' : ''; }
   const badgeEl = el.querySelector('.asset-badge');
   if (badgeEl) badgeEl.innerHTML = badge;
 
@@ -3778,7 +3787,7 @@ function refreshRowDerived(id, editedField) {
   const idx = rows.findIndex(r => r.id === id);
   const color = PALETTE[idx % PALETTE.length];
   const barEl = document.getElementById('bar-' + id);
-  if (tgt > 0) {
+  if (conObjetivo && tgt > 0) {
     const barHtml = onTargetBarHtml(actual, tgt, color, id);
     if (barEl) {
       barEl.outerHTML = barHtml;
@@ -3809,14 +3818,50 @@ function refreshRowDerived(id, editedField) {
   if (statsField) {
     statsField.innerHTML = `
       <span class="asset-stat">Actual: <strong>${actual.toFixed(1)}%</strong></span>
-      <span class="asset-stat">Objetivo: <strong>${tgt}%</strong></span>
-      <span class="asset-stat ${devClass}">Desv: <strong>${(dev >= 0 ? '+' : '') + dev.toFixed(1)}%</strong></span>
+      ${conObjetivo ? `<span class="asset-stat">Objetivo: <strong>${tgt}%</strong></span>
+      <span class="asset-stat ${devClass}">Desv: <strong>${(dev >= 0 ? '+' : '') + dev.toFixed(1)}%</strong></span>` : ''}
       ${pnl ? `<span class="asset-stat">P&L: ${formatPnl(pnl)}</span>` : ''}`;
   }
 }
 
 
 // ── Stats ──
+// ── Carteras con o sin porcentajes objetivo ──────────────────────────
+// Hay carteras que se rebalancean (40-30-30) y otras que son solo un cajón
+// de posiciones. En estas últimas sobran los objetivos y el rebalanceo.
+function usesTargets(port) {
+  const p = port || portfolios.find(x => x.id === currentPortId);
+  return !p || p.useTargets !== false;   // por defecto sí, como hasta ahora
+}
+
+function onUseTargetsToggle(on) {
+  const port = portfolios.find(p => p.id === currentPortId);
+  if (!port) return;
+  port.useTargets = !!on;
+  saveMeta();
+  schedulePush();
+  render();
+}
+
+// Muestra u oculta todo lo que depende de los objetivos.
+function applyTargetsVisibility() {
+  const on = usesTargets();
+  const chk = document.getElementById('use-targets');
+  if (chk) chk.checked = on;
+  const set = (id, visible, display) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = visible ? (display || '') : 'none';
+  };
+  set('rebalance-card',  on);
+  set('bar-chart-wrap',  on);
+  set('stat-obj-box',    on);
+  set('stat-maxdev-box', on);
+  if (!on) {
+    const w = document.getElementById('obj-warning');
+    if (w) w.style.display = 'none';
+  }
+}
+
 function updateStats() {
   const total = getTotal();
   const totalObj = rows.reduce((s, r) => s + (parseFloat(r.target) || 0), 0);
@@ -3836,6 +3881,7 @@ function updateStats() {
 // ── Cálculo de rebalanceo ──
 function calcRebalance() {
   const container = document.getElementById('rebalance-result');
+  if (!container || !usesTargets()) return;   // cartera sin objetivos: no se rebalancea
   if (rows.length === 0) {
     container.innerHTML = '<div class="empty-state">Añade activos para calcular el rebalanceo.</div>';
     return;
@@ -4130,6 +4176,7 @@ function drawPie() {
 }
 
 function drawBar() {
+  if (!usesTargets()) return;   // sin objetivos no hay nada que comparar
   const canvas = document.getElementById('bar-canvas');
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
