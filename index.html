@@ -3010,6 +3010,7 @@ function switchPortfolio(id) {
   currentPortId = id;
   rows = loadRows(id);
   ops  = loadOps(id);
+  syncRowsFromOps();
   saveMeta();
   setNewMoneyInput();
   renderTabs();
@@ -3092,6 +3093,7 @@ window.addEventListener('load', () => {
   if (!loaded) createDefaultPortfolios();
   setNewMoneyInput();
   renderTabs();
+  syncRowsFromOps();       // los títulos y el coste salen siempre del FIFO
   autoSnapshot();          // el histórico se mantiene solo
   render();
   setTimeout(resizeCharts, 50);
@@ -3434,6 +3436,16 @@ function autocompleteTicker(id, ticker) {
   schedSave();
 }
 
+// Al terminar de escribir el símbolo o el nombre, el activo puede pasar a
+// emparejar con operaciones ya importadas: entonces sus títulos y su precio
+// medio los pone el FIFO. Se hace en `change` (al salir del campo) y no en
+// cada tecla para no redibujar mientras se escribe.
+function commitAssetIdentity(id) {
+  syncRowsFromOps();
+  schedSave();
+  render();
+}
+
 function getTotal() {
   return rows.reduce((s, r) => s + getRowValue(r), 0);
 }
@@ -3515,12 +3527,12 @@ function renderTable() {
             <div class="asset-field">
               <label>Símbolo</label>
               <input class="ticker-badge" type="text" value="${esc(row.ticker||'')}" placeholder="TICKER"
-                oninput="autocompleteTicker(${row.id},this.value)" onclick="event.stopPropagation()">
+                oninput="autocompleteTicker(${row.id},this.value)" onchange="commitAssetIdentity(${row.id})" onclick="event.stopPropagation()">
             </div>
             <div class="asset-field">
               <label>Nombre</label>
               <input class="input-name" type="text" value="${esc(row.name)}" placeholder="Nombre del activo"
-                oninput="updateRow(${row.id},'name',this.value)" onclick="event.stopPropagation()">
+                oninput="updateRow(${row.id},'name',this.value)" onchange="commitAssetIdentity(${row.id})" onclick="event.stopPropagation()">
             </div>
             <div class="asset-field">
               <label>Precio (${sym})</label>
