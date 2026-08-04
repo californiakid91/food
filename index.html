@@ -957,20 +957,55 @@ function buildSnapshot(port, portRows, year, month) {
 // el tipo de cambio de ESE día (congelado): Hacienda exige valorar en euros
 // al cambio de la fecha de la operación, no al de hoy.
 
-function opsKey(portId) { return 'balance-ops-' + portId; }
+// Las operaciones son ÚNICAS para toda la cuenta del bróker, no por cartera:
+// las carteras de la app solo agrupan activos para verlos mejor, pero Hacienda
+// trata cada valor como un único conjunto homogéneo y el FIFO debe recorrerlo
+// entero. Además, así el mismo extracto no se puede importar dos veces por
+// estar en otra pestaña.
+const OPS_KEY = 'balance-ops';
+function opsKey(portId) { return 'balance-ops-' + portId; }   // formato antiguo
 
-let ops = [];   // operaciones de la cartera activa
+let ops = [];   // libro de operaciones completo
 
-function loadOps(portId) {
+function parseOpsBlob(raw) {
   try {
-    const d = JSON.parse(localStorage.getItem(opsKey(portId)) || 'null');
+    const d = JSON.parse(raw || 'null');
     if (Array.isArray(d)) return d;
     return d && Array.isArray(d.ops) ? d.ops : [];
   } catch { return []; }
 }
 
-function saveOpsData(portId, list) {
-  try { localStorage.setItem(opsKey(portId), JSON.stringify(list)); } catch (e) {}
+function loadOpsAll() { return parseOpsBlob(localStorage.getItem(OPS_KEY)); }
+function saveOpsAll(list) {
+  try { localStorage.setItem(OPS_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+// Huella de una operación para detectar la misma apuntada dos veces.
+function opFingerprint(o) {
+  const n = v => Math.round((parseFloat(v) || 0) * 1e6) / 1e6;
+  return [o.date || '', o.type || '', String(o.ticker || o.name || '').toUpperCase(),
+          n(o.titulos), n(o.price), n(o.amount), o.currency || ''].join('|');
+}
+
+function dedupeOps(list) {
+  const seen = new Set();
+  return list.filter(o => {
+    const k = opFingerprint(o);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+// Migración: junta en un solo libro las operaciones que estaban repartidas por
+// cartera. Se conservan las claves antiguas por si hubiera que mirar atrás.
+function migrateOpsToGlobal(portfolioIds) {
+  if (localStorage.getItem(OPS_KEY) !== null) return { migrated: false };
+  const juntas = [];
+  (portfolioIds || []).forEach(id => juntas.push(...parseOpsBlob(localStorage.getItem(opsKey(id)))));
+  const limpias = dedupeOps(juntas);
+  saveOpsAll(limpias);
+  return { migrated: true, total: juntas.length, duplicadas: juntas.length - limpias.length };
 }
 
 function genOpId() { return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
@@ -1064,10 +1099,29 @@ function fifoPosition(agg) {
 
 // Vuelca títulos y precio medio de las operaciones a los activos de la cartera.
 // Las operaciones mandan: son el dato real, con comisiones y cambio del día.
-function syncRowsFromOps() {
+// Vuelca el FIFO a los activos de TODAS las carteras: el libro es único y un
+// mismo valor puede estar en la pestaña que sea.
+function syncAllPortfoliosFromOps() {
   const agg = computeFifo(ops);
+  portfolios.forEach(p => {
+    if (p.id === currentPortId) { applyFifoToRows(rows, agg); return; }
+    try {
+      const raw = localStorage.getItem(rowsKey(p.id));
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      const list = data.rows || [];
+      if (!list.length) return;
+      applyFifoToRows(list, agg);
+      localStorage.setItem(rowsKey(p.id), JSON.stringify({ ...data, rows: list }));
+    } catch (e) {}
+  });
+}
+
+function syncRowsFromOps() { applyFifoToRows(rows, computeFifo(ops)); }
+
+function applyFifoToRows(list, agg) {
   Object.values(agg).forEach(a => {
-    const row = rows.find(r => rowAssetKey(r) === a.key);
+    const row = list.find(r => rowAssetKey(r) === a.key);
     if (!row) return;
     const pos = fifoPosition(a);
     row.titulos = parseFloat(pos.qty.toFixed(8));
@@ -1989,7 +2043,7 @@ function toggleOpReviewed(id) {
   const op = ops.find(o => o.id === id);
   if (!op) return;
   op.reviewed = !op.reviewed;
-  saveOpsData(currentPortId, ops);
+  saveOpsAll(ops);
   schedSave();
   renderOps();
 }
@@ -2004,8 +2058,8 @@ function deleteOp(id) {
 
 // Guarda las operaciones y propaga sus efectos a la cartera.
 function persistOps() {
-  saveOpsData(currentPortId, ops);
-  syncRowsFromOps();
+  saveOpsAll(ops);
+  syncAllPortfoliosFromOps();
   saveRows();
   autoSnapshot();   // la foto del mes refleja la cartera ya actualizada
   schedSave();
@@ -2132,7 +2186,7 @@ function fillTaxYears() {
   if (!sel) return;
   const years = new Set([new Date().getFullYear()]);
   portfolios.forEach(p => {
-    const list = p.id === currentPortId ? ops : loadOps(p.id);
+    const list = ops;
     list.forEach(o => { const y = parseInt(String(o.date || '').slice(0, 4), 10); if (y) years.add(y); });
     loadHistory(p.id).forEach(s => { if (s.year) years.add(s.year); });
   });
@@ -2147,28 +2201,46 @@ function exportTaxExcel(yearArg) {
   const year = yearArg || (sel && parseInt(sel.value, 10)) || new Date().getFullYear();
   const allMonths = MONTHS_ES.map((name, i) => ({ name, month: i + 1 }));
 
+  // Una sola hoja para toda la cuenta: las carteras de la app son una ayuda
+  // visual, pero la declaración es única y el FIFO recorre cada valor entero.
   let sheetsHtml = '';
 
-  portfolios.forEach((port, pi) => {
-    const snapshots = loadHistory(port.id);
-    const snapMap   = {};
-    snapshots.forEach(s => { if (s.year === year) snapMap[s.month] = s; });
+  // En qué cartera está cada activo (solo informativo, para localizarlo).
+  const carteraDe = {};
+  portfolios.forEach(p => {
+    const list = p.id === currentPortId
+      ? rows
+      : (() => { try { const raw = localStorage.getItem(rowsKey(p.id)); return raw ? (JSON.parse(raw).rows || []) : []; } catch { return []; } })();
+    list.forEach(r => { const k = rowAssetKey(r); if (k && !carteraDe[k]) carteraDe[k] = p.name; });
+  });
+  const carteraOf = (ticker, name) => carteraDe[String(ticker || name || '').toUpperCase()] || '';
 
-    // Reconstruir base de coste acumulada desde todos los snapshots
+  {
+    // Evolución mensual: se suman los valores de todas las carteras.
+    const snapMap = {};
+    portfolios.forEach(p => loadHistory(p.id).forEach(sn => {
+      if (sn.year !== year) return;
+      if (!snapMap[sn.month]) snapMap[sn.month] = { month: sn.month, label: sn.label, totalValue: 0 };
+      snapMap[sn.month].totalValue += sn.totalValue || 0;
+    }));
+
+    // Última foto conocida de cada activo, de cualquier cartera.
     const costBasis = {};
-    snapshots.filter(s => s.year <= year).forEach(s => {
-      s.assets.forEach(a => {
+    portfolios.forEach(p => loadHistory(p.id).filter(sn => sn.year <= year).forEach(sn => {
+      sn.assets.forEach(a => {
         const key = a.ticker || a.name;
         if (!costBasis[key]) costBasis[key] = { ticker: a.ticker, name: a.name, titulos: 0, totalCost: 0 };
-        // Tomar los títulos del último snapshot del activo
         costBasis[key].titulos   = a.titulos;
         costBasis[key].lastPrice = a.priceEur != null ? a.priceEur : a.price;  // Hacienda: siempre en €
         costBasis[key].lastValue = a.value;
+        costBasis[key].pctActual = a.pctActual;
+        costBasis[key].target    = a.target;
+        costBasis[key].label     = sn.label;
       });
-    });
+    }));
 
-    // Operaciones de esta cartera + reparto FIFO (base de las secciones 4 y 5)
-    const portOps  = port.id === currentPortId ? ops : loadOps(port.id);
+    // Libro único de operaciones: base de las secciones 0 y 4 a 7.
+    const portOps  = ops;
     const fifo     = computeFifo(portOps);
     const yearAll  = portOps
       .filter(o => String(o.date || '').startsWith(String(year)))
@@ -2233,14 +2305,17 @@ function exportTaxExcel(yearArg) {
       if (cb && pos.qty > 0) { cb.costEur = pos.costEur; cb.unitCostEur = pos.unitCostEur; }
     });
 
-    const sepStyle = pi > 0 ? 'mso-break-type:section-break' : '';
-
     sheetsHtml += `
-      ${pi > 0 ? `<br style="${sepStyle}">` : ''}
       <table border="1" style="border-collapse:collapse;font-family:Calibri,Arial;font-size:11pt;mso-number-format:General">
         <tr>
           <td colspan="14" style="background:#1a1a2e;color:#ffffff;font-size:14pt;font-weight:bold;padding:10px">
-            Declaración de la Renta ${year} — ${port.name}
+            Declaración de la Renta ${year} — cuenta completa
+          </td>
+        </tr>
+        <tr>
+          <td colspan="14" style="color:#888;font-size:9pt;padding:4px 10px;font-style:italic">
+            Todas las carteras de la app en un único informe: la declaración es una y el FIFO
+            recorre cada valor entero, sin separarlo por pestañas.
           </td>
         </tr>
         <tr><td colspan="14" style="height:10px;border:none"></td></tr>
@@ -2256,7 +2331,7 @@ function exportTaxExcel(yearArg) {
         <!-- SECCIÓN 1: Evolución mensual -->
         <tr>
           <td colspan="14" style="background:#2e3350;color:#e8eaf0;font-weight:bold;padding:6px 10px">
-            1. Evolución del valor de la cartera (${year})
+            1. Evolución del valor de la cuenta (${year}) — todas las carteras sumadas
           </td>
         </tr>
         <tr style="background:#f0f0f0;font-weight:bold">
@@ -2288,38 +2363,48 @@ function exportTaxExcel(yearArg) {
 
         <tr><td colspan="14" style="height:14px;border:none"></td></tr>
 
-        <!-- SECCIÓN 2: Detalle activos (último snapshot del año) -->
+        <!-- SECCIÓN 2: Composición consolidada -->
         ${(() => {
-          const lastSnap = [...snapshots].filter(s => s.year === year).sort((a,b) => b.month - a.month)[0];
-          if (!lastSnap) return '<tr><td colspan="14" style="color:#888;padding:6px 10px">Sin snapshots en ' + year + '</td></tr>';
+          // Última foto de cada cartera dentro del año, todas juntas.
+          const ultimas = portfolios.map(p => ({
+            port: p,
+            snap: [...loadHistory(p.id)].filter(sn => sn.year === year).sort((x, y) => y.month - x.month)[0]
+          })).filter(x => x.snap);
+          if (!ultimas.length) return '<tr><td colspan="14" style="color:#888;padding:6px 10px">Sin datos de composición en ' + year + '</td></tr>';
+          const totalGlobal = ultimas.reduce((n, x) => n + (x.snap.totalValue || 0), 0);
+          const filas = [];
+          ultimas.forEach(({ port, snap }) => snap.assets.forEach(a => filas.push({ ...a, cartera: port.name, mes: snap.label })));
+          filas.sort((a, b) => (b.value || 0) - (a.value || 0));
           return `
           <tr>
             <td colspan="14" style="background:#2e3350;color:#e8eaf0;font-weight:bold;padding:6px 10px">
-              2. Composición a ${lastSnap.label} (último snapshot ${year})
+              2. Composición de la cuenta al cierre de ${year}
             </td>
           </tr>
           <tr style="background:#f0f0f0;font-weight:bold">
             <td style="padding:5px 8px">Símbolo</td>
             <td style="padding:5px 8px">Activo</td>
+            <td style="padding:5px 8px">Cartera (app)</td>
             <td style="padding:5px 8px;text-align:right">Títulos</td>
             <td style="padding:5px 8px;text-align:right">Precio/ud. (€)</td>
             <td style="padding:5px 8px;text-align:right">Valor (€)</td>
-            <td style="padding:5px 8px;text-align:right">% Cartera</td>
+            <td style="padding:5px 8px;text-align:right">% Cuenta</td>
             <td style="padding:5px 8px;text-align:right">% Objetivo</td>
           </tr>
-          ${lastSnap.assets.map(a => `
+          ${filas.map(a => `
           <tr>
             <td style="padding:4px 8px;font-family:monospace">${esc(a.ticker||'')}</td>
             <td style="padding:4px 8px">${esc(a.name||'')}</td>
+            <td style="padding:4px 8px;color:#666">${esc(a.cartera)}</td>
             <td style="padding:4px 8px;text-align:right">${a.titulos || '—'}</td>
             <td style="padding:4px 8px;text-align:right">${a.priceEur != null ? fmtDec(a.priceEur) : (a.price ? fmtDec(a.price) : '—')}</td>
             <td style="padding:4px 8px;text-align:right;font-weight:bold">${fmt(a.value)}</td>
-            <td style="padding:4px 8px;text-align:right">${a.pctActual.toFixed(2)}%</td>
+            <td style="padding:4px 8px;text-align:right">${totalGlobal > 0 ? ((a.value || 0) / totalGlobal * 100).toFixed(2) : '0.00'}%</td>
             <td style="padding:4px 8px;text-align:right;color:#3060c0">${a.target}%</td>
           </tr>`).join('')}
           <tr style="font-weight:bold;background:#f8f8f8">
-            <td colspan="4" style="padding:4px 8px">TOTAL</td>
-            <td style="padding:4px 8px;text-align:right">${fmt(lastSnap.totalValue)} €</td>
+            <td colspan="5" style="padding:4px 8px">TOTAL CUENTA</td>
+            <td style="padding:4px 8px;text-align:right">${fmt(totalGlobal)} €</td>
             <td colspan="2"></td>
           </tr>`;
         })()}
@@ -2341,6 +2426,7 @@ function exportTaxExcel(yearArg) {
         <tr style="background:#f0f0f0;font-weight:bold">
           <td style="padding:5px 8px">Símbolo</td>
           <td style="padding:5px 8px">Activo</td>
+          <td style="padding:5px 8px">Cartera (app)</td>
           <td style="padding:5px 8px;text-align:right">Títulos</td>
           <td style="padding:5px 8px;text-align:right">Precio último (€)</td>
           <td style="padding:5px 8px;text-align:right">Valor mercado (€)</td>
@@ -2349,13 +2435,14 @@ function exportTaxExcel(yearArg) {
           <td style="padding:5px 8px">Tramo IRPF (referencia)</td>
         </tr>
         ${Object.values(costBasis).length === 0
-          ? '<tr><td colspan="8" style="padding:6px 10px;color:#888">Sin datos de base de coste</td></tr>'
+          ? '<tr><td colspan="9" style="padding:6px 10px;color:#888">Sin datos de base de coste</td></tr>'
           : Object.values(costBasis).map(cb => {
             const latente = cb.costEur != null ? (cb.lastValue || 0) - cb.costEur : null;
             return `
           <tr>
             <td style="padding:4px 8px;font-family:monospace">${esc(cb.ticker||'')}</td>
             <td style="padding:4px 8px">${esc(cb.name||'')}</td>
+            <td style="padding:4px 8px;color:#666">${esc(carteraOf(cb.ticker, cb.name))}</td>
             <td style="padding:4px 8px;text-align:right">${cb.titulos || '—'}</td>
             <td style="padding:4px 8px;text-align:right">${cb.lastPrice ? fmtDec(cb.lastPrice) : '—'}</td>
             <td style="padding:4px 8px;text-align:right;font-weight:bold">${fmt(cb.lastValue || 0)}</td>
@@ -2540,14 +2627,14 @@ function exportTaxExcel(yearArg) {
           </td>
         </tr>
       </table>`;
-  });
+  }
 
   const xls = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
     xmlns:x="urn:schemas-microsoft-com:office:excel"
     xmlns="http://www.w3.org/TR/REC-html40">
     <head><meta charset="UTF-8">
     <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>
-      ${portfolios.map(p => `<x:ExcelWorksheet><x:Name>${esc(p.name.replace(/[^a-zA-Z0-9 áéíóúÁÉÍÓÚñÑ]/g,''))}</x:Name></x:ExcelWorksheet>`).join('')}
+      <x:ExcelWorksheet><x:Name>Renta ${year}</x:Name></x:ExcelWorksheet>
     </x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
     </head><body>${sheetsHtml}</body></html>`;
 
@@ -2734,18 +2821,8 @@ function buildSyncPayload() {
       if (raw) historyData[p.id] = JSON.parse(raw);
     } catch {}
   });
-  const opsData = {};
-  portfolios.forEach(p => {
-    if (p.id === currentPortId) {
-      if (ops.length) opsData[p.id] = ops;
-    } else {
-      try {
-        const raw = localStorage.getItem(opsKey(p.id));
-        if (raw) opsData[p.id] = JSON.parse(raw);
-      } catch {}
-    }
-  });
-  return { portfolios, currentPortId, nextId, portfolioData, historyData, opsData, savedAt: Date.now() };
+  return { portfolios, currentPortId, nextId, portfolioData, historyData,
+           opsAll: ops, savedAt: Date.now() };
 }
 
 function applySyncPayload(data) {
@@ -2760,12 +2837,19 @@ function applySyncPayload(data) {
   Object.entries(data.historyData || {}).forEach(([id, hist]) => {
     localStorage.setItem(histKey(id), JSON.stringify(hist));
   });
-  Object.entries(data.opsData || {}).forEach(([id, list]) => {
-    localStorage.setItem(opsKey(id), JSON.stringify(list));
-  });
+  // `opsAll` es el libro único; `opsData` es el formato antiguo por cartera y
+  // se fusiona al llegar de un dispositivo que aún no se ha actualizado.
+  if (Array.isArray(data.opsAll)) {
+    saveOpsAll(dedupeOps(data.opsAll));
+  } else if (data.opsData) {
+    const juntas = [];
+    Object.values(data.opsData).forEach(list => juntas.push(...(Array.isArray(list) ? list : [])));
+    if (juntas.length) saveOpsAll(dedupeOps([...loadOpsAll(), ...juntas]));
+  }
   localStorage.setItem(META_KEY, JSON.stringify({ portfolios, currentPortId, nextId }));
   rows = loadRows(currentPortId);
-  ops  = loadOps(currentPortId);
+  ops  = loadOpsAll();
+  syncAllPortfoliosFromOps();
   return true;
 }
 
@@ -2917,7 +3001,7 @@ function schedSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveRows();
-    saveOpsData(currentPortId, ops);
+    saveOpsAll(ops);
     saveMeta();
     schedulePush();
   }, 600);
@@ -2942,7 +3026,7 @@ function initPortfolios() {
         currentPortId = data.currentPortId || portfolios[0].id;
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
         rows = loadRows(currentPortId);
-        ops  = loadOps(currentPortId);
+        ops  = loadOpsAll();
         return true;
       }
     }
@@ -3009,7 +3093,6 @@ function switchPortfolio(id) {
   saveRows();
   currentPortId = id;
   rows = loadRows(id);
-  ops  = loadOps(id);
   syncRowsFromOps();
   saveMeta();
   setNewMoneyInput();
@@ -3032,12 +3115,10 @@ function deletePortfolio(id) {
   if (portfolios.length === 1) { alert('Debes tener al menos una cartera.'); return; }
   if (!confirm(`¿Eliminar la cartera "${port.name}"? Se borrarán todos sus datos.`)) return;
   localStorage.removeItem(rowsKey(id));
-  localStorage.removeItem(opsKey(id));
   portfolios = portfolios.filter(p => p.id !== id);
   if (currentPortId === id) {
     currentPortId = portfolios[0].id;
     rows = loadRows(currentPortId);
-    ops  = loadOps(currentPortId);
   }
   saveMeta();
   renderTabs();
@@ -3093,8 +3174,10 @@ window.addEventListener('load', () => {
   if (!loaded) createDefaultPortfolios();
   setNewMoneyInput();
   renderTabs();
-  syncRowsFromOps();       // los títulos y el coste salen siempre del FIFO
-  autoSnapshot();          // el histórico se mantiene solo
+  const mig = migrateOpsToGlobal(portfolios.map(p => p.id));
+  if (mig.migrated) { ops = loadOpsAll(); if (mig.total) schedSave(); }
+  syncAllPortfoliosFromOps();   // los títulos y el coste salen siempre del FIFO
+  autoSnapshot();               // el histórico se mantiene solo
   render();
   setTimeout(resizeCharts, 50);
   initChartInteractivity();
