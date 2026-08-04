@@ -1663,14 +1663,34 @@ function rowHasOps(row) {
   return !!k && ops.some(o => o.type !== 'dividend' && opAssetKey(o) === k);
 }
 
+// Posición viva que el FIFO calcula hoy para este activo. Es esto —y no la
+// mera existencia de operaciones— lo que decide si la captura puede escribir
+// títulos: si las compras no cubren la posición, el FIFO no tiene nada que
+// defender y bloquear la escritura solo dejaría el activo vacío.
+function rowFifoPosition(row) {
+  const k = rowAssetKey(row);
+  if (!k) return null;
+  const agg = computeFifo(ops)[k];
+  return agg ? fifoPosition(agg) : null;
+}
+
+function fifoOwnsRow(row) {
+  const pos = rowFifoPosition(row);
+  return !!pos && pos.qty > 1e-9;
+}
+
 let pendingPosition = {};
 
 async function onPositionScreenshot(input, rowId) {
   const file = input.files && input.files[0];
   input.value = '';
-  if (!file || ocrBusy) return;
+  if (!file) return;
 
   const st = document.getElementById('pos-status-' + rowId);
+  if (ocrBusy) {
+    if (st) { st.className = 'ocr-status ocr-warn'; st.textContent = 'Hay otra captura leyéndose ahora mismo: espera a que termine.'; }
+    return;
+  }
   const show = (html, cls) => { if (st) { st.className = 'ocr-status' + (cls ? ' ' + cls : ''); st.innerHTML = html; } };
 
   ocrBusy = true;
@@ -1693,9 +1713,12 @@ async function onPositionScreenshot(input, rowId) {
     }
 
     pendingPosition[rowId] = d;
-    const row   = rows.find(r => r.id === rowId);
-    const conOps = row ? rowHasOps(row) : false;
-    const sym   = curSymbol(d.currency);
+    const row    = rows.find(r => r.id === rowId);
+    const pos    = row ? rowFifoPosition(row) : null;
+    const conOps = !!pos && pos.qty > 1e-9;          // el FIFO tiene posición viva
+    const huerfano = !conOps && row && rowHasOps(row); // hay operaciones pero no cubren nada
+    const descuadre = conOps && d.titulos > 0 && Math.abs(pos.qty - d.titulos) / d.titulos > 0.01;
+    const sym    = curSymbol(d.currency);
 
     show(`Leído de la captura:
       <div style="margin:6px 0 8px;line-height:1.7">
@@ -1705,7 +1728,9 @@ async function onPositionScreenshot(input, rowId) {
         ${d.pnl       ? `· Ganancia latente: <strong>${d.pnl > 0 ? '+' : ''}${fmtDec(d.pnl)} ${sym}</strong>${d.pnlPct ? ` (${fmtDec(d.pnlPct)} %)` : ''}` : ''}
       </div>
       ${!d.verified ? '<div style="color:var(--yellow)">⚠ Los números no cuadran entre sí (valor − títulos × precio medio ≠ ganancia): compruébalos.</div>' : ''}
-      ${conOps ? `<div style="color:var(--muted);margin-bottom:6px">Este activo ya tiene operaciones registradas: los títulos y el precio medio los calcula el FIFO desde tus compras y ventas, así que <strong>solo se actualizará el precio</strong>.</div>` : ''}
+      ${conOps ? `<div style="color:var(--muted);margin-bottom:6px">Tus operaciones ya dan posición en este activo (${parseFloat(pos.qty.toFixed(8))} títulos): los títulos y el precio medio los calcula el FIFO, así que <strong>solo se actualizará el precio</strong>.</div>` : ''}
+      ${descuadre ? `<div style="color:var(--yellow);margin-bottom:6px">⚠ Revolut dice <strong>${d.titulos}</strong> títulos y tus operaciones suman <strong>${parseFloat(pos.qty.toFixed(8))}</strong>: te falta alguna compra o venta por importar, y eso sí afecta al IRPF.</div>` : ''}
+      ${huerfano ? `<div style="color:var(--yellow);margin-bottom:6px">⚠ Tienes operaciones de este activo pero no dejan títulos en cartera (faltará alguna compra por importar). Aplico los datos de la captura para que puedas rebalancear, pero <strong>revisa las operaciones</strong>: el IRPF sale de ellas.</div>` : ''}
       <button class="btn btn-primary" style="font-size:11px;padding:4px 12px;" onclick="applyPosition(${rowId})">${conOps ? 'Actualizar precio' : 'Aplicar a este activo'}</button>
       <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;" onclick="showOcrText()">Ver texto leído</button>`,
       d.verified ? 'ocr-ok' : 'ocr-warn');
@@ -1724,9 +1749,9 @@ function applyPosition(rowId) {
   if (d.currency) row.currency = d.currency;
   if (d.price > 0) row.price = d.price;
 
-  // Los títulos y el coste medio solo se escriben si no hay operaciones: las
-  // compras y ventas reales mandan siempre sobre lo que muestre la pantalla.
-  if (!rowHasOps(row)) {
+  // Los títulos y el coste medio solo se respetan cuando el FIFO tiene una
+  // posición viva que defender; si no la tiene, la captura los rellena.
+  if (!fifoOwnsRow(row)) {
     if (d.titulos > 0)  row.titulos = d.titulos;
     if (d.avgPrice > 0) { row.avgPrice = d.avgPrice; delete row.avgPriceEur; }
   }
