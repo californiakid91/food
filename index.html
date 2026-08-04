@@ -1124,6 +1124,10 @@ function applyFifoToRows(list, agg) {
     const row = list.find(r => rowAssetKey(r) === a.key);
     if (!row) return;
     const pos = fifoPosition(a);
+    // Sin posición y sin ninguna compra registrada, el FIFO no sabe nada de
+    // este activo: si escribiera un cero borraría lo que haya puesto una
+    // captura de posición. Vender todo sí deja compras, y ahí el cero es real.
+    if (pos.qty <= 1e-9 && !a.buys.length) return;
     row.titulos = parseFloat(pos.qty.toFixed(8));
     if (pos.qty > 0) {
       // avgPriceEur es el coste real en € (lo que manda para el P&L). El campo
