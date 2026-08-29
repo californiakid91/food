@@ -3707,17 +3707,27 @@ function renderTable() {
   container.innerHTML = html;
 }
 
-// Convierte texto a número admitiendo coma decimal (teclado español) y espacios.
+// Convierte a número lo que el usuario teclea. A diferencia de parseLooseNum
+// (que atiende a extractos OCR en formato inglés), aquí nadie escribe
+// separadores de miles: manda el último separador que aparezca, y los demás
+// se descartan. Así "0,123" son 0,123 títulos y no ciento veintitrés.
 function parseNum(value) {
-  const neg = /^\s*-/.test(String(value));
-  const n = parseLooseNum(value);
+  const raw = String(value == null ? '' : value).trim();
+  const neg = /^-/.test(raw);
+  const s = raw.replace(/[^\d.,]/g, '');
+  if (!s) return 0;
+  const last = Math.max(s.lastIndexOf(','), s.lastIndexOf('.'));
+  const clean = last === -1
+    ? s
+    : s.slice(0, last).replace(/[.,]/g, '') + '.' + s.slice(last + 1).replace(/[.,]/g, '');
+  const n = parseFloat(clean) || 0;
   return neg ? -n : n;
 }
 
 // Los campos se muestran con coma decimal, como el resto de la app; al leerlos
-// se admite coma o punto indistintamente.
+// parseNum admite coma o punto indistintamente.
 function numIn(v) {
-  const n = parseFloat(v);
+  const n = parseNum(v);
   return n ? String(n).replace('.', ',') : '';
 }
 
@@ -4454,6 +4464,43 @@ function getTotalPnl() {
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost * 100) : 0;
   return { pnl: totalPnl, pnlPct: totalPnlPct };
 }
+
+// ── Autopruebas ──────────────────────────────────────────────────────────────
+// Invariantes de las funciones puras, para poder tocarlas sin romperlas en
+// silencio. Se ejecutan solo con ?selftest=1 en la URL; nunca en uso normal.
+function runSelfTests() {
+  const fails = [];
+  const check = (name, got, want) => {
+    if (got !== want) fails.push(`${name}: esperaba ${want}, obtuve ${got}`);
+  };
+
+  // Lo que se muestra con coma se relee igual: el bug del ×1000.
+  [0.123, 1.5, 2.345, 0.5, 12.345, 1.234, 123.456, 1000.5, 0.0001].forEach(x => {
+    check(`round-trip ${x}`, parseNum(numIn(x)), x);
+  });
+
+  // Entrada manual: el último separador es el decimal, venga como venga.
+  check('coma decimal', parseNum('0,123'), 0.123);
+  check('punto decimal', parseNum('0.123'), 0.123);
+  check('formato español', parseNum('1.234,56'), 1234.56);
+  check('formato inglés', parseNum('1,234.56'), 1234.56);
+  check('negativo', parseNum('-2,5'), -2.5);
+  check('con símbolo', parseNum('1.234,56 €'), 1234.56);
+  check('vacío', parseNum(''), 0);
+  check('nulo', parseNum(null), 0);
+
+  // El camino del OCR sí interpreta miles: no debe haberse tocado.
+  check('OCR miles', parseLooseNum('1,234'), 1234);
+
+  if (fails.length) {
+    console.error(`❌ ${fails.length} autopruebas fallidas:\n` + fails.join('\n'));
+  } else {
+    console.log('✅ Autopruebas OK');
+  }
+  return fails;
+}
+
+if (location.search.includes('selftest=1')) runSelfTests();
 
 </script>
 </body>
