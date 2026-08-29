@@ -11,20 +11,21 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 
 Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — en curso
-Planes: 01-01 CERRADO (`dd13e42` + `86ad865`); 01-02 planificado, sin ejecutar
-Status: ciclo 01-01 cerrado; listo para planificar/ejecutar 01-02
-Last activity: 2026-08-29 — UNIFY de 01-01: 4 AC en PASS, 8 defectos de la revisión arreglados
+Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 APPLY hecho (`77f8cef` +
+`56795eb`), UNIFY pendiente
+Status: 01-02 ejecutado y revisado, SIN cerrar y SIN desplegar
+Last activity: 2026-08-29 — APPLY de 01-02 + arreglo de los 8 hallazgos de la revisión del diff
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [█████░░░░░] 50% (01-01 de 2 planes)
+- Phase: [█████░░░░░] 50% (01-01 cerrado; 01-02 ejecutado, sin acta)
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ✓     [01-01 cerrado — listo para el siguiente PLAN]
+  ✓        ✓        ○     [01-02: falta cerrar el ciclo]
 ```
 
 ## Performance Metrics
@@ -55,6 +56,9 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | La puerta es `tools/verify.sh` | 2026-08-29 | Enganchada a `pre-push`; 16 controles con sabotaje que demuestra que muerden |
 | Ninguna cifra medida se copia a los documentos | 01-01 | Vive sólo en la foto sellada; se desactualizó dos veces el mismo día |
 | No sellar con amnistía al estrenar el trinquete | 01-01 | Se trocea la función; aflojar la vara el primer día haría rutina la amnistía |
+| Un único juez para las dos guardas de no-vaciado | 01-02 | `vaciariaElLibro` + `opsDelDocumento`: la misma función en los dos lados, no el mismo criterio escrito dos veces |
+| Fallar CERRADO si no se puede leer la nube | 01-02 | Se prefiere perder sincronía a perder el libro; y se ve en naranja, no en verde |
+| Los controles de las autopruebas viven en el ARNÉS | 01-02 | Uno dentro de la suite sería juez y parte; el de datos reales está en `run_selftests.py` |
 
 ### Deferred Issues
 
@@ -83,10 +87,9 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-29
-Stopped at: Ciclo 01-01 cerrado con su acta
-Next action: Verificar a mano en la app desplegada (recargando dos veces) que el aviso de guardado
-  se comporta; luego `/paul:apply .paul/phases/01-guardado-fiable/01-02-PLAN.md`
-Resume file: .paul/phases/01-guardado-fiable/01-01-SUMMARY.md
+Stopped at: 01-02 ejecutado y revisado; NADA desplegado (no se hizo push a propósito)
+Next action: `/paul:resume` y leer el handoff
+Resume file: .paul/HANDOFF-01-02-apply.md
 
 ---
 *STATE.md — Updated after every significant action*
