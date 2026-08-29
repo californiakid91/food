@@ -6,7 +6,8 @@
 >
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
-Última medición contra el código: **2026-08-29**, revisión `9b88521` + trabajo en curso.
+Última medición contra el código: **2026-08-29**, revisión `6edceca`.
+D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditoría inicial.
 
 ---
 
@@ -20,6 +21,8 @@
   `2911`). **No reproducido en vivo**: el comportamiento de Firestore con escrituras encoladas
   offline está razonado sobre la semántica documentada de `set()`, no observado.
 - **Estado:** planificada como Fase 3 del roadmap. Depende de tener backup antes (D-02).
+  **Cota parcial en el plan 01-02:** dos guardas impedirán el caso destructivo (que un libro vacío
+  pise uno con operaciones, en cualquiera de los dos sentidos). La fusión real sigue siendo Fase 3.
 - **Qué la reabre:** cualquier cambio en `buildSyncPayload`/`applySyncPayload` antes de la Fase 3.
 
 ### D-02 · No existe copia de seguridad fuera de Firestore
@@ -36,6 +39,27 @@
 - **Cómo se midió:** lectura del código. **El tamaño real del payload NO se ha medido nunca.**
 - **Estado:** abierta, sin fase asignada.
 - **Qué la reabre:** medir el payload. Si pasa de ~500 KB, sube a fase propia.
+
+### D-12 · Los identificadores de operación colisionan dentro de un extracto
+- **Qué es:** `genOpId` mezcla la marca de tiempo con tres caracteres aleatorios, y un extracto
+  entero se importa dentro del mismo milisegundo. Hoy no rompe nada visible, pero impide deduplicar
+  por identificador, que es lo que necesita el sync.
+- **Cómo se midió:** ejecutando el generador real, 2026-08-29: **10,2 % de los extractos de 100
+  operaciones tiene al menos una colisión**. El sufijo aleatorio sí tiene siempre 3 caracteres
+  (200.000 muestras); la causa es el problema del cumpleaños, no la longitud.
+- **Estado:** plan 01-02, Task 1. Descubierto por la revisión adversaria del plan 01-01.
+- **Qué la reabre:** los identificadores ya guardados NO se migran, así que las colisiones
+  históricas siguen ahí para siempre. Por eso 01-02 deduplica por identificador Y huella.
+
+### D-13 · Las ramas de legado siguen colapsando compras idénticas del mismo día
+- **Qué es:** `dedupeOps` por huella, que se conserva en `migrateOpsToGlobal` y en la rama `opsData`,
+  no distingue dos compras legítimamente idénticas del mismo día dentro de la misma cartera.
+- **Cómo se midió:** lectura del código, confirmada por la revisión adversaria del 2026-08-29
+  (`index.html:988`, `1010`, `2877`).
+- **Estado:** **límite aceptado a propósito** en el plan 01-02. La migración corre una sola vez y
+  `opsData` sólo llega de un dispositivo sin actualizar.
+- **Qué la reabre:** que aparezca un dispositivo antiguo sincronizando de verdad, o que la migración
+  tenga que volver a correr.
 
 ---
 

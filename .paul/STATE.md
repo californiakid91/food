@@ -11,9 +11,9 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 
 Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — Planning
-Plan: 01-01 creado, pendiente de aprobación
+Planes: 01-01 y 01-02 creados y revisados adversariamente, pendientes de aprobación
 Status: PLAN created, ready for APPLY
-Last activity: 2026-08-29 — Creado .paul/phases/01-guardado-fiable/01-01-PLAN.md
+Last activity: 2026-08-29 — Revisión adversaria del 01-01: 6 hallazgos, plan partido en 01-01 y 01-02
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
@@ -39,7 +39,7 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | Phase | Plans | Total Time | Avg/Plan |
 |-------|-------|------------|----------|
 | 00-hotfix-decimal | 1/1 | — | — |
-| 01-guardado-fiable | 0/1 | — | — |
+| 01-guardado-fiable | 0/2 | — | — |
 
 ## Accumulated Context
 
@@ -67,7 +67,7 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 
 ## Boundaries (Active)
 
-Del PLAN 01-01 (pendiente de incorporar los hallazgos de la revisión adversaria):
+De los PLANES 01-01 y 01-02:
 
 - `dedupeOps` / `opFingerprint` intactos: los necesitan `migrateOpsToGlobal` y el formato antiguo `opsData`
 - `parseNum` / `numIn` / `parseLooseNum` no se tocan (Fase 0)
@@ -81,8 +81,8 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-29
-Stopped at: Plan 01-01 creado
-Next action: Revisar y aprobar el plan, luego `/paul:apply .paul/phases/01-guardado-fiable/01-01-PLAN.md`
+Stopped at: Doctrina de `CLAUDE.md` implantada con su puerta; planes 01-01 y 01-02 revisados
+Next action: Aprobar y ejecutar `/paul:apply .paul/phases/01-guardado-fiable/01-01-PLAN.md`
 Resume file: .paul/phases/01-guardado-fiable/01-01-PLAN.md
 
 ---
