@@ -100,9 +100,18 @@ CASOS = [
          "  const okRows = saveRows(false);   // el aviso lo decide esta función, al final",
          "  const okRows = saveRows(true);",
          1, "AC-2"),
-    Caso("las autopruebas dejan de restaurar los datos del usuario", INDEX,
-         "    localStorage.clear();\n    Object.keys(copiaSeguridad).forEach(k => localStorage.setItem(k, copiaSeguridad[k]));",
-         "    localStorage.clear();",
+    # Las dos suites escriben en el localStorage REAL del usuario (?selftest=1
+    # tambien corre en su navegador), asi que cada una tiene su propio control
+    # de que devuelve las cosas como estaban. El ancla lleva la linea siguiente
+    # porque el bloque de restauracion es identico en las dos: sin ella el banco
+    # casaria de mas y no sabria cual esta midiendo.
+    Caso("pruebasGuardado deja de restaurar los datos del usuario", INDEX,
+         "    localStorage.clear();\n    Object.keys(copiaSeguridad).forEach(k => localStorage.setItem(k, copiaSeguridad[k]));\n    ops = estadoPrevio.ops;",
+         "    ops = estadoPrevio.ops;",
+         1, "AC-4"),
+    Caso("pruebasSincronizacion deja de restaurar los datos del usuario", INDEX,
+         "    localStorage.clear();\n    Object.keys(copiaSeguridad).forEach(k => localStorage.setItem(k, copiaSeguridad[k]));\n    ops = previo.ops;",
+         "    ops = previo.ops;",
          1, "AC-4"),
     # Una funcion enorme escondida tras `throw /}/;` — JavaScript valido que
     # despistaba al contador de llaves y le hacia medirla como si tuviera 2
@@ -111,6 +120,25 @@ CASOS = [
          "function sembrarCentinelas() {",
          "function trampaDeRegex() {\n  throw /}/;\n" + "  // relleno\n" * 85 + "}\n\nfunction sembrarCentinelas() {",
          1, "EL MONOLITO HA ENGORDADO"),
+    # Controles positivos del plan 01-02 (sincronizacion). Mismo criterio: cada
+    # arreglo, revertido, tiene que matar su propia prueba.
+    Caso("los identificadores vuelven a poder chocar", INDEX,
+         "  const seq = (opIdSeq++).toString(36).padStart(4, '0');\n"
+         "  return 'o' + Date.now().toString(36) + seq + Math.random().toString(36).slice(2, 5);",
+         "  return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);",
+         1, "AC-1"),
+    Caso("el sync vuelve a deduplicar por huella y se come operaciones", INDEX,
+         "saveOpsAll(dedupeOpsById(data.opsAll))",
+         "saveOpsAll(dedupeOps(data.opsAll))",
+         1, "AC-2"),
+    Caso("se quita la guarda de no-vaciado al aplicar", INDEX,
+         "    if (vaciariaElLibro(data.opsAll, ops)) {",
+         "    if (false) {",
+         1, "AC-4"),
+    Caso("se quita la guarda de no-vaciado al subir", INDEX,
+         "        if (vaciariaElLibro(payload.opsAll, cloudOps)) {",
+         "        if (false) {",
+         1, "AC-4"),
     Caso("deriva: se afloja la vara de medir", FUNCSIZE,
          "'umbral_lineas': 60,", "'umbral_lineas': 500,",
          3, "DERIVA"),

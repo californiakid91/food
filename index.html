@@ -1048,6 +1048,28 @@ function dedupeOps(list) {
   });
 }
 
+// Deduplicación de la SINCRONIZACIÓN: colapsa sólo si coinciden identificador Y
+// huella. Conviven dos criterios a propósito:
+//   - `dedupeOps` (por huella sola) es el de la MIGRACIÓN y el del formato
+//     antiguo `opsData`: ahí la misma operación sí llega repetida entre carteras
+//     y colapsarla es lo que se quiere.
+//   - aquí, en cambio, dos compras legítimas del mismo valor, día, precio y
+//     cantidad son dos operaciones distintas y la huella las confundiría.
+// Y no basta el identificador solo: los ya guardados vienen del generador viejo
+// y pueden traer colisiones de fábrica, así que se exige también la huella para
+// que una colisión histórica no se coma una operación legítima.
+// Sin identificador no se colapsa nunca: no hay con qué afirmar que sean la misma.
+function dedupeOpsById(list) {
+  const seen = new Set();
+  return list.filter(o => {
+    if (!o || !o.id) return true;
+    const k = String(o.id) + '\u0000' + opFingerprint(o);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 // Migración: junta en un solo libro las operaciones que estaban repartidas por
 // cartera. Se conservan las claves antiguas por si hubiera que mirar atrás.
 function migrateOpsToGlobal(portfolioIds) {
@@ -1070,7 +1092,19 @@ function migrateOpsToGlobal(portfolioIds) {
   return { migrated: true, total: juntas.length, duplicadas: juntas.length - limpias.length };
 }
 
-function genOpId() { return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+// Un extracto entero se importa dentro del mismo milisegundo, así que la marca
+// de tiempo no distingue nada y los 3 caracteres al azar sólo dan 46.656 valores:
+// medido con el generador viejo, el 10,2 % de los extractos de 100 operaciones
+// traía al menos una colisión. El contador monotónico hace imposible que dos
+// llamadas coincidan, caigan o no en el mismo milisegundo.
+// La marca de tiempo sigue DELANTE y el contador va con ancho fijo porque el id
+// es el desempate al ordenar (computeFifo y el listado de operaciones): sin
+// relleno, '10' iría antes que '9' y el orden de entrada se perdería.
+let opIdSeq = 0;
+function genOpId() {
+  const seq = (opIdSeq++).toString(36).padStart(4, '0');
+  return 'o' + Date.now().toString(36) + seq + Math.random().toString(36).slice(2, 5);
+}
 function todayISO() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 function fmtDate(iso) { const [y, m, d] = String(iso || '').split('-'); return y ? `${d}/${m}/${y}` : '—'; }
 
@@ -2936,7 +2970,13 @@ function applySyncPayload(data) {
       console.error('Libro local ilegible: se repara con el que llega de la nube.');
       opsIlegible = false;
     }
-    if (!saveOpsAll(dedupeOps(data.opsAll))) {
+    // Nadie vacía el libro de nadie: un libro vacío que llega de la nube no
+    // sustituye a uno local con operaciones. Fusionarlos es la Fase 3; esto
+    // sólo impide el caso destructivo.
+    if (vaciariaElLibro(data.opsAll, ops)) {
+      console.warn('[SYNC] libro recibido vacío: se conservan las', ops.length,
+                   'operaciones locales');
+    } else if (!saveOpsAll(dedupeOpsById(data.opsAll))) {
       console.error('No se pudo guardar el libro recibido de la nube.');
     }
   } else if (data.opsData) {
@@ -2949,6 +2989,19 @@ function applySyncPayload(data) {
   ops  = loadOpsAll();
   syncAllPortfoliosFromOps();
   return true;
+}
+
+// ¿Ese libro de operaciones tiene algo dentro? Predicado ÚNICO: lo usan la
+// guarda de subida y la de aplicación. Si cada lado tuviera el suyo, la
+// asimetría entre los dos sería el defecto, no la protección.
+function tieneOperaciones(lista) { return Array.isArray(lista) && lista.length > 0; }
+
+// ¿Sustituir `destino` por `origen` dejaría el libro vacío teniendo operaciones?
+// Este es el ÚNICO juez, y lo llaman literalmente las dos guardas: la de subir a
+// la nube y la de aplicar lo que llega. No es "el mismo criterio escrito dos
+// veces" — es la misma función.
+function vaciariaElLibro(origen, destino) {
+  return !tieneOperaciones(origen) && tieneOperaciones(destino);
 }
 
 // ¿Hay activos reales en local? (false = solo carteras por defecto vacías)
@@ -2988,6 +3041,18 @@ function schedulePush() {
     if (!ref) return;
     try {
       const payload = buildSyncPayload();
+      // Nadie vacía el libro de nadie, en el sentido contrario: un dispositivo
+      // con el libro vacío (o ilegible) no sube ese vacío encima de la nube.
+      // Mismo predicado que en applySyncPayload, a propósito.
+      if (!tieneOperaciones(payload.opsAll)) {
+        const snapOps = await ref.get();
+        const cloudOps = snapOps.exists ? (snapOps.data().opsAll || []) : [];
+        if (vaciariaElLibro(payload.opsAll, cloudOps)) {
+          console.warn('[SYNC] push omitido: libro local vacío, la nube tiene',
+                       cloudOps.length, 'operaciones');
+          return; // el libro de la nube se conserva
+        }
+      }
       if (hasRealLocalData()) {
         // Caso normal: set directo. Firestore lo encola si estás offline y
         // lo sincroniza solo al recuperar conexión (no usar transacción aquí:
@@ -4732,6 +4797,117 @@ function pruebasGuardado(check) {
   Object.keys(centinelas).forEach(k => localStorage.removeItem(k));
 }
 
+// AC-1: los identificadores no chocan dentro de un extracto.
+function pruebasIdentificadores(check) {
+  // El id es el desempate al ordenar (FIFO y listado): el orden de generación
+  // tiene que sobrevivir a una ordenación de texto.
+  check('AC-1 el orden de generación se conserva al ordenar por id',
+        genOpId() < genOpId(), true);
+
+  let rondasConColision = 0;
+  for (let ronda = 0; ronda < 1000; ronda++) {
+    const vistos = new Set();
+    for (let i = 0; i < 500; i++) vistos.add(genOpId());
+    if (vistos.size !== 500) rondasConColision++;
+  }
+  check('AC-1 mil ráfagas de 500 identificadores, ninguna colisión', rondasConColision, 0);
+
+  // Control positivo. Sin esto, la comprobación de arriba saldría verde también
+  // con un generador que no arreglase nada: hay que ver que el viejo SÍ chocaba.
+  let rondasViejas = 0;
+  for (let ronda = 0; ronda < 200; ronda++) {
+    const vistos = new Set();
+    for (let i = 0; i < 500; i++) {
+      vistos.add('o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5));
+    }
+    if (vistos.size !== 500) rondasViejas++;
+  }
+  check('AC-1 el generador viejo sí colisionaba (control positivo)', rondasViejas > 0, true);
+}
+
+// AC-2 y AC-3: los dos criterios de deduplicación, cada uno en su sitio.
+function pruebasDeduplicacion(check, base) {
+  const gemelas = [Object.assign({}, base, { id: 'x1' }), Object.assign({}, base, { id: 'x2' })];
+  check('AC-2 dos compras iguales con id distinto sobreviven al sync',
+        dedupeOpsById(gemelas).length, 2);
+  check('AC-2 la misma operación repetida (id y huella) se colapsa',
+        dedupeOpsById([Object.assign({}, base, { id: 'x1' }),
+                       Object.assign({}, base, { id: 'x1' })]).length, 1);
+  check('AC-2 un id repetido con huella distinta no se come nada',
+        dedupeOpsById([Object.assign({}, base, { id: 'x1' }),
+                       Object.assign({}, base, { id: 'x1', ticker: 'BBB' })]).length, 2);
+  check('AC-2 sin identificador no se colapsa nunca',
+        dedupeOpsById([Object.assign({}, base), Object.assign({}, base)]).length, 2);
+  // Y el criterio de legado NO se ha tocado: ahí sigue mandando la huella sola.
+  check('AC-3 el camino antiguo sigue consolidando por huella', dedupeOps(gemelas).length, 1);
+}
+
+// AC-3 extremo a extremo: el formato antiguo por cartera sigue consolidándose.
+function pruebasPayloadAntiguo(check, base) {
+  const misma = Object.assign({}, base, { id: 'vieja1' });
+  localStorage.setItem(OPS_KEY, JSON.stringify([]));
+  ops = loadOpsAll();
+  applySyncPayload({ portfolios: [{ id: 1, name: 'P1' }], currentPortId: 1, nextId: 2,
+                     opsData: { 1: [misma], 2: [misma] } });
+  check('AC-3 la misma operación en dos carteras acaba una sola vez', ops.length, 1);
+
+  // AC-2 extremo a extremo: no basta con que `dedupeOpsById` sea correcta, hace
+  // falta que la rama `opsAll` de la sincronización sea la que la llama. Sin
+  // esto, volver a poner ahí el criterio de huella pasaría desapercibido.
+  ops = [];
+  localStorage.setItem(OPS_KEY, JSON.stringify([]));
+  applySyncPayload({ portfolios: [{ id: 1, name: 'P1' }], currentPortId: 1, nextId: 2,
+                     opsAll: [Object.assign({}, base, { id: 'g1' }),
+                              Object.assign({}, base, { id: 'g2' })] });
+  check('AC-2 dos compras iguales del mismo día sobreviven al sync real', ops.length, 2);
+}
+
+// AC-4: nadie vacía el libro de nadie.
+function pruebasNoVaciar(check, base) {
+  check('AC-4 vaciaría: llega vacío y hay libro', vaciariaElLibro([], [base]), true);
+  check('AC-4 no vaciaría: lo que llega trae operaciones', vaciariaElLibro([base], [base]), false);
+  check('AC-4 no vaciaría: el destino ya estaba vacío', vaciariaElLibro([], []), false);
+
+  localStorage.setItem(OPS_KEY, JSON.stringify([Object.assign({}, base, { id: 'local1' })]));
+  ops = loadOpsAll();
+  applySyncPayload({ portfolios: [{ id: 1, name: 'P1' }], currentPortId: 1, nextId: 2, opsAll: [] });
+  check('AC-4 un libro vacío de la nube no borra el local', ops.length, 1);
+  check('AC-4 y no lo borra tampoco en disco',
+        parseOpsBlob(localStorage.getItem(OPS_KEY)).length, 1);
+
+  // Las dos guardas llaman al MISMO juez. Si alguien escribe una a mano en uno
+  // de los dos sitios, la asimetría vuelve y esto se pone rojo.
+  check('AC-4 la guarda de aplicar llama al juez único',
+        /vaciariaElLibro\(/.test(String(applySyncPayload)), true);
+  check('AC-4 la guarda de subir llama al juez único',
+        /vaciariaElLibro\(/.test(String(schedulePush)), true);
+}
+
+// Sincronización (plan 01-02). Escriben en localStorage y tocan los globales,
+// así que se guarda todo y se devuelve al final pase lo que pase: ?selftest=1
+// también corre en el navegador del usuario, con sus datos reales delante.
+function pruebasSincronizacion(check) {
+  const base = { date: '2026-03-01', type: 'buy', ticker: 'AAA',
+                 titulos: 1, price: 10, currency: 'EUR' };
+  const copiaSeguridad = {};
+  clavesGuardadas().forEach(k => { copiaSeguridad[k] = localStorage.getItem(k); });
+  const previo = { ops: ops, ilegible: opsIlegible, portfolios: portfolios,
+                   currentPortId: currentPortId, nextId: nextId, rows: rows };
+  try {
+    pruebasIdentificadores(check);
+    pruebasDeduplicacion(check, base);
+    pruebasPayloadAntiguo(check, base);
+    pruebasNoVaciar(check, base);
+  } finally {
+    localStorage.clear();
+    Object.keys(copiaSeguridad).forEach(k => localStorage.setItem(k, copiaSeguridad[k]));
+    ops = previo.ops; opsIlegible = previo.ilegible; portfolios = previo.portfolios;
+    currentPortId = previo.currentPortId; nextId = previo.nextId; rows = previo.rows;
+  }
+  check('AC-4 el almacenamiento se devolvió como estaba',
+        clavesGuardadas().length, Object.keys(copiaSeguridad).length);
+}
+
 function runSelfTests() {
   const fails = [];
   const check = (name, got, want) => {
@@ -4740,6 +4916,7 @@ function runSelfTests() {
 
   pruebasNumeros(check);
   pruebasGuardado(check);
+  pruebasSincronizacion(check);
 
   if (fails.length) {
     console.error(`❌ ${fails.length} autopruebas fallidas:\n` + fails.join('\n'));
