@@ -1998,10 +1998,10 @@ function renderImportPreview() {
               oninput="updateImportField(${r.idx},'ticker',this.value)"></td>
           <td style="padding:2px 4px">
             ${isDiv ? '<span style="color:var(--border)">—</span>'
-                    : `<input class="imp-in num-in" type="text" inputmode="decimal" value="${r.titulos || ''}"
+                    : `<input class="imp-in num-in" type="text" inputmode="decimal" value="${numIn(r.titulos)}"
                          oninput="updateImportField(${r.idx},'titulos',this.value)">`}</td>
           <td style="padding:2px 4px">
-            <input class="imp-in num-in" type="text" inputmode="decimal" value="${(isDiv ? r.amount : r.price) || ''}"
+            <input class="imp-in num-in" type="text" inputmode="decimal" value="${numIn(isDiv ? r.amount : r.price)}"
               oninput="updateImportField(${r.idx},'${isDiv ? 'amount' : 'price'}',this.value)"></td>
           <td style="padding:2px 4px">
             <select class="imp-in" style="text-align:center" onchange="updateImportField(${r.idx},'currency',this.value)">
@@ -2009,7 +2009,7 @@ function renderImportPreview() {
               <option value="USD"${r.currency === 'USD' ? ' selected' : ''}>$</option>
             </select></td>
           <td style="padding:2px 4px">
-            <input class="imp-in num-in" type="text" inputmode="decimal" value="${r.fee || ''}" placeholder="0"
+            <input class="imp-in num-in" type="text" inputmode="decimal" value="${numIn(r.fee)}" placeholder="0"
               oninput="updateImportField(${r.idx},'fee',this.value)"></td>
           <td style="padding:4px 8px;font-size:11px" id="imp-status-${r.idx}">${importStatusHtml(r)}</td>
           <td style="padding:4px 6px;text-align:center">
@@ -3656,7 +3656,7 @@ function renderTable() {
             <div class="asset-field">
               <label>Precio (${sym})</label>
               <div style="display:flex;gap:4px;align-items:center;">
-                <input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${price||''}" placeholder="0.00"
+                <input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${numIn(price)}" placeholder="0,00"
                   style="flex:1" oninput="updateRow(${row.id},'price',this.value)" onclick="event.stopPropagation()">
                 <select class="cur-sel" onchange="updateRow(${row.id},'currency',this.value)" onclick="event.stopPropagation()" title="Moneda de cotización">
                   <option value="EUR"${cur === 'EUR' ? ' selected' : ''}>€</option>
@@ -3667,27 +3667,27 @@ function renderTable() {
             </div>
             <div class="asset-field">
               <label>Títulos</label>
-              <input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${titulos||''}" placeholder="0"
+              <input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${numIn(titulos)}" placeholder="0"
                 oninput="updateRow(${row.id},'titulos',this.value)" onclick="event.stopPropagation()">
             </div>
             <div class="asset-field" id="valor-field-${row.id}">
               <label>Valor (€)</label>
               ${isAuto
                 ? `<div class="valor-auto">${fmtDec(val)} € <span style="font-size:11px;color:var(--border)">(${titulos} × ${fmtDec(priceEur)} €)</span></div>`
-                : `<input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${val || ''}" placeholder="0"
+                : `<input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${numIn(val)}" placeholder="0"
                      oninput="updateRow(${row.id},'value',this.value)" onclick="event.stopPropagation()">`}
             </div>
             <div class="asset-field" id="target-field-${row.id}" style="${conObjetivo ? '' : 'display:none'}">
               <label>% Objetivo</label>
               <div style="display:flex;gap:4px;align-items:center;">
-                <input id="target-input-${row.id}" class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${tgt || ''}" placeholder="0"
+                <input id="target-input-${row.id}" class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${numIn(tgt)}" placeholder="0"
                   style="flex:1" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmTarget(${row.id});}">
                 <button class="btn btn-ghost" style="padding:4px 8px;font-size:14px;min-height:32px;color:var(--green);" onclick="confirmTarget(${row.id})" title="Confirmar">&#10003;</button>
               </div>
             </div>
             <div class="asset-field">
               <label>Precio medio (${sym})</label>
-              <input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${parseFloat(row.avgPrice) || ''}" placeholder="0.00"
+              <input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${numIn(row.avgPrice)}" placeholder="0,00"
                 oninput="updateRow(${row.id},'avgPrice',this.value)" onclick="event.stopPropagation()">
             </div>
           </div>
@@ -3709,7 +3709,16 @@ function renderTable() {
 
 // Convierte texto a número admitiendo coma decimal (teclado español) y espacios.
 function parseNum(value) {
-  return parseFloat(String(value).replace(/\s/g, '').replace(',', '.')) || 0;
+  const neg = /^\s*-/.test(String(value));
+  const n = parseLooseNum(value);
+  return neg ? -n : n;
+}
+
+// Los campos se muestran con coma decimal, como el resto de la app; al leerlos
+// se admite coma o punto indistintamente.
+function numIn(v) {
+  const n = parseFloat(v);
+  return n ? String(n).replace('.', ',') : '';
 }
 
 let derivedTimer;
@@ -3808,7 +3817,7 @@ function refreshRowDerived(id, editedField) {
       valorField.innerHTML = `<label>Valor (€)</label>
         ${isAuto
           ? `<div class="valor-auto">${fmtDec(val)} € <span style="font-size:11px;color:var(--border)">(${titulos} × ${fmtDec(priceEur)} €)</span></div>`
-          : `<input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${val || ''}" placeholder="0"
+          : `<input class="num-in" type="text" inputmode="decimal" enterkeyhint="done" value="${numIn(val)}" placeholder="0"
                oninput="updateRow(${id},'value',this.value)" onclick="event.stopPropagation()">`}`;
     }
   }
