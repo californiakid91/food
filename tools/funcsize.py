@@ -12,6 +12,10 @@ CEGUERAS DECLARADAS (antes de que alguien las descubra):
     lineas escrita como `const f = () => {...}` es INVISIBLE a este instrumento.
   - Cuenta lineas crudas del cuerpo, comentarios y blancos incluidos.
   - La huella no lleva numero de linea: reordenar el fichero no la mueve.
+  - Al contar llaves salta cadenas, plantillas, comentarios y expresiones
+    regulares. Distinguir una regex de una division se hace por heuristica
+    (que caracter la precede), como cualquier tokenizador sin gramatica
+    completa. Si se equivocara, el instrumento no calla: da rc=2.
 
 Codigos de salida (nominales, cada uno con su mensaje):
   0  verde
@@ -36,6 +40,92 @@ SEMANTICA = {
     'metrica': 'lineas crudas del cuerpo, comentarios y blancos incluidos',
     'version': 1,
 }
+
+
+def fin_de_cadena(js, i):
+    """Devuelve el indice justo despues de la cadena que empieza en i."""
+    comilla = js[i]
+    k = i + 1
+    while k < len(js):
+        if js[k] == '\\':
+            k += 2
+            continue
+        if js[k] == comilla:
+            return k + 1
+        # Interpolacion de plantilla: puede contener llaves y cadenas propias.
+        if comilla == '`' and js[k] == '$' and k + 1 < len(js) and js[k + 1] == '{':
+            prof, k = 1, k + 2
+            while k < len(js) and prof:
+                if js[k] in '"\'`':
+                    k = fin_de_cadena(js, k)
+                    continue
+                if js[k] == '{':
+                    prof += 1
+                elif js[k] == '}':
+                    prof -= 1
+                k += 1
+            continue
+        k += 1
+    return k
+
+
+def es_regex(js, i):
+    """¿La barra en i abre un literal /.../ o es una division?
+
+    Heuristica del tokenizador pobre: mira el ultimo caracter con significado
+    que hay antes. Tras un valor (identificador, numero, cierre de parentesis)
+    una barra divide; tras un operador o un separador, abre una expresion
+    regular.
+    """
+    k = i - 1
+    while k >= 0 and js[k] in ' \t\n\r':
+        k -= 1
+    if k < 0:
+        return True
+    c = js[k]
+    if c in ')]}':
+        return False
+    if c.isalnum() or c in '_$':
+        # Palabras clave tras las que una barra abre regex, no divide.
+        fin = k + 1
+        while k >= 0 and (js[k].isalnum() or js[k] in '_$'):
+            k -= 1
+        return js[k + 1:fin] in {'return', 'typeof', 'case', 'in', 'of', 'new',
+                                 'delete', 'do', 'else', 'instanceof', 'void'}
+    return True
+
+
+def fin_de_regex(js, i):
+    """Devuelve el indice justo despues del literal regex que empieza en i."""
+    k = i + 1
+    en_clase = False
+    while k < len(js):
+        c = js[k]
+        if c == '\\':
+            k += 2
+            continue
+        if c == '[':
+            en_clase = True
+        elif c == ']':
+            en_clase = False
+        elif c == '/' and not en_clase:
+            k += 1
+            while k < len(js) and js[k].isalpha():   # banderas: g, i, m...
+                k += 1
+            return k
+        elif c == '\n':
+            return k   # una regex no cruza lineas: era una division
+        k += 1
+    return k
+
+
+def fin_de_comentario(js, i):
+    """Devuelve el indice justo despues del comentario que empieza en i."""
+    if js[i + 1] == '/':
+        n = js.find('\n', i)
+        return len(js) if n == -1 else n
+    n = js.find('*/', i + 2)
+    return len(js) if n == -1 else n + 2
 
 
 def roto(msg):
@@ -64,9 +154,22 @@ def medir():
             roto(f"no encuentro el cuerpo de {m.group(1)}")
         prof, k = 0, j
         while k < len(js):
-            if js[k] == '{':
+            c = js[k]
+            # Saltar cadenas y comentarios: una llave dentro de un texto no
+            # abre nada. Sin esto, escribir '{' en una cadena deja ciego al
+            # instrumento entero (medido el 2026-08-29).
+            if c in '"\'`':
+                k = fin_de_cadena(js, k)
+                continue
+            if c == '/' and k + 1 < len(js) and js[k + 1] in '/*':
+                k = fin_de_comentario(js, k)
+                continue
+            if c == '/' and es_regex(js, k):
+                k = fin_de_regex(js, k)
+                continue
+            if c == '{':
                 prof += 1
-            elif js[k] == '}':
+            elif c == '}':
                 prof -= 1
                 if prof == 0:
                     break

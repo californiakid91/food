@@ -971,17 +971,58 @@ function opsKey(portId) { return 'balance-ops-' + portId; }   // formato antiguo
 
 let ops = [];   // libro de operaciones completo
 
+// Un libro que no se entiende NO es un libro vacío: se aparta y se avisa, en vez
+// de dejar que el siguiente guardado lo machaque con una lista vacía.
+let opsIlegible = false;
+
 function parseOpsBlob(raw) {
   try {
     const d = JSON.parse(raw || 'null');
     if (Array.isArray(d)) return d;
-    return d && Array.isArray(d.ops) ? d.ops : [];
-  } catch { return []; }
+    if (d && Array.isArray(d.ops)) return d.ops;
+    if (d === null || d === undefined) return [];
+    throw new Error('el contenido no es un libro de operaciones');
+  } catch {
+    return null;   // ilegible: distinto de "no hay nada"
+  }
 }
 
-function loadOpsAll() { return parseOpsBlob(localStorage.getItem(OPS_KEY)); }
+// Guarda una copia del contenido ilegible antes de que nadie escriba encima.
+function rescatarOpsIlegible(raw) {
+  if (!raw) return;
+  try {
+    localStorage.setItem('balance-ops-rescate-' + Date.now(), raw);
+  } catch (e) {
+    console.error('No se pudo ni rescatar el libro ilegible:', e);
+  }
+}
+
+function loadOpsAll() {
+  const raw = localStorage.getItem(OPS_KEY);
+  const lista = parseOpsBlob(raw);
+  if (lista === null) {
+    opsIlegible = true;
+    rescatarOpsIlegible(raw);
+    console.error('El libro de operaciones no se pudo leer. Copia guardada aparte; no se sobrescribirá.');
+    return [];
+  }
+  opsIlegible = false;
+  return lista;
+}
+
 function saveOpsAll(list) {
-  try { localStorage.setItem(OPS_KEY, JSON.stringify(list)); } catch (e) {}
+  // Con el libro ilegible ya rescatado, escribir encima solo añadiría pérdida.
+  if (opsIlegible) {
+    console.error('No se guarda el libro: el que hay en disco es ilegible y está rescatado.');
+    return false;
+  }
+  try {
+    localStorage.setItem(OPS_KEY, JSON.stringify(list));
+    return true;
+  } catch (e) {
+    console.error('No se pudo guardar el libro de operaciones:', e);
+    return false;
+  }
 }
 
 // Huella de una operación para detectar la misma apuntada dos veces.
@@ -1006,7 +1047,18 @@ function dedupeOps(list) {
 function migrateOpsToGlobal(portfolioIds) {
   if (localStorage.getItem(OPS_KEY) !== null) return { migrated: false };
   const juntas = [];
-  (portfolioIds || []).forEach(id => juntas.push(...parseOpsBlob(localStorage.getItem(opsKey(id)))));
+  // parseOpsBlob devuelve null si el blob antiguo es ilegible: se salta esa
+  // cartera en vez de reventar la migración entera.
+  (portfolioIds || []).forEach(id => {
+    const raw = localStorage.getItem(opsKey(id));
+    const lista = parseOpsBlob(raw);
+    if (lista === null) {
+      rescatarOpsIlegible(raw);
+      console.error('Operaciones antiguas ilegibles en la cartera ' + id + '; copia guardada aparte.');
+      return;
+    }
+    juntas.push(...lista);
+  });
   const limpias = dedupeOps(juntas);
   saveOpsAll(limpias);
   return { migrated: true, total: juntas.length, duplicadas: juntas.length - limpias.length };
@@ -1765,9 +1817,8 @@ function applyPosition(rowId) {
   }
 
   delete pendingPosition[rowId];
-  schedSave();
+  schedSave('Activo actualizado ✓');   // se anuncia al guardar, no antes
   render();
-  showSaveIndicator('Activo actualizado ✓');
 }
 
 let ocrBusy = false;
@@ -3006,17 +3057,29 @@ const META_KEY   = 'balance-meta-v2';
 function rowsKey(id) { return 'balance-rows-' + id; }
 
 // ── Persistencia meta (lista de carteras + activa) ──
+// Las tres funciones de guardado devuelven si lo consiguieron. Quien las llama
+// decide qué anunciar: antes se tragaban el error y la pantalla decía
+// "Guardado ✓" igualmente, que es la peor de las mentiras posibles aquí.
 function saveMeta() {
   try {
     localStorage.setItem(META_KEY, JSON.stringify({ portfolios, currentPortId, nextId, savedAt: Date.now() }));
-  } catch(e) {}
+    return true;
+  } catch(e) {
+    console.error('No se pudo guardar la lista de carteras:', e);
+    return false;
+  }
 }
 
 function saveRows() {
   try {
     localStorage.setItem(rowsKey(currentPortId), JSON.stringify({ rows, nextId }));
     showSaveIndicator();
-  } catch(e) {}
+    return true;
+  } catch(e) {
+    console.error('No se pudieron guardar los activos:', e);
+    showSaveIndicator('No se pudo guardar', false);
+    return false;
+  }
 }
 
 function loadRows(id) {
@@ -3030,26 +3093,44 @@ function loadRows(id) {
 }
 
 let saveTimer;
-function schedSave() {
+let saveMensaje = null;   // qué anunciar cuando el guardado aplazado termine bien
+function schedSave(mensajeExito) {
+  if (mensajeExito) saveMensaje = mensajeExito;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    saveRows();
-    saveOpsAll(ops);
-    saveMeta();
+    // Se guardan las tres cosas y solo se canta victoria si las tres fueron
+    // bien. `saveRows` ya muestra el indicador por su cuenta (tiene llamantes
+    // que no pasan por aquí), así que aquí solo se corrige si algo falló.
+    const okRows = saveRows();
+    const okOps  = saveOpsAll(ops);
+    const okMeta = saveMeta();
+    if (!(okRows && okOps && okMeta)) {
+      showSaveIndicator('No se pudo guardar', false);
+    } else if (saveMensaje) {
+      showSaveIndicator(saveMensaje);
+    }
+    saveMensaje = null;
     schedulePush();
   }, 600);
 }
 
-function showSaveIndicator(text = 'Guardado ✓') {
+// `ok` en false pinta el aviso en rojo y lo deja más tiempo: un fallo de
+// guardado no puede pasar tan desapercibido como un éxito.
+function showSaveIndicator(text = 'Guardado ✓', ok = true) {
   const el = document.getElementById('save-indicator');
   if (!el) return;
   el.textContent = text;
+  el.style.color = ok ? 'var(--green)' : 'var(--red)';
   el.style.opacity = '1';
-  setTimeout(() => el.style.opacity = '0', 1800);
+  setTimeout(() => el.style.opacity = '0', ok ? 1800 : 5000);
 }
 
 // ── Gestión de carteras ──
 function initPortfolios() {
+  // El libro de operaciones se carga SIEMPRE, pase lo que pase con la lista de
+  // carteras. Si dependiera de ella, un META corrupto arrancaría con el libro
+  // vacío y el primer guardado lo escribiría encima del bueno.
+  ops = loadOpsAll();
   try {
     const raw = localStorage.getItem(META_KEY);
     if (raw) {
@@ -3059,11 +3140,12 @@ function initPortfolios() {
         currentPortId = data.currentPortId || portfolios[0].id;
         if (data.nextId) nextId = Math.max(nextId, data.nextId);
         rows = loadRows(currentPortId);
-        ops  = loadOpsAll();
-        return true;
+        return true;   // `ops` ya se cargó arriba, antes de mirar META
       }
     }
-  } catch(e) {}
+  } catch(e) {
+    console.error('La lista de carteras no se pudo leer; se arranca con las de por defecto:', e);
+  }
   return false;
 }
 
@@ -3535,8 +3617,7 @@ function confirmTarget(id) {
   updateStats();
   calcRebalance();
   drawCharts();
-  schedSave();
-  showSaveIndicator('Objetivo guardado ✓');
+  schedSave('Objetivo guardado ✓');   // se anuncia al guardar, no antes
 }
 
 function autocompleteTicker(id, ticker) {
@@ -4468,12 +4549,9 @@ function getTotalPnl() {
 // ── Autopruebas ──────────────────────────────────────────────────────────────
 // Invariantes de las funciones puras, para poder tocarlas sin romperlas en
 // silencio. Se ejecutan solo con ?selftest=1 en la URL; nunca en uso normal.
-function runSelfTests() {
-  const fails = [];
-  const check = (name, got, want) => {
-    if (got !== want) fails.push(`${name}: esperaba ${want}, obtuve ${got}`);
-  };
-
+// Cada bloque de invariantes vive en su propia función: así ninguna crece por
+// encima del presupuesto de tamaño y se ve de un vistazo qué se está midiendo.
+function pruebasNumeros(check) {
   // Lo que se muestra con coma se relee igual: el bug del ×1000.
   [0.123, 1.5, 2.345, 0.5, 12.345, 1.234, 123.456, 1000.5, 0.0001].forEach(x => {
     check(`round-trip ${x}`, parseNum(numIn(x)), x);
@@ -4491,6 +4569,107 @@ function runSelfTests() {
 
   // El camino del OCR sí interpreta miles: no debe haberse tocado.
   check('OCR miles', parseLooseNum('1,234'), 1234);
+}
+
+// Las claves de localStorage con la interfaz estándar: Object.keys() no es
+// aplicable a un almacenamiento, aunque los navegadores lo toleren.
+function clavesGuardadas() {
+  const out = [];
+  for (let i = 0; i < localStorage.length; i++) out.push(localStorage.key(i));
+  return out;
+}
+
+// AC-2: si la escritura falla, se dice; y no se dice que fue bien. Sustituye
+// temporalmente localStorage, console y el indicador, y los devuelve siempre.
+function pruebasFalloDeEscritura(check, dosOps) {
+  localStorage.setItem(OPS_KEY, JSON.stringify(dosOps));
+  ops = loadOpsAll();
+  const setReal = localStorage.setItem.bind(localStorage);
+  const errReal = console.error;
+  const indReal = showSaveIndicator;
+  const avisos = [];
+  let errores = 0;
+  try {
+    localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+    console.error = () => { errores++; };
+    showSaveIndicator = (texto, ok = true) => { avisos.push({ texto, ok }); };
+    check('AC-2 un guardado fallido devuelve false', saveOpsAll(ops), false);
+    check('AC-2 el fallo se registra', errores > 0, true);
+    check('AC-2 saveMeta también avisa del fallo', saveMeta(), false);
+    saveRows();
+    check('AC-2 el aviso es de error, no de éxito', avisos.some(a => a.ok === false), true);
+    check('AC-2 no se anuncia ningún éxito', avisos.some(a => a.ok !== false), false);
+  } finally {
+    localStorage.setItem = setReal;
+    console.error = errReal;
+    showSaveIndicator = indReal;
+  }
+}
+
+// Guardado íntegro (plan 01-01). Estas pruebas escriben en localStorage, y
+// ?selftest=1 también corre en el navegador del usuario: se guarda todo y se
+// restaura al final, pase lo que pase, o le machacaríamos sus datos reales.
+function pruebasGuardado(check) {
+  const copiaSeguridad = {};
+  clavesGuardadas().forEach(k => { copiaSeguridad[k] = localStorage.getItem(k); });
+  const estadoPrevio = { ops: ops, ilegible: opsIlegible };
+
+  try {
+    const dosOps = [
+      { id: 'o1', date: '2026-01-02', type: 'buy', ticker: 'AAA', titulos: 1, price: 10, currency: 'EUR' },
+      { id: 'o2', date: '2026-01-03', type: 'buy', ticker: 'BBB', titulos: 2, price: 20, currency: 'EUR' },
+    ];
+
+    // AC-1: con la lista de carteras corrupta, el libro se carga igual.
+    localStorage.setItem(OPS_KEY, JSON.stringify(dosOps));
+    localStorage.setItem(META_KEY, '{esto no es json');
+    ops = [];
+    initPortfolios();
+    check('AC-1 el libro sobrevive a un META corrupto', ops.length, 2);
+
+    // Y el guardado siguiente NO lo sustituye por una lista vacía.
+    saveOpsAll(ops);
+    check('AC-1 el guardado no vacía el libro',
+          parseOpsBlob(localStorage.getItem(OPS_KEY)).length, 2);
+
+    // AC-3: un libro que no se entiende se aparta, no se machaca.
+    clavesGuardadas().filter(k => k.startsWith('balance-ops-rescate-'))
+      .forEach(k => localStorage.removeItem(k));
+    localStorage.setItem(OPS_KEY, '{roto');
+    ops = loadOpsAll();
+    check('AC-3 un libro ilegible se lee como vacío', ops.length, 0);
+    check('AC-3 queda marcado como ilegible', opsIlegible, true);
+    const rescates = clavesGuardadas().filter(k => k.startsWith('balance-ops-rescate-'));
+    check('AC-3 se guardó una copia de rescate', rescates.length, 1);
+    check('AC-3 la copia conserva el original', localStorage.getItem(rescates[0]), '{roto');
+    saveOpsAll([]);
+    check('AC-3 no se escribe encima del ilegible', localStorage.getItem(OPS_KEY), '{roto');
+
+    pruebasFalloDeEscritura(check, dosOps);
+  } finally {
+    // AC-4: se devuelve el almacenamiento exactamente como estaba.
+    localStorage.clear();
+    Object.keys(copiaSeguridad).forEach(k => localStorage.setItem(k, copiaSeguridad[k]));
+    ops = estadoPrevio.ops;
+    opsIlegible = estadoPrevio.ilegible;
+  }
+
+  // AC-4: comprobado DESPUÉS de restaurar, comparando con la foto de antes.
+  const clavesAhora = clavesGuardadas();
+  const clavesAntes = Object.keys(copiaSeguridad);
+  check('AC-4 no sobra ni falta ninguna clave', clavesAhora.length, clavesAntes.length);
+  check('AC-4 todas las claves valen lo que valían',
+        clavesAntes.every(k => localStorage.getItem(k) === copiaSeguridad[k]), true);
+}
+
+function runSelfTests() {
+  const fails = [];
+  const check = (name, got, want) => {
+    if (got !== want) fails.push(`${name}: esperaba ${want}, obtuve ${got}`);
+  };
+
+  pruebasNumeros(check);
+  pruebasGuardado(check);
 
   if (fails.length) {
     console.error(`❌ ${fails.length} autopruebas fallidas:\n` + fails.join('\n'));
