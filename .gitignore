@@ -1,2 +1,5 @@
 sync.key
 portfolio-sync.json
+
+# Marcador temporal de los hooks de revisión, no es del proyecto
+.paul/.phase-review-done

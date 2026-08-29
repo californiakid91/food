@@ -35,6 +35,8 @@ Llevar al día tus carteras con precios manuales y sacar de ahí una declaració
 
 - [x] Corrección del separador decimal en la entrada manual (`parseNum`) — `69f728e`, 2026-08-29
 - [x] `runSelfTests()` con `?selftest=1` cubriendo el round-trip `parseNum`/`numIn` — `69f728e`
+- [x] Puerta de verificación `tools/verify.sh` con códigos de salida nominales, banco de sabotaje y enganche `pre-push` — 2026-08-29
+- [x] Trinquete de tamaño de funciones sellado sobre el código real — 2026-08-29
 
 ### Active (In Progress)
 
@@ -74,7 +76,7 @@ Ninguno — listo para planificar la Fase 1.
 - Un solo fichero `index.html` sin build system: nada de imports, bundlers ni dependencias nuevas
 - Todo el estado viaja en UN documento de Firestore (límite de 1 MB; los snapshots mensuales lo engordan)
 - iOS/PWA no ejecuta nada en segundo plano
-- Los cambios se validan a mano: no hay CI
+- No hay CI: la puerta es local (`tools/verify.sh` + enganche `pre-push`, que hay que reinstalar en cada máquina con `tools/install-hooks.sh`)
 
 ### Business Constraints
 
@@ -90,12 +92,17 @@ Ninguno — listo para planificar la Fase 1.
 | Fiscal antes que UX | El dato del que sale la renta pesa más que la comodidad diaria | 2026-08-29 | Active |
 | Sin SonarQube ni audit enterprise | Proyecto personal de un fichero; no aportan | 2026-08-29 | Active |
 | Autopruebas con `?selftest=1` en vez de framework de tests | Blinda invariantes sin introducir build system | 2026-08-29 | Active |
+| Adoptada la doctrina de proceso y verificación en `CLAUDE.md` | Traída de otro proyecto del operador; cada regla nació de un fallo real medido | 2026-08-29 | Active |
+| La puerta es `tools/verify.sh`, enganchada a `pre-push` | Un instrumento que no dispara ningún objetivo no existe | 2026-08-29 | Active |
+| §9 adaptada: presupuesto por función (60 líneas), no módulos hoja | El monolito es el producto: `index.html` debe servirse tal cual | 2026-08-29 | Active |
+| Las deudas viven en `.paul/DEUDAS.md`, no en las actas | Una deuda que sólo existe en un SUMMARY es como si no existiera | 2026-08-29 | Active |
 
 ## Success Metrics
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Autopruebas en verde antes de cada despliegue | 100% | round-trip decimal | On track |
+| La puerta (`tools/verify.sh`) en verde antes de cada push | 100% | enganchada a pre-push | On track |
+| Controles de la puerta con sabotaje que demuestra que muerden | 100% | 9 de 9 | Achieved |
 | Invariantes cubiertos por `runSelfTests()` | 4 (decimal, FIFO, año fiscal, sync) | 1 | On track |
 | Escenarios de pérdida de datos abiertos | 0 | 4 (ops sin cargar, dedupe, sync, sin backup) | At risk |
 | Riesgos fiscales conocidos sin resolver | 0 | 4 (orden intradía, split, 2 meses, opFx) | At risk |

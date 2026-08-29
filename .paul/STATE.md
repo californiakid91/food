@@ -10,10 +10,10 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 Milestone: v0.1 Datos fiables (v0.1.0)
-Phase: 1 of 6 (Guardado que no miente)
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-08-29 — Fase 0 desplegada (`69f728e`), PAUL inicializado desde la auditoría Fable
+Phase: 1 of 6 (Guardado que no miente) — Planning
+Plan: 01-01 creado, pendiente de aprobación
+Status: PLAN created, ready for APPLY
+Last activity: 2026-08-29 — Creado .paul/phases/01-guardado-fiable/01-01-PLAN.md
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
@@ -24,7 +24,7 @@ Progress:
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [Ready for first PLAN]
+  ✓        ○        ○     [Plan created, awaiting approval]
 ```
 
 ## Performance Metrics
@@ -39,7 +39,7 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | Phase | Plans | Total Time | Avg/Plan |
 |-------|-------|------------|----------|
 | 00-hotfix-decimal | 1/1 | — | — |
-| 01-guardado-fiable | 0/3 | — | — |
+| 01-guardado-fiable | 0/1 | — | — |
 
 ## Accumulated Context
 
@@ -51,14 +51,13 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | Fiscal antes que UX | Roadmap | Fases 3-4 antes que la 5 |
 | Autopruebas con `?selftest=1`, sin build system | Fase 0 | Cada fase añade su invariante a `runSelfTests()` |
 | Sin SonarQube ni audit enterprise | Init | No se crea `.paul/config.md` |
+| Adoptada la doctrina de `CLAUDE.md` | 2026-08-29 | Todo PLAN lleva revisión adversaria; nada se cierra sin la puerta en verde |
+| La puerta es `tools/verify.sh` | 2026-08-29 | Enganchada a `pre-push`; 9 controles con sabotaje que demuestra que muerden |
 
 ### Deferred Issues
 
-| Issue | Origin | Effort | Revisit |
-|-------|--------|--------|---------|
-| Confirmar si los dividendos del OCR de Revolut llegan brutos o netos de retención | Auditoría 2026-08-29 | S | Con una captura real, antes de la Fase 6 |
-| El documento único de Firestore crece hacia el límite de 1 MB por los snapshots | Auditoría 2026-08-29 | M | Cuando el payload pase de ~500 KB |
-| Borrar el Worker de Cloudflare en su dashboard | Memoria previa | S | Junto a la limpieza de `worker.js` (Fase 6) |
+**Las deudas viven ahora en `.paul/DEUDAS.md`** (D-01 a D-11), que es la lista viva que se lee al
+arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos fuentes de verdad.
 
 ### Blockers/Concerns
 
@@ -68,18 +67,23 @@ PLAN ──▶ APPLY ──▶ UNIFY
 
 ## Boundaries (Active)
 
-Sin PLAN activo todavía. Protecciones permanentes del proyecto:
+Del PLAN 01-01 (pendiente de incorporar los hallazgos de la revisión adversaria):
+
+- `dedupeOps` / `opFingerprint` intactos: los necesitan `migrateOpsToGlobal` y el formato antiguo `opsData`
+- `parseNum` / `numIn` / `parseLooseNum` no se tocan (Fase 0)
+- `buildSyncPayload` y la resolución por `savedAt` son Fase 3; `computeFifo` y `exportTaxExcel`, Fase 4
+
+Permanentes del proyecto:
 
 - `index.html` sigue siendo un fichero único sin build system ni dependencias nuevas
-- `parseLooseNum` conserva su heurística de miles: es el camino del OCR
 - No reintroducir la obtención automática de precios
 
 ## Session Continuity
 
 Last session: 2026-08-29
-Stopped at: Fase 0 desplegada y PAUL inicializado con el roadmap de la auditoría
-Next action: `/paul:plan` para la Fase 1 "Guardado que no miente"
-Resume context: el backlog completo con citas de línea está en la memoria `food-audit-2026-08-29`
+Stopped at: Plan 01-01 creado
+Next action: Revisar y aprobar el plan, luego `/paul:apply .paul/phases/01-guardado-fiable/01-01-PLAN.md`
+Resume file: .paul/phases/01-guardado-fiable/01-01-PLAN.md
 
 ---
 *STATE.md — Updated after every significant action*

@@ -1,0 +1,47 @@
+{
+  "excede": {
+    "calcRebalance": [
+      141
+    ],
+    "drawBar": [
+      132
+    ],
+    "drawGlobalSpark": [
+      66
+    ],
+    "drawPie": [
+      75
+    ],
+    "exportTaxExcel": [
+      449
+    ],
+    "parseRevolutStatement": [
+      96
+    ],
+    "parseRevolutTrade": [
+      117
+    ],
+    "refreshRowDerived": [
+      80
+    ],
+    "renderGlobalPosition": [
+      110
+    ],
+    "renderImportPreview": [
+      83
+    ],
+    "renderOps": [
+      102
+    ],
+    "renderTable": [
+      132
+    ]
+  },
+  "funciones_vistas": 146,
+  "semantica": {
+    "ambito": "funciones `function NOMBRE(` de primer nivel del <script> inline de index.html",
+    "metrica": "lineas crudas del cuerpo, comentarios y blancos incluidos",
+    "umbral_lineas": 60,
+    "version": 1
+  }
+}

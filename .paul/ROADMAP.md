@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 3 | Not started | - |
+| 1 | Guardado que no miente | 1 | Planning | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -49,9 +49,7 @@ Phases: 1 of 7 complete (Fase 0)
 - `applySyncPayload` debe deduplicar por `id`, nunca por huella; la huella se queda solo en la importación (`index.html:988`, `2874`)
 
 **Plans:**
-- [ ] 01-01: Carga incondicional de `ops` al arrancar
-- [ ] 01-02: Errores de guardado visibles (indicador en rojo, sin "Guardado ✓" falso)
-- [ ] 01-03: Deduplicación por `id` al sincronizar, por huella al importar
+- [ ] 01-01: Guardado íntegro — carga incondicional de `ops`, errores de guardado visibles y deduplicación por `id` al sincronizar (3 tareas en un plan: mismo concern, mismo fichero)
 
 ### Phase 2: Backup y restauración
 
