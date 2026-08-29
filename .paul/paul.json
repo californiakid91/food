@@ -1,0 +1,25 @@
+{
+  "name": "food",
+  "version": "0.0.0",
+  "milestone": {
+    "name": "v0.1 Datos fiables",
+    "version": "0.1.0",
+    "status": "in_progress"
+  },
+  "phase": {
+    "number": 1,
+    "name": "Guardado que no miente",
+    "status": "not_started"
+  },
+  "loop": {
+    "plan": null,
+    "position": "IDLE"
+  },
+  "timestamps": {
+    "created_at": "2026-08-29T00:00:00Z",
+    "updated_at": "2026-08-29T00:00:00Z"
+  },
+  "satellite": {
+    "groom": true
+  }
+}
