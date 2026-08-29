@@ -123,7 +123,7 @@ CASOS = [
     # Controles positivos del plan 01-02 (sincronizacion). Mismo criterio: cada
     # arreglo, revertido, tiene que matar su propia prueba.
     Caso("los identificadores vuelven a poder chocar", INDEX,
-         "  const seq = (opIdSeq++).toString(36).padStart(4, '0');\n"
+         "  const seq = (opIdSeq++).toString(36).padStart(6, '0');\n"
          "  return 'o' + Date.now().toString(36) + seq + Math.random().toString(36).slice(2, 5);",
          "  return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);",
          1, "AC-1"),
@@ -132,13 +132,39 @@ CASOS = [
          "saveOpsAll(dedupeOps(data.opsAll))",
          1, "AC-2"),
     Caso("se quita la guarda de no-vaciado al aplicar", INDEX,
-         "    if (vaciariaElLibro(data.opsAll, ops)) {",
+         "    if (vaciariaElLibro(opsDelDocumento(data), ops)) {",
          "    if (false) {",
          1, "AC-4"),
     Caso("se quita la guarda de no-vaciado al subir", INDEX,
          "        if (vaciariaElLibro(payload.opsAll, cloudOps)) {",
          "        if (false) {",
          1, "AC-4"),
+    # El fallo mas caro encontrado en la revision del 01-02: las autopruebas
+    # sembraban centinelas SOBRE las claves reales, la foto de seguridad
+    # retrataba a los centinelas y al final se borraban esas claves. Abrir
+    # ?selftest=1 en el navegador borraba el libro de operaciones del usuario
+    # imprimiendo "Autopruebas OK". El control vive en el arnes, no en la suite.
+    Caso("las autopruebas se comen el libro real del usuario", INDEX,
+         "    'centinela-libro': JSON.stringify([{ id: 'centinela'",
+         "    'balance-ops': JSON.stringify([{ id: 'centinela'",
+         1, "se comieron datos reales"),
+    # Contar claves no basta: hay que comparar VALORES. Este sabotaje devuelve
+    # el almacenamiento con TODAS las claves puestas pero con la basura dentro.
+    # Con la comprobacion ciega al valor, salia verde.
+    Caso("la restauracion devuelve las claves pero con la basura dentro", INDEX,
+         "    Object.keys(copiaSeguridad).forEach(k => localStorage.setItem(k, copiaSeguridad[k]));\n"
+         "    ops = previo.ops;",
+         "    Object.keys(copiaSeguridad).forEach(k => localStorage.setItem(k, 'BASURA'));\n"
+         "    ops = previo.ops;",
+         1, "AC-4"),
+    Caso("la guarda de subida vuelve a ser ciega al formato antiguo", INDEX,
+         "  Object.values(data.opsData || {}).forEach(l => juntas.push(...(Array.isArray(l) ? l : [])));",
+         "  Object.values({}).forEach(l => juntas.push(...(Array.isArray(l) ? l : [])));",
+         1, "AC-4 un documento en formato antiguo"),
+    Caso("el identificador puede cambiar de anchura", INDEX,
+         "  const seq = (opIdSeq++).toString(36).padStart(6, '0');",
+         "  const seq = (opIdSeq++).toString(36).padStart(2, '0');",
+         1, "AC-1 el identificador no cambia de anchura"),
     Caso("deriva: se afloja la vara de medir", FUNCSIZE,
          "'umbral_lineas': 60,", "'umbral_lineas': 500,",
          3, "DERIVA"),

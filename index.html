@@ -1100,9 +1100,13 @@ function migrateOpsToGlobal(portfolioIds) {
 // La marca de tiempo sigue DELANTE y el contador va con ancho fijo porque el id
 // es el desempate al ordenar (computeFifo y el listado de operaciones): sin
 // relleno, '10' iría antes que '9' y el orden de entrada se perdería.
+// El ancho es 6 (36^6 = 2.176 millones) y no 4: `padStart` rellena pero NO
+// trunca, así que al pasarse el contador el identificador crecería un carácter
+// y el orden se invertiría. Con 4 lo alcanzaban tres pasadas de las propias
+// autopruebas. Hay un invariante que comprueba que el ancho no cambia.
 let opIdSeq = 0;
 function genOpId() {
-  const seq = (opIdSeq++).toString(36).padStart(4, '0');
+  const seq = (opIdSeq++).toString(36).padStart(6, '0');
   return 'o' + Date.now().toString(36) + seq + Math.random().toString(36).slice(2, 5);
 }
 function todayISO() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
@@ -2880,6 +2884,13 @@ function setSyncUI(state) {
         btn.textContent = 'Salir';
       }
     }
+  } else if (state === 'pendiente') {
+    // Ni verde ni error: hay cambios que a propósito no se han subido.
+    // El silencio nunca es "limpio": si se omite un push, se ve.
+    dot.style.background = '#e67e22';
+    dot.title = 'Cambios sin subir';
+    status.textContent = 'Cambios sin subir: este dispositivo no tiene operaciones y no se pisa el libro de la nube.';
+    status.style.display = 'block';
   } else if (state === 'auth') {
     dot.style.background = '#e74c3c';
     dot.title = 'Error de autenticación';
@@ -2973,7 +2984,7 @@ function applySyncPayload(data) {
     // Nadie vacía el libro de nadie: un libro vacío que llega de la nube no
     // sustituye a uno local con operaciones. Fusionarlos es la Fase 3; esto
     // sólo impide el caso destructivo.
-    if (vaciariaElLibro(data.opsAll, ops)) {
+    if (vaciariaElLibro(opsDelDocumento(data), ops)) {
       console.warn('[SYNC] libro recibido vacío: se conservan las', ops.length,
                    'operaciones locales');
     } else if (!saveOpsAll(dedupeOpsById(data.opsAll))) {
@@ -2995,6 +3006,19 @@ function applySyncPayload(data) {
 // guarda de subida y la de aplicación. Si cada lado tuviera el suyo, la
 // asimetría entre los dos sería el defecto, no la protección.
 function tieneOperaciones(lista) { return Array.isArray(lista) && lista.length > 0; }
+
+// ¿Qué libro tiene ese documento? Los dos formatos cuentan: `opsAll` es el
+// moderno y `opsData` el antiguo por cartera, que `applySyncPayload` sigue
+// aceptando de un dispositivo sin actualizar. Mirar sólo `opsAll` dejaría al
+// guardián ciego justo en el caso para el que existe: una nube en formato
+// antiguo se leería como libro vacío y se podría pisar.
+function opsDelDocumento(data) {
+  if (!data) return [];
+  if (Array.isArray(data.opsAll)) return data.opsAll;
+  const juntas = [];
+  Object.values(data.opsData || {}).forEach(l => juntas.push(...(Array.isArray(l) ? l : [])));
+  return juntas;
+}
 
 // ¿Sustituir `destino` por `origen` dejaría el libro vacío teniendo operaciones?
 // Este es el ÚNICO juez, y lo llaman literalmente las dos guardas: la de subir a
@@ -3045,11 +3069,22 @@ function schedulePush() {
       // con el libro vacío (o ilegible) no sube ese vacío encima de la nube.
       // Mismo predicado que en applySyncPayload, a propósito.
       if (!tieneOperaciones(payload.opsAll)) {
-        const snapOps = await ref.get();
-        const cloudOps = snapOps.exists ? (snapOps.data().opsAll || []) : [];
+        let cloudOps;
+        try {
+          const snapOps = await ref.get();
+          cloudOps = opsDelDocumento(snapOps.exists ? snapOps.data() : null);
+        } catch (e) {
+          // Sin poder leer la nube no se puede afirmar que subir sea inocuo, y
+          // el libro es el dato más caro de reconstruir: se falla CERRADO. Es
+          // lo que pasa sin conexión y sin caché, así que TIENE que verse.
+          console.warn('[SYNC] push omitido: libro local vacío y la nube no se pudo leer:', e);
+          setSyncUI('pendiente');
+          return;
+        }
         if (vaciariaElLibro(payload.opsAll, cloudOps)) {
           console.warn('[SYNC] push omitido: libro local vacío, la nube tiene',
                        cloudOps.length, 'operaciones');
+          setSyncUI('pendiente');
           return; // el libro de la nube se conserva
         }
       }
@@ -3067,6 +3102,7 @@ function schedulePush() {
           : 0;
         if (cloudAssets > 0) {
           console.warn('[SYNC] push omitido: estado local vacío, la nube tiene', cloudAssets, 'activos');
+          setSyncUI('pendiente');
           return; // la nube se conserva
         }
         await ref.set(payload);
@@ -4663,15 +4699,23 @@ function pruebasNumeros(check) {
   check('OCR miles', parseLooseNum('1,234'), 1234);
 }
 
-// Datos de mentira que imitan los del usuario, sembrados ANTES de la foto de
-// seguridad. Sin ellos, en node el almacenamiento arranca vacío y comprobar que
-// todo se restauró sería comparar cero con cero: la prueba pasaría aunque se
-// borrase la restauración entera.
+// Datos de mentira sembrados ANTES de la foto de seguridad. Sin ellos, en node
+// el almacenamiento arranca vacío y comprobar que todo se restauró sería
+// comparar cero con cero: la prueba pasaría aunque se borrase la restauración
+// entera.
+//
+// Sus nombres NO son claves de la app, y eso es el arreglo de un fallo real:
+// antes se sembraban sobre `balance-ops` y `balance-meta-v2`, o sea que la foto
+// de seguridad retrataba a los centinelas en vez de al usuario, y al final se
+// borraban esas dos claves. Resultado medido: abrir `?selftest=1` en el
+// navegador BORRABA el libro de operaciones y la lista de carteras del usuario
+// mientras imprimía «✅ Autopruebas OK». Las claves reales las escriben y las
+// restauran las propias pruebas, con el original ya a salvo en la foto.
 function sembrarCentinelas() {
   const centinelas = {
-    'balance-ops': JSON.stringify([{ id: 'centinela', date: '2020-01-01', type: 'buy',
-                                     ticker: 'ZZZ', titulos: 7, price: 3, currency: 'EUR' }]),
-    'balance-meta-v2': JSON.stringify({ portfolios: [{ id: 'p-centinela', name: 'No tocar' }] }),
+    'centinela-libro': JSON.stringify([{ id: 'centinela', date: '2020-01-01', type: 'buy',
+                                         ticker: 'ZZZ', titulos: 7, price: 3, currency: 'EUR' }]),
+    'centinela-meta': JSON.stringify({ portfolios: [{ id: 'p-centinela', name: 'No tocar' }] }),
     'ajeno-a-la-app': 'esto no es nuestro y tiene que seguir aquí',
   };
   Object.keys(centinelas).forEach(k => localStorage.setItem(k, centinelas[k]));
@@ -4805,12 +4849,17 @@ function pruebasIdentificadores(check) {
         genOpId() < genOpId(), true);
 
   let rondasConColision = 0;
+  const anchos = new Set();
   for (let ronda = 0; ronda < 1000; ronda++) {
     const vistos = new Set();
-    for (let i = 0; i < 500; i++) vistos.add(genOpId());
+    for (let i = 0; i < 500; i++) { const id = genOpId(); vistos.add(id); anchos.add(id.length); }
     if (vistos.size !== 500) rondasConColision++;
   }
   check('AC-1 mil ráfagas de 500 identificadores, ninguna colisión', rondasConColision, 0);
+  // `padStart` rellena pero no trunca: si el contador desborda su ancho, el
+  // identificador crece un carácter y el orden del FIFO se invierte a mitad de
+  // sesión. Medir la LONGITUD es lo único que lo ve; el comentario no.
+  check('AC-1 el identificador no cambia de anchura', anchos.size, 1);
 
   // Control positivo. Sin esto, la comprobación de arriba saldría verde también
   // con un generador que no arreglase nada: hay que ver que el viejo SÍ chocaba.
@@ -4868,6 +4917,18 @@ function pruebasNoVaciar(check, base) {
   check('AC-4 no vaciaría: lo que llega trae operaciones', vaciariaElLibro([base], [base]), false);
   check('AC-4 no vaciaría: el destino ya estaba vacío', vaciariaElLibro([], []), false);
 
+  // La nube puede venir en el formato ANTIGUO. Si el guardián sólo mirase
+  // `opsAll` la leería como libro vacío y dejaría pasar el pisotón: quedaría
+  // ciego justo en el caso para el que existe.
+  const nubeAntigua = { opsData: { 1: [base], 2: [] } };
+  check('AC-4 un documento en formato antiguo sí tiene libro',
+        opsDelDocumento(nubeAntigua).length, 1);
+  check('AC-4 subir un libro vacío sobre una nube antigua la vaciaría',
+        vaciariaElLibro([], opsDelDocumento(nubeAntigua)), true);
+  check('AC-4 un documento moderno se lee por opsAll',
+        opsDelDocumento({ opsAll: [base, base] }).length, 2);
+  check('AC-4 un documento inexistente no tiene libro', opsDelDocumento(null).length, 0);
+
   localStorage.setItem(OPS_KEY, JSON.stringify([Object.assign({}, base, { id: 'local1' })]));
   ops = loadOpsAll();
   applySyncPayload({ portfolios: [{ id: 1, name: 'P1' }], currentPortId: 1, nextId: 2, opsAll: [] });
@@ -4889,8 +4950,11 @@ function pruebasNoVaciar(check, base) {
 function pruebasSincronizacion(check) {
   const base = { date: '2026-03-01', type: 'buy', ticker: 'AAA',
                  titulos: 1, price: 10, currency: 'EUR' };
+  const centinelas = sembrarCentinelas();
   const copiaSeguridad = {};
   clavesGuardadas().forEach(k => { copiaSeguridad[k] = localStorage.getItem(k); });
+  check('AC-4 la foto de sincronización no está vacía',
+        Object.keys(copiaSeguridad).length >= 3, true);
   const previo = { ops: ops, ilegible: opsIlegible, portfolios: portfolios,
                    currentPortId: currentPortId, nextId: nextId, rows: rows };
   try {
@@ -4904,8 +4968,13 @@ function pruebasSincronizacion(check) {
     ops = previo.ops; opsIlegible = previo.ilegible; portfolios = previo.portfolios;
     currentPortId = previo.currentPortId; nextId = previo.nextId; rows = previo.rows;
   }
-  check('AC-4 el almacenamiento se devolvió como estaba',
-        clavesGuardadas().length, Object.keys(copiaSeguridad).length);
+  // Contar claves NO basta: devolver el almacenamiento con todos los valores
+  // corrompidos daba verde. Se comparan los VALORES, uno a uno.
+  const clavesAntes = Object.keys(copiaSeguridad);
+  check('AC-4 no sobra ni falta ninguna clave', clavesGuardadas().length, clavesAntes.length);
+  check('AC-4 todas las claves valen lo que valían',
+        clavesAntes.every(k => localStorage.getItem(k) === copiaSeguridad[k]), true);
+  Object.keys(centinelas).forEach(k => localStorage.removeItem(k));
 }
 
 function runSelfTests() {

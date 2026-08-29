@@ -36,7 +36,30 @@ def main():
         broken("runSelfTests() no esta en index.html")
 
     harness = (ROOT / 'tools' / 'dom_stub.js').read_text(encoding='utf-8')
-    runner = harness + "\n" + js + """
+    # Datos REALES de mentira, sembrados por el arnés ANTES de cargar la app:
+    # ?selftest=1 tambien corre en el navegador del usuario, con sus datos
+    # delante, y ya se comio el libro de operaciones una vez -- silenciosamente,
+    # imprimiendo "Autopruebas OK". Este control vive FUERA de la suite a
+    # proposito: uno que corriera dentro seria juez y parte.
+    siembra = """
+const __real = {
+  'balance-ops': JSON.stringify([{ id: 'REAL1', date: '2024-05-05', type: 'buy',
+                                   ticker: 'REAL', titulos: 99, price: 1, currency: 'EUR' }]),
+  'balance-meta-v2': JSON.stringify({ portfolios: [{ id: 7, name: 'Mi cartera real' }], currentPortId: 7 }),
+  'balance-rows-7': JSON.stringify({ rows: [{ id: 1, name: 'REAL' }] }),
+  'ajeno-del-usuario': 'ni tocarlo',
+};
+Object.keys(__real).forEach(k => localStorage.setItem(k, __real[k]));
+"""
+    comprobacion = """
+const __perdidas = Object.keys(__real).filter(k => localStorage.getItem(k) !== __real[k]);
+if (__perdidas.length) {
+  console.error('HALLAZGO: las autopruebas se comieron datos reales del usuario: ' +
+                __perdidas.map(k => k + ' -> ' + localStorage.getItem(k)).join(', '));
+  process.exit(1);
+}
+"""
+    runner = harness + siembra + "\n" + js + """
 if (typeof runSelfTests !== 'function') {
   console.error('INSTRUMENTO ROTO: runSelfTests no quedo definida tras cargar el script');
   process.exit(2);
@@ -51,7 +74,9 @@ if (!Array.isArray(fails)) {
   console.error('INSTRUMENTO ROTO: runSelfTests no devolvio la lista de fallos');
   process.exit(2);
 }
-process.exit(fails.length ? 1 : 0);
+if (fails.length) process.exit(1);
+""" + comprobacion + """
+process.exit(0);
 """
     with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-8') as f:
         f.write(runner)

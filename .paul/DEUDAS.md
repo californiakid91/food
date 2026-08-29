@@ -21,8 +21,11 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   `2911`). **No reproducido en vivo**: el comportamiento de Firestore con escrituras encoladas
   offline está razonado sobre la semántica documentada de `set()`, no observado.
 - **Estado:** planificada como Fase 3 del roadmap. Depende de tener backup antes (D-02).
-  **Cota parcial en el plan 01-02:** dos guardas impedirán el caso destructivo (que un libro vacío
-  pise uno con operaciones, en cualquiera de los dos sentidos). La fusión real sigue siendo Fase 3.
+  **Cota parcial YA PUESTA** en el ciclo 01-02 (`77f8cef`): un único juez, `vaciariaElLibro`,
+  cablea las dos guardas e impide el caso destructivo en los dos sentidos. La fusión real sigue
+  siendo Fase 3. Ojo: la guarda de subida omite el push ENTERO, así que mientras el libro local
+  esté vacío y la nube tenga operaciones, los cambios de activos tampoco suben. Es deliberado —
+  fusionar es Fase 3— pero no es gratis.
 - **Qué la reabre:** cualquier cambio en `buildSyncPayload`/`applySyncPayload` antes de la Fase 3.
 
 ### D-02 · No existe copia de seguridad fuera de Firestore
@@ -40,26 +43,55 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Estado:** abierta, sin fase asignada.
 - **Qué la reabre:** medir el payload. Si pasa de ~500 KB, sube a fase propia.
 
-### D-12 · Los identificadores de operación colisionan dentro de un extracto
-- **Qué es:** `genOpId` mezcla la marca de tiempo con tres caracteres aleatorios, y un extracto
-  entero se importa dentro del mismo milisegundo. Hoy no rompe nada visible, pero impide deduplicar
-  por identificador, que es lo que necesita el sync.
-- **Cómo se midió:** ejecutando el generador real, 2026-08-29: **10,2 % de los extractos de 100
-  operaciones tiene al menos una colisión**. El sufijo aleatorio sí tiene siempre 3 caracteres
-  (200.000 muestras); la causa es el problema del cumpleaños, no la longitud.
-- **Estado:** plan 01-02, Task 1. Descubierto por la revisión adversaria del plan 01-01.
-- **Qué la reabre:** los identificadores ya guardados NO se migran, así que las colisiones
-  históricas siguen ahí para siempre. Por eso 01-02 deduplica por identificador Y huella.
-
 ### D-13 · Las ramas de legado siguen colapsando compras idénticas del mismo día
 - **Qué es:** `dedupeOps` por huella, que se conserva en `migrateOpsToGlobal` y en la rama `opsData`,
   no distingue dos compras legítimamente idénticas del mismo día dentro de la misma cartera.
 - **Cómo se midió:** lectura del código, confirmada por la revisión adversaria del 2026-08-29
   (`index.html:988`, `1010`, `2877`).
-- **Estado:** **límite aceptado a propósito** en el plan 01-02. La migración corre una sola vez y
-  `opsData` sólo llega de un dispositivo sin actualizar.
+- **Estado:** **límite aceptado a propósito**, vigente desde el ciclo 01-02 (`77f8cef`). La
+  migración corre una sola vez y `opsData` sólo llega de un dispositivo sin actualizar. La rama
+  moderna (`opsAll`) ya NO tiene este problema: deduplica por identificador Y huella, con
+  autoprueba y sabotaje permanentes.
 - **Qué la reabre:** que aparezca un dispositivo antiguo sincronizando de verdad, o que la migración
   tenga que volver a correr.
+
+### D-16 · La guarda de subida deja de sincronizar los activos, no sólo el libro
+- **Qué es:** cuando la guarda salta, `schedulePush` abandona el push ENTERO. Mientras el libro
+  local esté vacío y la nube tenga operaciones, tampoco suben carteras, activos, histórico ni
+  precios. Es deliberado —fusionar es Fase 3— pero no es gratis: un usuario que borre todas sus
+  operaciones a propósito deja de sincronizar lo demás indefinidamente.
+- **Cómo se midió:** revisión del diff del ciclo 01-02, sobre `77f8cef`.
+- **Estado:** aceptado a propósito, ya NO en silencio: desde este ciclo el indicador se pone
+  naranja («Cambios sin subir») en vez de quedarse verde, que era el defecto de verdad.
+- **Qué la reabre:** la Fase 3, que al fusionar libros hace innecesaria la guarda entera.
+
+### D-17 · Sin conexión y sin caché, un dispositivo sin operaciones no sube nada
+- **Qué es:** la guarda de subida necesita leer la nube, y `enablePersistence` es best-effort
+  (falla con varias pestañas abiertas y en navegadores que no lo soportan). Sin caché y sin red, esa
+  lectura falla. Se ha decidido fallar CERRADO: no se sube y se avisa en naranja.
+- **Cómo se midió:** revisión del diff del ciclo 01-02. El comentario del propio código ya advertía
+  de esto para las transacciones; la guarda nueva reintrodujo una lectura en ese camino.
+- **Estado:** abierto y acotado. Sólo afecta a dispositivos SIN operaciones locales; el usuario con
+  libro sigue subiendo directo, sin lectura previa. Se elige perder sincronía antes que perder el
+  libro.
+- **Qué la reabre:** que el modo avión se vuelva un caso de uso principal, o la Fase 3.
+
+### D-15 · La guarda de subida está comprobada por presencia, no por precedencia
+- **Qué es:** la guarda que impide subir un libro vacío vive dentro de `schedulePush`, que es
+  asíncrona, va detrás de un temporizador y habla con Firestore. Las autopruebas corren en node sin
+  Firestore, así que lo único que comprueban de ese lado es que `schedulePush` **llama** al juez
+  `vaciariaElLibro`. El juez sí está ejercido de verdad, y la guarda hermana —la de aplicar— está
+  ejercida extremo a extremo.
+- **Cómo se midió:** ciclo 01-02. El sabotaje «se quita la guarda de no-vaciado al subir» muerde
+  (rc=1, `AC-4`), lo que demuestra que la llamada existe. No demuestra ni el ORDEN ni el EFECTO:
+  comprobado por la revisión del diff, poner `if (false && vaciariaElLibro(...))` deja la puerta en
+  verde, mientras que la misma mutación en la guarda hermana —la de aplicar— la pone roja con dos
+  fallos. El juez y su lectura del documento (`opsDelDocumento`) sí están ejercidos de verdad; lo
+  que no lo está es que la guarda corra, y corra ANTES del `set()`.
+- **Estado:** abierta, aceptada a propósito. Cerrarla pide un doble de Firestore en el arnés y
+  autopruebas asíncronas, que hoy no existen.
+- **Qué la reabre:** el primer doble de Firestore que entre en `tools/`, o la Fase 3, que reescribe
+  esta zona entera y tendrá que traerse su arnés.
 
 ---
 
@@ -69,7 +101,12 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué es:** el desempate del FIFO es lexicográfico por `id`, y `genOpId` lleva un sufijo
   aleatorio, así que una compra y una venta del mismo día pueden procesarse al revés.
 - **Cómo se midió:** lectura del código (`index.html:1015`, `1042`).
-- **Estado:** Fase 4, plan 04-01.
+- **Estado:** Fase 4, plan 04-01. **Reducida a medias, sin querer, por el ciclo 01-02**
+  (`77f8cef`): los identificadores NUEVOS llevan un contador de ancho fijo delante del azar, así
+  que entre ellos el desempate ya es el orden de entrada, no el azar. Pero esto NO cierra la deuda:
+  (a) los identificadores YA guardados siguen siendo aleatorios y son los del histórico fiscal;
+  (b) el orden de entrada tampoco es necesariamente el orden real de las operaciones dentro del
+  día. Sigue haciendo falta un criterio explícito, que es lo que hace la Fase 4.
 - **Qué la reabre:** nada; está en cola. Debe cerrarse antes de la próxima campaña de la renta.
 
 ### D-05 · No existe el tipo de operación «split»
@@ -174,3 +211,19 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   decimal; la heurística de miles se quedó sólo en el camino del OCR.
 - **Qué la reabriría:** el invariante está en `runSelfTests()` y hay un sabotaje permanente que
   lo verifica. Si `tools/sabotage.py` deja de morder ahí, esta deuda vuelve a estar abierta.
+
+### D-12 · Los identificadores de operación colisionaban dentro de un extracto — CERRADA 2026-08-29
+- **Qué era:** `genOpId` mezclaba la marca de tiempo con tres caracteres aleatorios, y un extracto
+  entero se importa dentro del mismo milisegundo: sólo 46.656 valores distinguían las operaciones.
+- **Cómo se midió:** ejecutando el generador real, 2026-08-29: **10,2 % de los extractos de 100
+  operaciones tenía al menos una colisión**. El sufijo aleatorio sí tenía siempre 3 caracteres
+  (200.000 muestras); la causa era el problema del cumpleaños, no la longitud.
+- **Cómo se cerró:** ciclo 01-02 (`77f8cef`). Un contador monotónico de ancho fijo, detrás de la
+  marca de tiempo y delante del azar, hace imposible que dos llamadas coincidan. El ancho es fijo
+  porque el identificador es el desempate al ordenar el FIFO.
+- **Residuo conocido:** los identificadores ya guardados NO se migran, así que las colisiones
+  históricas siguen en disco. Por eso la deduplicación del sync exige identificador **Y** huella:
+  una colisión de fábrica no puede comerse una operación legítima.
+- **Qué la reabriría:** hay autoprueba (mil ráfagas de 500 identificadores) con su control positivo
+  —el generador viejo tiene que seguir colisionando— y un sabotaje permanente. Si `tools/sabotage.py`
+  deja de morder en «los identificadores vuelven a poder chocar», esta deuda vuelve a estar abierta.
