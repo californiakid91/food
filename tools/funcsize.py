@@ -91,7 +91,8 @@ def es_regex(js, i):
         while k >= 0 and (js[k].isalnum() or js[k] in '_$'):
             k -= 1
         return js[k + 1:fin] in {'return', 'typeof', 'case', 'in', 'of', 'new',
-                                 'delete', 'do', 'else', 'instanceof', 'void'}
+                                 'delete', 'do', 'else', 'instanceof', 'void',
+                                 'throw', 'yield', 'await'}
     return True
 
 

@@ -107,8 +107,10 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 ### D-09 · Doce funciones por encima del presupuesto de 60 líneas
 - **Qué es:** deuda de tamaño declarada y congelada. Sólo pueden encoger; ninguna función nueva
   puede unirse a la lista.
-- **Cómo se midió:** `tools/funcsize.py`, 2026-08-29, sobre 146 funciones vistas. Sellada en
-  `.paul/baseline-funcs.json`. Exenciones nombradas una a una:
+- **Cómo se midió:** `tools/funcsize.py`, re-medido el 2026-08-29 tras el plan 01-01. La cifra de
+  funciones vistas vive sólo en `.paul/baseline-funcs.json`, porque copiarla aquí la desactualiza
+  al siguiente ciclo — ya pasó dos veces el mismo día. Los doce tamaños de abajo sí se citan porque están congelados:
+  si cambiaran, el trinquete se pondría rojo. Exenciones nombradas una a una:
 
   | Función | Líneas | Motivo de la exención |
   |---|---|---|
@@ -136,6 +138,18 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Estado:** abierta y **declarada**, no descubierta. Un límite declarado es un límite; uno
   descubierto después es un agujero.
 - **Qué la reabre:** que aparezca código nuevo escrito con funciones flecha grandes.
+
+### D-14 · La distinción entre una regex y una división es heurística
+- **Qué es:** para contar llaves, `funcsize.py` decide si una barra abre una expresión regular
+  mirando el carácter anterior. Es lo que hace cualquier tokenizador sin gramática completa, y
+  puede equivocarse con construcciones raras.
+- **Cómo se midió:** la revisión de falsos verdes del 2026-08-29 construyó el caso `throw /}/;`
+  —JavaScript válido— y demostró que el instrumento medía una función de 85 líneas como si
+  tuviera 2, **en silencio y sin dar rc=2**. Se añadieron `throw`, `yield` y `await` a la lista, y
+  hay un sabotaje permanente que mete esa función y exige que el instrumento la vea.
+- **Estado:** el caso conocido está cerrado; la clase (heurística sin gramática) sigue abierta.
+- **Qué la reabre:** cualquier otra palabra clave tras la que una barra abra regex. Si aparece,
+  se añade a la lista y se le pone su sabotaje.
 
 ---
 

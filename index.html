@@ -991,6 +991,12 @@ function parseOpsBlob(raw) {
 function rescatarOpsIlegible(raw) {
   if (!raw) return;
   try {
+    // Una copia por contenido, no una por arranque: si no, cada apertura de la
+    // app añadiría otro duplicado hasta agotar el almacenamiento.
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k.startsWith('balance-ops-rescate-') && localStorage.getItem(k) === raw) return;
+    }
     localStorage.setItem('balance-ops-rescate-' + Date.now(), raw);
   } catch (e) {
     console.error('No se pudo ni rescatar el libro ilegible:', e);
@@ -2924,7 +2930,15 @@ function applySyncPayload(data) {
   // `opsAll` es el libro único; `opsData` es el formato antiguo por cartera y
   // se fusiona al llegar de un dispositivo que aún no se ha actualizado.
   if (Array.isArray(data.opsAll)) {
-    saveOpsAll(dedupeOps(data.opsAll));
+    // Si el libro local era ilegible, este de la nube lo repara: el original
+    // ya está a salvo en su copia de rescate, así que el cerrojo se levanta.
+    if (opsIlegible) {
+      console.error('Libro local ilegible: se repara con el que llega de la nube.');
+      opsIlegible = false;
+    }
+    if (!saveOpsAll(dedupeOps(data.opsAll))) {
+      console.error('No se pudo guardar el libro recibido de la nube.');
+    }
   } else if (data.opsData) {
     const juntas = [];
     Object.values(data.opsData).forEach(list => juntas.push(...(Array.isArray(list) ? list : [])));
@@ -3070,14 +3084,17 @@ function saveMeta() {
   }
 }
 
-function saveRows() {
+// `anunciar` en false deja el aviso en manos de quien llama: `guardarTodo` no
+// puede permitir que esto cante "Guardado ✓" antes de saber si el libro de
+// operaciones se ha guardado. Sus otros llamantes sí quieren el aviso.
+function saveRows(anunciar = true) {
   try {
     localStorage.setItem(rowsKey(currentPortId), JSON.stringify({ rows, nextId }));
-    showSaveIndicator();
+    if (anunciar) showSaveIndicator();
     return true;
   } catch(e) {
     console.error('No se pudieron guardar los activos:', e);
-    showSaveIndicator('No se pudo guardar', false);
+    if (anunciar) showSaveIndicator('No se pudo guardar', false);
     return false;
   }
 }
@@ -3094,35 +3111,45 @@ function loadRows(id) {
 
 let saveTimer;
 let saveMensaje = null;   // qué anunciar cuando el guardado aplazado termine bien
+
+// Guarda las tres cosas y solo canta victoria si las tres fueron bien.
+// `saveRows` muestra el indicador por su cuenta (tiene llamantes que no pasan
+// por aquí), así que aquí se corrige el anuncio si algo falló.
+// Vive fuera del temporizador para que las autopruebas puedan ejercerla: si el
+// único camino fuera el aplazado, esta garantía no sería verificable.
+function guardarTodo() {
+  const okRows = saveRows(false);   // el aviso lo decide esta función, al final
+  const okOps  = saveOpsAll(ops);
+  const okMeta = saveMeta();
+  const todoBien = okRows && okOps && okMeta;
+  showSaveIndicator(todoBien ? (saveMensaje || 'Guardado ✓') : 'No se pudo guardar', todoBien);
+  saveMensaje = null;
+  // Si el guardado local falló, lo que hay en memoria no es de fiar: subirlo
+  // machacaría la copia buena de la nube, que puede ser la última que quede.
+  if (todoBien) schedulePush();
+  else console.error('No se sincroniza: el guardado local falló.');
+  return todoBien;
+}
+
 function schedSave(mensajeExito) {
   if (mensajeExito) saveMensaje = mensajeExito;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    // Se guardan las tres cosas y solo se canta victoria si las tres fueron
-    // bien. `saveRows` ya muestra el indicador por su cuenta (tiene llamantes
-    // que no pasan por aquí), así que aquí solo se corrige si algo falló.
-    const okRows = saveRows();
-    const okOps  = saveOpsAll(ops);
-    const okMeta = saveMeta();
-    if (!(okRows && okOps && okMeta)) {
-      showSaveIndicator('No se pudo guardar', false);
-    } else if (saveMensaje) {
-      showSaveIndicator(saveMensaje);
-    }
-    saveMensaje = null;
-    schedulePush();
-  }, 600);
+  saveTimer = setTimeout(guardarTodo, 600);
 }
 
 // `ok` en false pinta el aviso en rojo y lo deja más tiempo: un fallo de
 // guardado no puede pasar tan desapercibido como un éxito.
+let indicadorTimer;
 function showSaveIndicator(text = 'Guardado ✓', ok = true) {
   const el = document.getElementById('save-indicator');
   if (!el) return;
   el.textContent = text;
   el.style.color = ok ? 'var(--green)' : 'var(--red)';
   el.style.opacity = '1';
-  setTimeout(() => el.style.opacity = '0', ok ? 1800 : 5000);
+  // Sin cancelar el anterior, el temporizador de un "Guardado ✓" apagaría a los
+  // 1,8 s el aviso de error que acaba de sustituirlo.
+  clearTimeout(indicadorTimer);
+  indicadorTimer = setTimeout(() => el.style.opacity = '0', ok ? 1800 : 5000);
 }
 
 // ── Gestión de carteras ──
@@ -4571,6 +4598,21 @@ function pruebasNumeros(check) {
   check('OCR miles', parseLooseNum('1,234'), 1234);
 }
 
+// Datos de mentira que imitan los del usuario, sembrados ANTES de la foto de
+// seguridad. Sin ellos, en node el almacenamiento arranca vacío y comprobar que
+// todo se restauró sería comparar cero con cero: la prueba pasaría aunque se
+// borrase la restauración entera.
+function sembrarCentinelas() {
+  const centinelas = {
+    'balance-ops': JSON.stringify([{ id: 'centinela', date: '2020-01-01', type: 'buy',
+                                     ticker: 'ZZZ', titulos: 7, price: 3, currency: 'EUR' }]),
+    'balance-meta-v2': JSON.stringify({ portfolios: [{ id: 'p-centinela', name: 'No tocar' }] }),
+    'ajeno-a-la-app': 'esto no es nuestro y tiene que seguir aquí',
+  };
+  Object.keys(centinelas).forEach(k => localStorage.setItem(k, centinelas[k]));
+  return centinelas;
+}
+
 // Las claves de localStorage con la interfaz estándar: Object.keys() no es
 // aplicable a un almacenamiento, aunque los navegadores lo toleren.
 function clavesGuardadas() {
@@ -4599,6 +4641,29 @@ function pruebasFalloDeEscritura(check, dosOps) {
     saveRows();
     check('AC-2 el aviso es de error, no de éxito', avisos.some(a => a.ok === false), true);
     check('AC-2 no se anuncia ningún éxito', avisos.some(a => a.ok !== false), false);
+
+    // Éxito PARCIAL: es el camino que la garantía promete y el que nadie medía.
+    // Se deja pasar la escritura de los activos y se rompe la del libro.
+    avisos.length = 0;
+    let subidas = 0;
+    const pushReal = schedulePush;
+    const opsRealSave = saveOpsAll;
+    try {
+      schedulePush = () => { subidas++; };
+      localStorage.setItem = setReal;              // los activos sí se guardan
+      saveOpsAll = () => false;                    // el libro no
+      check('AC-2 con un fallo parcial, guardarTodo dice que no', guardarTodo(), false);
+      check('AC-2 un fallo parcial no anuncia éxito', avisos.some(a => a.ok !== false), false);
+      check('AC-2 un fallo parcial avisa del error', avisos.some(a => a.ok === false), true);
+      check('AC-2 un fallo parcial no sube nada a la nube', subidas, 0);
+      saveOpsAll = opsRealSave;
+      check('AC-2 sin fallos, guardarTodo dice que sí', guardarTodo(), true);
+      check('AC-2 sin fallos sí se sube a la nube', subidas, 1);
+    } finally {
+      schedulePush = pushReal;
+      saveOpsAll = opsRealSave;
+      localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+    }
   } finally {
     localStorage.setItem = setReal;
     console.error = errReal;
@@ -4610,8 +4675,10 @@ function pruebasFalloDeEscritura(check, dosOps) {
 // ?selftest=1 también corre en el navegador del usuario: se guarda todo y se
 // restaura al final, pase lo que pase, o le machacaríamos sus datos reales.
 function pruebasGuardado(check) {
+  const centinelas = sembrarCentinelas();
   const copiaSeguridad = {};
   clavesGuardadas().forEach(k => { copiaSeguridad[k] = localStorage.getItem(k); });
+  check('AC-4 la foto de seguridad no está vacía', Object.keys(copiaSeguridad).length >= 3, true);
   const estadoPrevio = { ops: ops, ilegible: opsIlegible };
 
   try {
@@ -4660,6 +4727,9 @@ function pruebasGuardado(check) {
   check('AC-4 no sobra ni falta ninguna clave', clavesAhora.length, clavesAntes.length);
   check('AC-4 todas las claves valen lo que valían',
         clavesAntes.every(k => localStorage.getItem(k) === copiaSeguridad[k]), true);
+  check('AC-4 los datos del usuario siguen intactos',
+        Object.keys(centinelas).every(k => localStorage.getItem(k) === centinelas[k]), true);
+  Object.keys(centinelas).forEach(k => localStorage.removeItem(k));
 }
 
 function runSelfTests() {

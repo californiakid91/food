@@ -406,12 +406,17 @@ real, que no es lo mismo que ejecutarlos en node.
 > **Adaptación deliberada.** El original exige que el código nuevo aterrice en módulos hoja y
 > nunca engorde un monolito. Aquí **el monolito es el producto**: `index.html` tiene que poder
 > servirse tal cual desde Pages, sin build. Así que la regla se sustituye por su equivalente
-> medible dentro de un fichero único, con cifras derivadas del código real (medidas el
-> 2026-08-29: 146 funciones, mediana 8 líneas, p90 39, máximo 449).
+> medible dentro de un fichero único, con cifras derivadas del código real: mediana 8 líneas,
+> p90 39, máximo 449.
+>
+> **El recuento vigente NO se copia aquí a propósito.** Vive en `.paul/baseline-funcs.json`, que
+> se resella con el instrumento. Una cifra copiada a mano en un documento queda desfasada al
+> siguiente cambio y luego se cita como si fuera cierta — pasó con esta misma línea el
+> 2026-08-29: decía 146 cuando ya eran 151.
 
 - **Presupuesto: ninguna función nueva pasa de 60 líneas.** Es holgado sobre el p90 real (39) y
   lo vigila `tools/funcsize.py`, cableado a la puerta.
-- **Las 12 funciones que ya lo exceden son deuda declarada, nombrada una a una** en
+- **Las funciones que ya lo exceden son deuda declarada, nombrada una a una** en
   `.paul/baseline-funcs.json` y en `.paul/DEUDAS.md`. Sólo pueden encoger.
 - **Toda función pura nueva nace con su invariante en `runSelfTests()`**, en el mismo commit.
   Es lo más parecido a un «módulo hoja» que admite este proyecto: código sin DOM, verificable
