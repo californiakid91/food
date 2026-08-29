@@ -9,10 +9,10 @@
   "phase": {
     "number": 1,
     "name": "Guardado que no miente",
-    "status": "not_started"
+    "status": "in_progress"
   },
   "loop": {
-    "plan": null,
+    "plan": "01-02",
     "position": "IDLE"
   },
   "timestamps": {
