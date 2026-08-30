@@ -6,8 +6,8 @@
 >
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
-Última medición contra el código: **2026-08-30**, revisión `feb643b` (cierre del ciclo 01-02 y
-verificación manual de la Fase 1 en la app desplegada).
+Última medición contra el código: **2026-08-30**, revisión `abe5e80` (transición de la Fase 1:
+brazos de seguridad y de radio de impacto sobre el diff completo `69f728e..abe5e80`).
 D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditoría inicial.
 
 ---
@@ -95,6 +95,54 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   libro sigue subiendo directo, sin lectura previa. Se elige perder sincronía antes que perder el
   libro.
 - **Qué la reabre:** que el modo avión se vuelva un caso de uso principal, o la Fase 3.
+
+### D-19 · La lectura previa a subir puede contestarla la caché, no el servidor
+- **Qué es:** antes de subir, un dispositivo con el libro local vacío pregunta a la nube si está
+  vacía (`ref.get()` en `schedulePush`). Firestore tiene la persistencia activada
+  (`db.enablePersistence({ synchronizeTabs: true })`), así que esa lectura puede resolverse desde
+  la caché local. Con una caché anticuada, el dispositivo A cree que la nube sigue vacía, la
+  guarda le deja pasar, y el `set()` machaca las operaciones que el dispositivo B ya había subido.
+  La guarda hermana ya falla CERRADO cuando la lectura RECHAZA (D-17); lo que no cubre es que la
+  lectura RESPONDA, y responda algo rancio.
+- **Cómo se midió:** brazo de seguridad de la transición de la Fase 1, 2026-08-30, sobre el diff
+  `69f728e..abe5e80`. Verificado en el código: la persistencia se habilita en `index.html:2855` y
+  la lectura de la guarda no pasa `{ source: 'server' }`.
+- **Estado:** abierto y acotado. **No es una regresión**: antes de esta fase no había guarda
+  ninguna y ese dispositivo machacaba la nube SIEMPRE. Es el residuo que la guarda no alcanza.
+  El arreglo obvio —forzar lectura de servidor— reintroduce y agrava D-17: sin red esa lectura
+  rechaza y el dispositivo deja de sincronizar. El equilibrio pertenece a la Fase 3, que sustituye
+  la guarda entera por una fusión y ya no necesita preguntar quién gana.
+- **Qué la reabre:** la Fase 3; o que aparezca un caso real de dos dispositivos con la caché
+  desincronizada.
+
+### D-20 · El payload de la nube sólo está validado en el bloque del libro
+- **Qué es:** el ciclo 01-02 blindó el tramo de `opsAll` de `applySyncPayload` (comprueba que sea
+  un array, tolera entradas nulas). El tramo anterior, el de `portfolioData`, sigue sin validar:
+  un documento con `portfolioData: { "1": null }` lanza una excepción al leer `pd.nextId` cuando
+  `portfolios`, `currentPortId` y `nextId` YA se han reasignado a los valores de la nube y parte
+  de las claves de activos ya se han escrito. Queda un estado a medias en memoria y en disco. Y un
+  `nextId` no numérico deja `nextId = NaN`, con lo que todas las filas nuevas nacen con
+  identificador `NaN`.
+- **Cómo se midió:** brazo de seguridad de la transición de la Fase 1, 2026-08-30. Preexistente:
+  el diff de la fase no tocó ese tramo.
+- **Estado:** abierto. Zona ligada: una operación con campos absurdos que pase `dedupeOpsById`
+  llega hasta el cálculo del FIFO —base de la renta— sin validación de forma.
+- **Qué la reabre:** la Fase 3 reescribe `applySyncPayload`; la Fase 4 toca el FIFO. Lo que llegue
+  antes.
+
+### D-21 · La migración del formato antiguo con el libro ilegible no la ejerce nadie
+- **Qué es:** `migrateOpsToGlobal` convierte el formato antiguo por cartera al libro único. El
+  ciclo 01-01 le añadió un camino nuevo —saltar la cartera ilegible y rescatar su contenido— que
+  ninguna autoprueba ejecuta. Es un camino de UNA SOLA OPORTUNIDAD: corre en la primera apertura
+  tras actualizar un dispositivo viejo, y si pierde o duplica operaciones históricas no hay
+  segunda ocasión de notarlo.
+- **Cómo se midió:** brazo de radio de impacto de la transición de la Fase 1, 2026-08-30.
+  `grep -n "migrateOpsToGlobal(" index.html` devuelve sólo su definición (1075) y su único
+  llamante de producción (3420): cero llamantes en la zona de autopruebas.
+- **Estado:** abierto. La función entera tiene llamante de producción, así que no es código
+  muerto; lo que no está ejercido es su rama nueva.
+- **Qué la reabre:** que se toque `migrateOpsToGlobal` o el formato antiguo `opsData`; y se cierra
+  con una autoprueba que siembre una cartera antigua con blob ilegible.
 
 ### D-15 · La guarda de subida está comprobada por presencia, no por precedencia
 - **Qué es:** la guarda que impide subir un libro vacío vive dentro de `schedulePush`, que es
@@ -211,6 +259,24 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 ---
 
 ## Abiertas — limpieza
+
+### D-22 · El instrumento de radio de impacto no ve el producto
+- **Qué es:** el brazo G7 de la transición de fase es `code-review-graph`, que construye un grafo
+  del código y calcula el alcance de un cambio. **No parsea el JavaScript inline de un `.html`**,
+  así que `index.html` —que ES el producto— no entra en su grafo. Corre, tarda, da rc=0 y presenta
+  un panel de ahorro de tokens sobre un análisis que no ha mirado el fichero que la fase cambió.
+  Es un instrumento que existe y no dispara ningún objetivo: por `CLAUDE.md` §0, no existe.
+- **Cómo se midió:** transición de la Fase 1, 2026-08-30. Tras `code-review-graph build`, el grafo
+  tiene 49 nodos repartidos en 10 ficheros y **ninguno es `index.html`** (consultado directamente
+  contra `.code-review-graph/graph.db`, agrupando por `file_path`). `detect-changes --base 69f728e`
+  reporta «25 funciones cambiadas» y «Untested: roto, main, noop, el, k», que son nombres de
+  `tools/` y `sync.py`, no del producto. Es la misma ceguera que ya tenía `smart_search`.
+- **Estado:** abierto. G7 queda declarado **DEGRADADO** y sustituido, en esta transición, por un
+  análisis de radio de impacto hecho con grep dirigido por un revisor adversario; ese sustituto
+  encontró seis huecos de cobertura reales, así que el brazo no se saltó, se reemplazó.
+- **Qué la reabre:** nada la cierra por sí sola. Se cierra cuando el grafo indexe el `<script>` de
+  `index.html`, o cuando el sustituto por grep se convierta en un script del repo cableado a la
+  puerta —que es lo que exige `CLAUDE.md` §4.1 si el juicio se repite por tercera vez.
 
 ### D-11 · `worker.js` es un proxy obsoleto
 - **Qué es:** proxy de precios de Yahoo, sin uso desde que se quitó la obtención automática de

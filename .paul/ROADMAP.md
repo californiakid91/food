@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 2 | In progress (2/2 ciclos; sin desplegar) | - |
+| 1 | Guardado que no miente | 3 | In progress (2/3 ciclos; transición devolvió un hallazgo) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -52,9 +52,14 @@ Phases: 1 of 7 complete (Fase 0)
 - [x] 01-01: Arranque y guardado honestos — cerrado 2026-08-29 (`dd13e42`, `86ad865`) — carga incondicional de `ops`, rescate de un libro ilegible, errores de guardado visibles
 - [x] 01-02: Sincronización que no destruye — cerrado 2026-08-30 (`77f8cef`, `56795eb`) — identificadores sin colisión, deduplicación por identificador Y huella, guardas simétricas de no-vaciado (añadido por la revisión adversaria del 01-01)
 
-**La fase NO está cerrada.** Los tres objetivos del scope están en el código y medidos uno a uno,
-pero nada se ha desplegado y ningún eslabón se ha visto en un navegador. El cierre de la fase
-exige `git push` + comprobación manual en la app desplegada, recargando dos veces.
+- [ ] 01-03: El cerrojo del libro ilegible — abierto por la transición de fase del 2026-08-30
+
+**La fase NO está cerrada.** Los tres objetivos del scope están en el código, medidos uno a uno
+contra él, desplegados y verificados en el navegador real. Lo que la mantiene abierta es otra cosa:
+la **transición de fase** (2026-08-30) encontró un defecto de correctness introducido en la propia
+fase — el cerrojo que impide escribir sobre un libro ilegible se levanta antes de confirmar la
+reparación, y el cruce de esas dos condiciones no lo mide ninguna autoprueba. Se arregla en el
+ciclo 01-03. Acta completa: `.paul/phases/01-guardado-fiable/01-TRANSICION.md`.
 
 ### Phase 2: Backup y restauración
 

@@ -13,22 +13,27 @@ Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — en curso
 Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 CERRADO (`77f8cef` +
 `56795eb` + acta)
-Status: los DOS ciclos cerrados, DESPLEGADO (`feb643b`) y VERIFICADO en el navegador real.
-Pendiente sólo la transición de fase (brazos G7/CRG y G8/security-review)
-Last activity: 2026-08-30 — push (`feb643b`, puerta verde en el pre-push) + verificación manual
-en la app desplegada: 3 de 4 puntos confirmados; el 4º sube al libro como D-18
+Status: los DOS ciclos cerrados, desplegado y verificado. **Transición de fase EJECUTADA y la
+fase NO cierra**: los brazos encontraron un defecto de correctness introducido en la fase. Se abre
+el ciclo 01-03 para arreglarlo. Acta: `.paul/phases/01-guardado-fiable/01-TRANSICION.md`
+Last activity: 2026-08-30 — transición de la Fase 1: puerta verde en `abe5e80`, los 3 objetivos
+medidos contra el código (PASS), G8/seguridad apto con reservas, G7/CRG **DEGRADADO** (no ve
+`index.html`) y sustituido por un análisis con grep. Cuatro deudas nuevas: D-19 a D-22
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [█████████░] 95% (ciclos cerrados, desplegado y verificado; falta la transición de fase)
+- Phase: [█████████░] 90% (transición ejecutada; un defecto de correctness abre el ciclo 01-03)
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ✓     [01-02 cerrado. Fase 1 pendiente de despliegue + navegador]
+  ○        ○        ○     [ciclo 01-03 por planificar: el cerrojo del libro ilegible]
 ```
+
+Ciclos 01-01 y 01-02: cerrados. La transición de fase se ejecutó y devolvió un hallazgo, así que
+la Fase 1 sigue abierta.
 
 ## Performance Metrics
 
@@ -61,6 +66,8 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | Un único juez para las dos guardas de no-vaciado | 01-02 | `vaciariaElLibro` + `opsDelDocumento`: la misma función en los dos lados, no el mismo criterio escrito dos veces |
 | Fallar CERRADO si no se puede leer la nube | 01-02 | Se prefiere perder sincronía a perder el libro; y se ve en naranja, no en verde |
 | Los controles de las autopruebas viven en el ARNÉS | 01-02 | Uno dentro de la suite sería juez y parte; el de datos reales está en `run_selftests.py` |
+| La transición de fase abre el ciclo 01-03 en vez de cerrar la fase | Fase 1 transición | El brazo de radio de impacto encontró un cruce sin medir que deja escribir un libro vacío sobre uno ilegible. Registrarlo como deuda lo blanquearía como «fase hecha»; se arregla |
+| G7 se declara DEGRADADO y se sustituye, no se salta | Fase 1 transición | `code-review-graph` no parsea el JS inline de un `.html`: 0 nodos de `index.html`. Un verde suyo sobre esta fase sería un falso verde |
 | Cerrar el ciclo 01-02 sin cerrar la FASE 1 | 01-02 UNIFY | Los 3 objetivos del scope están en el código, medidos uno a uno; pero ningún eslabón se ha visto en un navegador y nada está desplegado. Una sonda verde no supera a un intento real |
 
 ### Deferred Issues
@@ -72,7 +79,8 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 
 | Blocker | Impact | Resolution Path |
 |---------|--------|-----------------|
-| Ninguno | — | Los dos blockers anteriores (sin desplegar, sin ver en navegador) se cerraron el 2026-08-30, ver «Verificación manual» |
+| El cerrojo del libro ilegible se levanta antes de confirmar la reparación | La Fase 1 no puede cerrarse: es correctness introducido en la propia fase | Ciclo 01-03. Escenario completo en `01-TRANSICION.md` §5 |
+| G7 (radio de impacto) no ve `index.html` | La transición de fase no tiene instrumento propio; hoy se hace a mano | D-22. Se cierra cuando el grafo indexe el `<script>`, o cuando el sustituto sea un script del repo cableado a la puerta |
 
 ## Verificación manual de la Fase 1 — app desplegada, 2026-08-30
 
@@ -108,12 +116,12 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-30
-Stopped at: Fase 1 desplegada y verificada en el navegador real. La fase sigue formalmente
-abierta: falta su transición, que es donde corren los dos brazos de revisión DE FASE.
-Next action: transición de la Fase 1 — G7 (CRG blast-radius) y G8 (`/security-review`) sobre el
-diff de la fase, evolución de PROJECT.md y ROADMAP.md, y commit de cierre. Empezar con contexto
-limpio.
-Resume file: .paul/phases/01-guardado-fiable/01-02-SUMMARY.md
+Stopped at: transición de la Fase 1 ejecutada. Los dos brazos corrieron sobre el diff completo
+`69f728e..abe5e80`. La fase NO cierra: hay un defecto de correctness introducido en ella.
+Next action: `/paul:plan` del ciclo **01-03** — el cerrojo del libro ilegible debe levantarse sólo
+después de que el guardado de reparación se confirme, con su invariante del CRUCE «libro local
+ilegible + libro vacío desde la nube» y su sabotaje permanente. Empezar con contexto limpio.
+Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION.md
 
 ---
 *STATE.md — Updated after every significant action*

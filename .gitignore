@@ -3,3 +3,10 @@ portfolio-sync.json
 
 # Marcador temporal de los hooks de revisión, no es del proyecto
 .paul/.phase-review-done
+
+# Bytecode de Python: se regenera solo, no es del proyecto
+__pycache__/
+*.pyc
+
+# Grafo de code-review-graph: artefacto local
+.code-review-graph/
