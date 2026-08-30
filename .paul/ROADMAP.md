@@ -52,7 +52,7 @@ Phases: 1 of 7 complete (Fase 0)
 - [x] 01-01: Arranque y guardado honestos — cerrado 2026-08-29 (`dd13e42`, `86ad865`) — carga incondicional de `ops`, rescate de un libro ilegible, errores de guardado visibles
 - [x] 01-02: Sincronización que no destruye — cerrado 2026-08-30 (`77f8cef`, `56795eb`) — identificadores sin colisión, deduplicación por identificador Y huella, guardas simétricas de no-vaciado (añadido por la revisión adversaria del 01-01)
 
-- [ ] 01-03: El cerrojo del libro ilegible — abierto por la transición de fase del 2026-08-30
+- [ ] 01-03: El cerrojo del libro ilegible — abierto por la transición de fase del 2026-08-30; PLAN escrito 2026-08-30 (`01-03-PLAN.md`), sin ejecutar
 
 **La fase NO está cerrada.** Los tres objetivos del scope están en el código, medidos uno a uno
 contra él, desplegados y verificados en el navegador real. Lo que la mantiene abierta es otra cosa:

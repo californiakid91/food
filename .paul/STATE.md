@@ -12,28 +12,28 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — en curso
 Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 CERRADO (`77f8cef` +
-`56795eb` + acta)
-Status: los DOS ciclos cerrados, desplegado y verificado. **Transición de fase EJECUTADA y la
-fase NO cierra**: los brazos encontraron un defecto de correctness introducido en la fase. Se abre
-el ciclo 01-03 para arreglarlo. Acta: `.paul/phases/01-guardado-fiable/01-TRANSICION.md`
-Last activity: 2026-08-30 — transición de la Fase 1: puerta verde en `abe5e80`, los 3 objetivos
-medidos contra el código (PASS), G8/seguridad apto con reservas, G7/CRG **DEGRADADO** (no ve
-`index.html`) y sustituido por un análisis con grep. Cuatro deudas nuevas: D-19 a D-22
+`56795eb` + acta); **01-03 PLANIFICADO**, pendiente de aprobación
+Status: PLAN 01-03 creado y REVISADO ADVERSARIAMENTE — «El cerrojo del libro ilegible». Ataca el
+único defecto de correctness que impide cerrar la Fase 1, encontrado por la transición del
+2026-08-30 (`.paul/phases/01-guardado-fiable/01-TRANSICION.md` §5). Listo para APPLY.
+Last activity: 2026-08-30 — escrito `.paul/phases/01-guardado-fiable/01-03-PLAN.md` y corregido
+con los 8 cambios que exigió el ataque de Fable: 5 AC, 5 tareas + checkpoint de navegador,
+5 sabotajes nuevos y 2 rediseñados
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [█████████░] 90% (transición ejecutada; un defecto de correctness abre el ciclo 01-03)
+- Phase: [█████████░] 90% (transición ejecutada; el ciclo 01-03 planificado, sin ejecutar)
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [ciclo 01-03 por planificar: el cerrojo del libro ilegible]
+  ✓        ○        ○     [01-03 creado, esperando aprobación]
 ```
 
 Ciclos 01-01 y 01-02: cerrados. La transición de fase se ejecutó y devolvió un hallazgo, así que
-la Fase 1 sigue abierta.
+la Fase 1 sigue abierta. El ciclo 01-03 la cierra.
 
 ## Performance Metrics
 
@@ -68,6 +68,8 @@ la Fase 1 sigue abierta.
 | Los controles de las autopruebas viven en el ARNÉS | 01-02 | Uno dentro de la suite sería juez y parte; el de datos reales está en `run_selftests.py` |
 | La transición de fase abre el ciclo 01-03 en vez de cerrar la fase | Fase 1 transición | El brazo de radio de impacto encontró un cruce sin medir que deja escribir un libro vacío sobre uno ilegible. Registrarlo como deuda lo blanquearía como «fase hecha»; se arregla |
 | G7 se declara DEGRADADO y se sustituye, no se salta | Fase 1 transición | `code-review-graph` no parsea el JS inline de un `.html`: 0 nodos de `index.html`. Un verde suyo sobre esta fase sería un falso verde |
+| El arreglo del cerrojo cierra la CLASE, no el caso: la rama del formato antiguo también repara | 01-03 PLAN | La revisión adversaria vio que un dispositivo sin actualizar no podría reparar nunca, porque `loadOpsAll` re-marca el cerrojo y `saveOpsAll` se niega. Cerrar sólo `opsAll` habría dejado el mismo defecto vivo por el otro camino (§5.15) |
+| El coste del arreglo se registra como deuda en vez de esconderse | 01-03 PLAN | El arreglo convierte un caso recuperable-con-pérdida-acotada en un bloqueo silencioso indefinido. Es mejor para el dato y peor para el operador; se dice por escrito o no existe |
 | Cerrar el ciclo 01-02 sin cerrar la FASE 1 | 01-02 UNIFY | Los 3 objetivos del scope están en el código, medidos uno a uno; pero ningún eslabón se ha visto en un navegador y nada está desplegado. Una sonda verde no supera a un intento real |
 
 ### Deferred Issues
@@ -102,11 +104,14 @@ imprimir «OK» **mientras** borraba, así que «no borró» y «dijo OK» son a
 
 ## Boundaries (Active)
 
-Del PLAN 01-02 (siguiente):
+Del PLAN 01-03 (el vigente):
 
+- `vaciariaElLibro` / `tieneOperaciones` / `opsDelDocumento` intactos: son el juez único del 01-02
+- `rescatarOpsIlegible` intacto: es la red que hace que este defecto no sea pérdida de datos
 - `dedupeOps` / `opFingerprint` intactos: los necesitan `migrateOpsToGlobal` y el formato antiguo `opsData`
 - `parseNum` / `numIn` / `parseLooseNum` no se tocan (Fase 0)
 - `buildSyncPayload` y la resolución por `savedAt` son Fase 3; `computeFifo` y `exportTaxExcel`, Fase 4
+- No se cierran D-01, D-15, D-18, D-21 ni D-22 en este ciclo
 
 Permanentes del proyecto:
 
@@ -116,12 +121,10 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-30
-Stopped at: transición de la Fase 1 ejecutada. Los dos brazos corrieron sobre el diff completo
-`69f728e..abe5e80`. La fase NO cierra: hay un defecto de correctness introducido en ella.
-Next action: `/paul:plan` del ciclo **01-03** — el cerrojo del libro ilegible debe levantarse sólo
-después de que el guardado de reparación se confirme, con su invariante del CRUCE «libro local
-ilegible + libro vacío desde la nube» y su sabotaje permanente. Empezar con contexto limpio.
-Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION.md
+Stopped at: PLAN del ciclo 01-03 escrito, atacado por Fable y corregido con los 8 cambios
+exigidos. Nada de código tocado todavía.
+Next action: `/paul:apply .paul/phases/01-guardado-fiable/01-03-PLAN.md`.
+Resume file: .paul/phases/01-guardado-fiable/01-03-PLAN.md
 
 ---
 *STATE.md — Updated after every significant action*
