@@ -144,6 +144,12 @@ Además, y esto es lo urgente: **el fallo nº 1 sigue vivo en producción.** Abr
 operaciones y las carteras. Está arreglado en local pero **sin desplegar**. No abrir esa dirección
 con `?selftest=1` hasta que se haga push.
 
+> **Addendum 2026-08-30, posterior al cierre del ciclo.** Ya está desplegado (`feb643b`, puerta
+> verde en el `pre-push`) y verificado en el navegador real. `?selftest=1` dejó **90 operaciones y
+> 4 carteras intactas**, contadas antes y después, e imprimió «✅ Autopruebas OK». El fallo que
+> borraba el libro ya no está vivo en producción. Queda sin comprobar el aviso en ROJO: sube al
+> libro como **D-18**. Detalle en `.paul/STATE.md` § «Verificación manual de la Fase 1».
+
 ## Pendiente antes de cerrar la fase
 
 1. `git push` (el enganche `pre-push` vuelve a correr la puerta).

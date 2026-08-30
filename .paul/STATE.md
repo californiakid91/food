@@ -13,13 +13,14 @@ Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — en curso
 Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 CERRADO (`77f8cef` +
 `56795eb` + acta)
-Status: los DOS ciclos de la fase cerrados. La FASE NO se cierra: nada desplegado ni visto en
-navegador (ver «Blockers»)
-Last activity: 2026-08-30 — UNIFY de 01-02: acta escrita, 4 AC en PASS, puerta rc=0
+Status: los DOS ciclos cerrados, DESPLEGADO (`feb643b`) y VERIFICADO en el navegador real.
+Pendiente sólo la transición de fase (brazos G7/CRG y G8/security-review)
+Last activity: 2026-08-30 — push (`feb643b`, puerta verde en el pre-push) + verificación manual
+en la app desplegada: 3 de 4 puntos confirmados; el 4º sube al libro como D-18
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [█████████░] 90% (los 2 ciclos cerrados; falta desplegar y comprobar en navegador)
+- Phase: [█████████░] 95% (ciclos cerrados, desplegado y verificado; falta la transición de fase)
 
 ## Loop Position
 
@@ -71,8 +72,25 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 
 | Blocker | Impact | Resolution Path |
 |---------|--------|-----------------|
-| Nada de la Fase 1 está desplegado | El fallo del `?selftest=1` que borra el libro **sigue vivo en producción**. No abrir esa dirección con `?selftest=1` | `git push` (el enganche `pre-push` vuelve a correr la puerta) |
-| La Fase 1 no se ha visto en un navegador | La puerta ejerce funciones puras en node; no prueba la interfaz ni Firestore | Abrir la app desplegada recargando DOS veces y comprobar: punto verde al guardar, aviso ROJO cuando el guardado falla, `?selftest=1` deja los datos intactos |
+| Ninguno | — | Los dos blockers anteriores (sin desplegar, sin ver en navegador) se cerraron el 2026-08-30, ver «Verificación manual» |
+
+## Verificación manual de la Fase 1 — app desplegada, 2026-08-30
+
+Hecha sobre `https://californiakid91.github.io/food/` con `feb643b` publicado. Confirmado antes de
+empezar que Pages servía la versión nueva (huella del fichero descargado idéntica a la local) y que
+el navegador del operador la tenía cargada (`typeof dedupeOpsById === 'function'` en consola, no
+por el aspecto de la pantalla).
+
+| Punto | Resultado | Evidencia |
+|---|---|---|
+| Aviso verde «Guardado ✓» al guardar | **PASS** | visto en pantalla por el operador |
+| El naranja «Cambios sin subir» NO sale en uso normal | **PASS** | el puntito quedó verde |
+| `?selftest=1` deja los datos intactos | **PASS** | **90 operaciones y 4 carteras, idénticas antes y después**, contadas en consola. Es el fallo que estaba vivo en producción |
+| `?selftest=1` imprime «✅ Autopruebas OK» | **PASS** | leído en la consola del navegador |
+| El aviso sale en ROJO cuando el guardado falla | **NO COMPROBADO** | → **D-18**. Exige agotar el almacenamiento del navegador; no se improvisó con 90 operaciones reales delante |
+
+Los dos últimos se comprobaron por separado a propósito: el fallo original consistía justamente en
+imprimir «OK» **mientras** borraba, así que «no borró» y «dijo OK» son afirmaciones independientes.
 
 ## Boundaries (Active)
 
@@ -90,10 +108,11 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-30
-Stopped at: ciclo 01-02 cerrado con acta. Los dos ciclos de la Fase 1 están cerrados, pero la
-FASE sigue abierta: falta desplegar y comprobarlo en el navegador.
-Next action: `git push`, y acto seguido la verificación manual en la app desplegada. Sólo
-después se puede transicionar la Fase 1.
+Stopped at: Fase 1 desplegada y verificada en el navegador real. La fase sigue formalmente
+abierta: falta su transición, que es donde corren los dos brazos de revisión DE FASE.
+Next action: transición de la Fase 1 — G7 (CRG blast-radius) y G8 (`/security-review`) sobre el
+diff de la fase, evolución de PROJECT.md y ROADMAP.md, y commit de cierre. Empezar con contexto
+limpio.
 Resume file: .paul/phases/01-guardado-fiable/01-02-SUMMARY.md
 
 ---

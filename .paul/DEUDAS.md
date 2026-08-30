@@ -6,7 +6,8 @@
 >
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
-Última medición contra el código: **2026-08-29**, revisión `6edceca`.
+Última medición contra el código: **2026-08-30**, revisión `feb643b` (cierre del ciclo 01-02 y
+verificación manual de la Fase 1 en la app desplegada).
 D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditoría inicial.
 
 ---
@@ -54,6 +55,25 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   autoprueba y sabotaje permanentes.
 - **Qué la reabre:** que aparezca un dispositivo antiguo sincronizando de verdad, o que la migración
   tenga que volver a correr.
+
+### D-18 · Que el aviso de guardado se PINTE de rojo no lo ejerce nadie
+- **Qué es:** cuando el guardado falla, la app debe avisar en rojo en vez de decir «Guardado ✓».
+  La DECISIÓN de avisar como error está cubierta: los invariantes sustituyen `showSaveIndicator`
+  y comprueban que recibe `ok === false`, incluido el camino de éxito PARCIAL (los activos se
+  guardan y el libro no). Lo que nadie ejerce es el último eslabón, dentro del cuerpo de
+  `showSaveIndicator`: `el.style.color = ok ? 'var(--green)' : 'var(--red)'`. Al interceptar la
+  función, el invariante nunca corre su cuerpo. Es exactamente la trampa de `CLAUDE.md` §5.6:
+  cubrir el mecanismo no cubre su aviso.
+- **Cómo se midió:** verificación manual de la Fase 1 en la app desplegada, 2026-08-30. Tres de
+  los cuatro puntos se confirmaron en el navegador real (aviso verde al guardar; el naranja no
+  aparece en uso normal; `?selftest=1` deja los datos intactos — 90 operaciones y 4 carteras,
+  idénticas antes y después). El cuarto NO se comprobó: provocar un fallo real de guardado exige
+  agotar el almacenamiento del navegador, y no se improvisó con 90 operaciones reales delante.
+- **Estado:** abierto y acotado. Riesgo bajo —es un operador ternario de una línea— pero el
+  eslabón no está ejercido y no se blanquea como comprobado. Hereda del ciclo 01-01, donde el
+  aviso rojo se construyó y nunca se vio en pantalla.
+- **Qué la reabre:** cualquier cambio en `showSaveIndicator` o en el tema de colores; y se cierra
+  cuando exista una forma segura y repetible de provocar un fallo de guardado real.
 
 ### D-16 · La guarda de subida deja de sincronizar los activos, no sólo el libro
 - **Qué es:** cuando la guarda salta, `schedulePush` abandona el push ENTERO. Mientras el libro
