@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 3 | In progress (2/3 ciclos; transición devolvió un hallazgo) | - |
+| 1 | Guardado que no miente | 4 | In progress (3 ciclos cerrados; la 2ª transición devolvió otro hallazgo → 01-04) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -56,19 +56,28 @@ Phases: 1 of 7 complete (Fase 0)
   su cerrojo, que ahora sólo se levanta tras confirmar la reparación; el cruce «ilegible × nube vacía» con
   autoprueba propia; el formato antiguo también repara; 10 controles positivos nuevos en el banco
 
-**La fase SIGUE abierta.** Los tres objetivos del scope están en el código, medidos uno a uno
-contra él, desplegados y verificados en el navegador real; y el defecto de correctness que encontró
-la transición del 2026-08-30 —el cerrojo que se levantaba antes de confirmar la reparación— está
-arreglado y desplegado en el ciclo 01-03 (`96c7a3e`).
+**La fase SIGUE abierta — segunda transición, 2026-08-30.**
 
-Lo que la mantiene abierta es que **el cierre de un CICLO no autoriza el cierre de una FASE**
-(`CLAUDE.md` §7): el disparador es medir los objetivos **contra el código otra vez**, sobre el diff
-resultante, y la transición anterior ya demostró que medir cambia el resultado. Hace falta repetirla
-sobre `abe5e80..96c7a3e`. Actas: `01-TRANSICION.md` (la que abrió el ciclo) y `01-03-SUMMARY.md`.
+Los tres objetivos del alcance están en el código y medidos uno a uno contra él (PASS), desplegados
+y verificados en el navegador real. Lo que NO se sostiene es la META de la fase: *«que ningún fallo
+de guardado ni de arranque pueda borrar el libro de operaciones en silencio»*.
 
-Aviso para quien repita la transición: **G7 (radio de impacto) sigue DEGRADADO** — `code-review-graph`
-no ve el JS dentro de `index.html` y sobre este commit informó de «0 funciones cambiadas» ante un
-diff de 265 líneas. Un verde suyo sobre esta fase sería un falso verde (**D-22**).
+Hay **tres** escrituras al documento de Firestore y sólo **dos** pasan por la guarda de no-vaciado.
+La tercera, en el manejador de inicio de sesión, se recorre también cuando la lectura de la nube
+FALLA —no sólo cuando está vacía— y sube un libro vacío encima de uno completo mientras el
+indicador de sincronía se queda verde. Es la misma forma del defecto que abrió el 01-03: el
+mecanismo existe y hay un camino que no lo atraviesa. **Presencia ≠ precedencia.**
+
+Se arregla en el ciclo **01-04**, cuyo objetivo es cerrar la CLASE —derivar del código el conjunto
+de escrituras a la nube y dejar un control que se ponga rojo si aparece una cuarta— y no los dos
+casos conocidos. Fichas: **D-33** y **D-34**. Acta: `01-TRANSICION-2.md`.
+
+**Aviso para quien repita la transición:** G7 (radio de impacto) sigue **DEGRADADO** —
+`code-review-graph` no ve el JS dentro de `index.html` (**D-22**). Se sustituyó a mano por cuatro
+brazos adversarios disjuntos; el brazo de seguridad no encontró nada y el de objetivos encontró el
+hallazgo que paró la fase. Un solo brazo la habría cerrado.
+
+**Planes:** 01-01, 01-02 y 01-03 cerrados; **01-04 pendiente de planificar**.
 
 ### Phase 2: Backup y restauración
 
@@ -160,4 +169,4 @@ diff de 265 líneas. Un verde suyo sobre esta fase sería un falso verde (**D-22
 
 ---
 *Roadmap created: 2026-08-29*
-*Last updated: 2026-08-29*
+*Last updated: 2026-08-30*

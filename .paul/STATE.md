@@ -10,31 +10,36 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 Milestone: v0.1 Datos fiables (v0.1.0)
-Phase: 1 of 6 (Guardado que no miente) — en curso
+Phase: 1 of 6 (Guardado que no miente) — **ABIERTA tras la segunda transición**
 Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 CERRADO (`77f8cef` +
-`56795eb` + acta); **01-03 CERRADO** (`96c7a3e`, desplegado y verificado en el navegador)
-Status: los 5 AC del 01-03 en PASS con su evidencia. El cerrojo del libro ilegible ya no se levanta
-sin una escritura de reparación confirmada, y el cruce que nadie medía tiene autoprueba propia y
-diez controles positivos. **La FASE 1 sigue abierta**: cerrarla exige repetir la transición sobre
-`abe5e80..96c7a3e`, y el cierre de un ciclo nunca autoriza el de una fase.
-Last activity: 2026-08-30 — ciclo 01-03 ejecutado, revisado por cuatro brazos, desplegado a Pages
-y verificado en el navegador real (90 operaciones y 4 carteras, idénticas antes y después de
-`?selftest=1`). Acta en `01-03-SUMMARY.md`
+`56795eb` + acta); 01-03 CERRADO (`96c7a3e`, desplegado y verificado en el navegador);
+**01-04 PENDIENTE DE PLANIFICAR**
+Status: la SEGUNDA transición de la Fase 1 midió los tres objetivos del alcance contra el código
+sobre el diff completo `69f728e..HEAD`: los tres en **PASS**. Pero la **META de la fase FALLA**:
+hay tres escrituras a la nube y sólo dos pasan por la guarda de no-vaciado. La tercera, en el
+manejador de inicio de sesión, se recorre también cuando la lectura de la nube FALLA y sube un
+libro vacío encima de uno completo, con el indicador en verde. Fichado como **D-33** (y **D-34**,
+dos `catch` vacíos dentro de `buildSyncPayload`), y **son el objetivo del ciclo 01-04**, no deuda
+diferida: ficharlos y cerrar la fase la blanquearía como hecha.
+Last activity: 2026-08-30 — segunda transición de la Fase 1. Puerta verde por sus DOS variantes,
+árbol en exclusiva, despliegue idéntico a lo medido. Cuatro brazos adversarios disjuntos (radio de
+impacto, objetivos contra código, seguridad, documentos contra evidencia). Acta:
+`01-TRANSICION-2.md`. Ocho fichas nuevas: D-27 a D-34.
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [█████████▓] 95% (ciclo 01-03 cerrado y desplegado; falta repetir la transición de fase)
+- Phase: [████████░░] 80% (3 ciclos cerrados; la meta de la fase falla por D-33 → falta el 01-04)
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ✓     [01-03 cerrado — `96c7a3e`]
+  ○        ○        ○     [01-04 — sin planificar]
 ```
 
-Ciclos 01-01, 01-02 y 01-03: cerrados. **Parar aquí** (`CLAUDE.md` §1): no se encadena otro ciclo
-en la misma sesión. Lo siguiente es la transición de fase, en contexto limpio.
+Ciclos 01-01, 01-02 y 01-03: cerrados. La transición de fase NO cerró la fase: devolvió un hallazgo
+de correctness que contradice su meta. Lo siguiente es `/paul:plan 01-04`, **en contexto limpio**.
 
 ## Performance Metrics
 
@@ -75,6 +80,10 @@ en la misma sesión. Lo siguiente es la transición de fase, en contexto limpio.
 | Los checks enmascarados por la relectura se ANOTAN, no se borran | 01-03 | `applySyncPayload` termina releyendo el disco, así que varios checks del cerrojo pasan con y sin el arreglo. Documentan el estado esperado; lo que no se hace es confiar en ellos. Lo que mide de verdad es la llamada directa a `repararLibroIlegible` |
 | Los cuatro hallazgos de correctness ajenos al ciclo se difieren por escrito | 01-03 UNIFY | D-24 exige releer el disco en cada guardado y cambiar el contrato de `escribirOpsAll` recién fijado; D-26 exige cambiar qué compara `--check`, que el instrumento declara DERIVA (rc=3). Rediseñar la pieza recién puesta dentro de un ciclo que va de otra cosa es mover la vara sin plan |
 | Cerrar el ciclo 01-02 sin cerrar la FASE 1 | 01-02 UNIFY | Los 3 objetivos del scope están en el código, medidos uno a uno; pero ningún eslabón se ha visto en un navegador y nada está desplegado. Una sonda verde no supera a un intento real |
+| La segunda transición tampoco cierra la FASE 1: abre el ciclo 01-04 | Fase 1 transición 2 | Los tres objetivos del alcance están en PASS, pero la META no: la guarda de no-vaciado cubre dos de las tres escrituras a la nube. Es la misma forma del defecto que abrió el 01-03. Ficharlo como deuda lo blanquearía como «fase hecha» (§5.10) |
+| El 01-04 cierra la CLASE, no los dos casos | Fase 1 transición 2 | Enumerar a mano las tres escrituras repetiría el defecto: una lista blanca sólo protege de lo que ya conoce (§5.15). El conjunto se deriva del código y hace falta un control que muerda si aparece una cuarta |
+| Los números de línea del libro de deudas se declaran NO fiables en vez de actualizarse | Fase 1 transición 2 | La auditoría encontró casi todas desfasadas. Corregirlas una a una las deja mal otra vez mañana — es la trampa de §9. Se cierra la clase: para localizar código se usa el NOMBRE y `grep` |
+| Cuatro brazos adversarios disjuntos sustituyen a G7, que sigue ciego | Fase 1 transición 2 | El de seguridad no encontró nada y el de objetivos encontró el hallazgo que paró la fase. Brazos que miden lo mismo se corroboran en su punto ciego; éstos midieron cosas distintas |
 
 ### Deferred Issues
 
@@ -86,7 +95,8 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 | Blocker | Impact | Resolution Path |
 |---------|--------|-----------------|
 | ~~El cerrojo del libro ilegible se levanta antes de confirmar la reparación~~ | **RESUELTO** en el ciclo 01-03 (`96c7a3e`) | Arreglado, con autoprueba del cruce y diez controles positivos. Acta: `01-03-SUMMARY.md` |
-| La FASE 1 no se ha medido contra el código DESPUÉS del 01-03 | No puede cerrarse la fase: el cierre de un ciclo nunca autoriza el de una fase | Repetir la transición sobre `abe5e80..96c7a3e`, en contexto limpio, midiendo los objetivos contra el código antes de preguntar nada |
+| ~~La FASE 1 no se ha medido contra el código después del 01-03~~ | **RESUELTO**: medida el 2026-08-30 sobre `69f728e..HEAD` | Acta: `01-TRANSICION-2.md`. La medición cambió el resultado: destapó D-33 |
+| **D-33 · una tercera escritura a la nube esquiva la guarda de no-vaciado** | **Impide cerrar la FASE 1**: contradice su meta —puede borrar el libro de la nube en silencio y con el indicador en verde | Ciclo **01-04**: cerrar la CLASE (derivar del código el conjunto de escrituras a la nube) y dejar un control que muerda si aparece una cuarta. Va con D-34 y arrastra D-31 (el aviso) |
 | G7 (radio de impacto) no ve `index.html` | La transición de fase no tiene instrumento propio; hoy se hace a mano | D-22. Se cierra cuando el grafo indexe el `<script>`, o cuando el sustituto sea un script del repo cableado a la puerta |
 
 ## Verificación manual de la Fase 1 — app desplegada, 2026-08-30
@@ -138,14 +148,16 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-30
-Stopped at: ciclo 01-03 CERRADO, desplegado (`96c7a3e`) y verificado en el navegador real. Puerta
-verde por las dos variantes (a mano y `pre-push`), 30 controles de sabotaje mordiendo, árbol
-idéntico antes y después de medir. Cuatro deudas nuevas registradas: D-23, D-24, D-25, D-26.
-Next action: **transición de la Fase 1**, en contexto LIMPIO. Medir los tres objetivos del scope
-contra el código sobre el diff `abe5e80..96c7a3e` ANTES de preguntar nada, y preguntarse por cada
-medición heredada «¿qué eslabón NO miró?». G7 sigue DEGRADADO (D-22): sustituirlo a mano, no
-aceptar su verde.
-Resume file: .paul/phases/01-guardado-fiable/01-03-SUMMARY.md
+Stopped at: SEGUNDA transición de la Fase 1 terminada. Puerta VERDE por sus dos variantes (manual
+`rc=0` y enganche `pre-push` `rc=0`, comparados byte a byte para descartar deriva), árbol en
+exclusiva (`HEAD^{tree}` idéntico antes y después de medir), y lo desplegado en Pages idéntico a lo
+medido (`md5 661acd6b17aed4808c9d8367a2cd72b4`). Cuatro brazos adversarios disjuntos. **La fase NO
+se cerró**: D-33 contradice su meta. Ocho fichas nuevas en el libro: D-27 a D-34.
+Next action: **`/paul:plan 01-04`**, en contexto LIMPIO. Objetivo: cerrar la CLASE «escritura a la
+nube sin guarda» —derivar el conjunto del código, no enumerarlo— cubriendo D-33 y D-34, con su
+control positivo y su caso en el banco de sabotaje; y decidir si D-31 (el indicador verde tras un
+error) entra en el mismo ciclo, porque cubrir el mecanismo no cubre su aviso (§5.6).
+Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION-2.md
 
 ---
 *STATE.md — Updated after every significant action*

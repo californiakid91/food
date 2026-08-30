@@ -6,13 +6,64 @@
 >
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
-Última medición contra el código: **2026-08-30**, revisión `abe5e80` (transición de la Fase 1:
-brazos de seguridad y de radio de impacto sobre el diff completo `69f728e..abe5e80`).
+Última medición contra el código: **2026-08-30**, revisión `85d56bb` (SEGUNDA transición de la
+Fase 1: cuatro brazos adversarios disjuntos —radio de impacto, objetivos contra código, seguridad
+y documentos contra evidencia— sobre el diff completo `69f728e..HEAD`). Acta:
+`.paul/phases/01-guardado-fiable/01-TRANSICION-2.md`.
 D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditoría inicial.
+
+> ### ⚠️ Los números de línea de este libro son de la revisión en que se MIDIÓ, no de HEAD.
+> `index.html` crece en cada ciclo y las citas de línea se desfasan al día siguiente: la auditoría
+> de documentos del 2026-08-30 encontró que **casi todas** las de este fichero ya apuntaban mal.
+> Se cierra la CLASE en vez del caso (`CLAUDE.md` §5.15): **para localizar el código se usa el
+> NOMBRE de la función y `grep`, nunca el número de línea.** Las cifras derivadas de instrumentos
+> (tamaños de función, controles de sabotaje, hashes) sí son fiables: las vuelve a derivar un
+> script. Las copiadas a mano, no.
 
 ---
 
 ## Abiertas — riesgo de pérdida de datos
+
+### D-33 · Una tercera escritura a la nube esquiva la guarda de no-vaciado
+- **Qué es:** hay tres escrituras al documento de Firestore. Dos viven en `schedulePush` y pasan
+  por el juez `vaciariaElLibro`. La tercera está en el manejador de inicio de sesión
+  (`onAuthStateChanged`) y **no pasa por ninguna guarda**. Se recorre cuando `pullFromFirestore`
+  devuelve `false`, que ocurre tanto si la nube está vacía como **si la lectura FALLA**: su `catch`
+  hace `console.error` y devuelve `false`, así que un fallo de red es indistinguible de «no hay
+  nada arriba». Acto seguido comprueba `hasRealLocalData()`, que mira **las filas de activos, no
+  las operaciones**, y sube `buildSyncPayload()`, cuyo `opsAll` es `ops` — vacío si el libro está
+  vacío o si el cerrojo de D-23 está puesto. Resultado: un libro vacío encima de una nube con el
+  libro completo, encolado offline por Firestore y aplicado al reconectar. Y el `catch` exterior
+  termina en `setSyncUI('ok')`: **el indicador se queda verde** (ver D-31).
+- **Cómo se midió:** brazo adversario de objetivos de la segunda transición de la Fase 1
+  (2026-08-30), confirmado a mano después: `grep -n "\.set(" index.html` devuelve exactamente tres
+  escrituras a la nube y sólo dos están dentro de la guarda. **No reproducido en vivo:** está
+  trazado eslabón a eslabón leyendo el código, no ejecutado contra un Firestore real.
+  **No es una regresión:** `git show 69f728e:index.html` muestra ese bloque idéntico antes de la
+  fase. Lo que falla es la COBERTURA de la guarda que la fase puso.
+- **Estado:** **OBJETIVO DEL CICLO 01-04**, no deuda diferida. Contradice directamente la meta de
+  la Fase 1 («ningún fallo de guardado ni de arranque puede borrar el libro en silencio») y por eso
+  la fase no se cerró. Es la misma forma del defecto que abrió el 01-03: el mecanismo existe y hay
+  un camino que no lo atraviesa. **Presencia ≠ precedencia** (`CLAUDE.md` §5.11).
+- **Qué la reabre:** se cierra cuando las tres escrituras pasen por el mismo juez **y** exista un
+  control que se ponga rojo si aparece una CUARTA. Enumerar las tres a mano repetiría el defecto:
+  una lista blanca sólo protege de lo que ya conoce (§5.15). Si el arreglo enumera en vez de
+  derivar, esta ficha sigue abierta.
+
+### D-34 · Dos `catch` vacíos dentro de la función que construye lo que se sube a la nube
+- **Qué es:** `buildSyncPayload` lee los activos y el histórico de cada cartera con `try { … }
+  catch {}`. Si el `getItem` o el `JSON.parse` de una cartera falla, esa cartera **se omite del
+  paquete en silencio** y se sube un documento incompleto encima del bueno. Misma clase de daño que
+  D-33, sobre los activos en vez de sobre el libro.
+- **Cómo se midió:** auditoría de documentos de la segunda transición (2026-08-30). Destapó de paso
+  que el censo de `catch` vacíos del acta anterior era **falso: dijo 4 y son 6**. El patrón usado
+  sólo casaba `catch (e) {}` y no la variante `catch {}` sin parámetro. Es la trampa de los dos
+  predicados asimétricos sobre el mismo conjunto (`CLAUDE.md` §5.16). Censo correcto:
+  `grep -nE "catch *(\([a-zA-Z_$]*\))? *\{ *\}" index.html` → **6**.
+- **Estado:** **OBJETIVO DEL CICLO 01-04**, junto con D-33: son la misma clase.
+- **Qué la reabre:** que vuelva a aparecer un `catch` vacío en cualquier camino que alimente la
+  subida. El censo de `catch` vacíos debería ser un control del banco, no un grep de un acta.
+
 
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
 - **Qué es:** `applySyncPayload` sustituye `ops` entero por lo que venga de la nube, con
@@ -225,6 +276,77 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué la reabre:** el primer doble de Firestore que entre en `tools/`, o la Fase 3, que reescribe
   esta zona entera y tendrá que traerse su arnés.
 
+### D-27 · `persistOps` canta «Guardado ✓» antes de saber si el libro entró
+- **Qué es:** `persistOps` —el camino de borrar una operación y el de confirmar una importación—
+  llama a `saveOpsAll(ops)` **ignorando su booleano**, luego a `saveRows()`, que pinta «Guardado ✓»
+  en VERDE por su cuenta. Con el cerrojo puesto (D-23) o el almacenamiento lleno, la pantalla dice
+  que se guardó mientras el libro NO se guardó. El `schedSave()` posterior lo corrige a rojo ~600 ms
+  después. Es exactamente la mentira que el objetivo OBJ-2 de la fase prohibía, en un llamante que
+  ninguna prueba ejerce.
+- **Cómo se midió:** brazo de radio de impacto de la segunda transición (2026-08-30).
+  `grep -n "persistOps(" index.html` da dos llamantes de producción y **cero** en la zona de
+  autopruebas. Las pruebas de fallo de escritura ejercen `saveRows` y `guardarTodo` por separado,
+  nunca esta secuencia — el CRUCE no lo mide nadie (`CLAUDE.md` §5.5).
+- **Estado:** abierta. Severidad menor (se autocorrige), pero matiza **D-23**: su ficha dice que el
+  único aviso es un `console.error`; en realidad al editar sí sale el rojo, **precedido de un verde
+  mentiroso**. La experiencia no es muda, es contradictoria.
+- **Qué la reabre:** nada la cierra sola. Se cierra cuando `persistOps` decida el aviso al final,
+  como hace `guardarTodo`, y una autoprueba ejerza el cruce.
+
+### D-28 · La migración del formato antiguo se declara exitosa aunque su escritura falle
+- **Qué es:** la Fase 1 cambió el contrato de `saveOpsAll`, que ahora devuelve `false` si no pudo
+  escribir. `migrateOpsToGlobal` **ignora ese booleano** y devuelve `migrated: true` igualmente. Si
+  la escritura falla, el arranque hace `ops = loadOpsAll()` → `[]` y el `schedSave()` siguiente
+  puede sellar un libro vacío —una escritura pequeña sí cabe donde no cabía la grande—. A partir de
+  ahí la clave ya no está ausente, la migración devuelve `migrated: false` **para siempre**, y las
+  operaciones históricas quedan varadas en las claves antiguas. Es un camino de **una sola
+  oportunidad**.
+- **Cómo se midió:** brazo de radio de impacto de la segunda transición (2026-08-30), censando los
+  llamantes de `saveOpsAll` tras el cambio de contrato. El dato no se destruye —las claves antiguas
+  sobreviven— pero sale del libro vivo sin más rastro que la consola. **No reproducido en vivo:**
+  exige la cuota agotada justo en la primera apertura tras actualizar.
+- **Estado:** abierta. Distinta de **D-21**, que ficha la rama ilegible sin ejercer, no este
+  contrato roto.
+- **Qué la reabre:** nada la cierra sola. El arreglo es propagar el booleano al resultado; hace
+  falta además una autoprueba que falle la escritura y exija `migrated: false`.
+
+### D-29 · La invariante «si el guardado local falló, no se sube» sólo la respeta `guardarTodo`
+- **Qué es:** la fase estableció que un guardado local fallido no debe sincronizarse: subir lo que
+  hay en memoria machacaría la copia buena de la nube. Esa regla vive **sólo dentro de
+  `guardarTodo`**. Seis llamantes de `saveMeta` ignoran su booleano, y uno de ellos
+  (`onUseTargetsToggle`) hace `saveMeta(); schedulePush();` seguido: con `saveMeta` fallido, sube
+  igualmente. La asimetría ES el defecto (`CLAUDE.md` §5.16).
+- **Cómo se midió:** brazos de radio de impacto y de objetivos de la segunda transición
+  (2026-08-30). `grep -n "saveMeta()" index.html` da el llamante de `guardarTodo` —que sí lo
+  comprueba— y seis que lo ignoran.
+- **Estado:** abierta. **No es una regresión**: esos llamantes ya empujaban así antes de la fase.
+  Lo que la fase hizo fue crear la invariante y dejarla asimétrica.
+- **Qué la reabre:** nada la cierra sola. Se cierra cuando la decisión de subir dependa del
+  resultado del guardado en TODOS los caminos, no sólo en uno.
+
+### D-30 · `applySyncPayload` escribe META sin `savedAt`
+- **Qué es:** tras aplicar un documento de la nube, `applySyncPayload` reescribe META **sin el
+  campo `savedAt`**. La siguiente lectura calcula `localSaved = 0`, con lo que cualquier snapshot
+  posterior se considera más nuevo y se vuelve a aplicar. Amplifica **D-01** y **D-24**.
+- **Cómo se midió:** brazo de objetivos de la segunda transición (2026-08-30), leyendo el objeto
+  que se serializa al final de `applySyncPayload` y comparándolo con el que escribe `saveMeta`,
+  que sí lleva `savedAt`. Otra asimetría entre dos escrituras de la misma clave.
+- **Estado:** abierta. El ROADMAP ya lo tenía en el alcance de la **Fase 3** («`applySyncPayload`
+  debe guardar META con su `savedAt`»); esta ficha lo saca del roadmap y lo pone en la lista viva,
+  que es lo que se lee al arrancar.
+- **Qué la reabre:** nada; va con la Fase 3.
+
+### D-31 · El indicador de sincronía se pinta VERDE después de un error
+- **Qué es:** el `catch` que envuelve el manejador de inicio de sesión hace `console.error` y
+  después `setSyncUI('ok')`. Sea cual sea el fallo —lectura, escritura, aplicación del documento—
+  el operador ve el puntito verde. Es la fábrica de silencio que hace invisible a **D-33**: el caso
+  destructivo ocurre y la pantalla dice que todo va bien.
+- **Cómo se midió:** brazo de objetivos de la segunda transición (2026-08-30).
+- **Estado:** abierta. Es la mitad «aviso» del mismo defecto que D-33, y **cubrir el mecanismo no
+  cubre su aviso** (`CLAUDE.md` §5.6): el arreglo de D-33 debe traer su propio control para éste, o
+  quedará un camino que repara el dato y sigue mintiendo en pantalla.
+- **Qué la reabre:** se cierra con D-33, y sólo si el aviso tiene control propio.
+
 ---
 
 ## Abiertas — corrección fiscal
@@ -357,6 +479,21 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué la reabre:** nada la cierra por sí sola. Se cierra cuando el grafo indexe el `<script>` de
   `index.html`, o cuando el sustituto por grep se convierta en un script del repo cableado a la
   puerta —que es lo que exige `CLAUDE.md` §4.1 si el juicio se repite por tercera vez.
+
+### D-32 · Las copias de rescate del libro no tienen tope ni caducidad
+- **Qué es:** `rescatarOpsIlegible` guarda el blob ilegible en una clave `balance-ops-rescate-<marca
+  de tiempo>` para no perderlo. Deduplica por contenido exacto, pero nada limita cuántas copias se
+  acumulan si el contenido cambia cada vez (corrupción parcial repetida). Es un riesgo de agotar la
+  cuota del navegador, que a su vez es la causa de varios de los fallos de guardado que esta misma
+  fase intenta hacer visibles.
+- **Cómo se midió:** brazo de seguridad de la segunda transición de la Fase 1 (2026-08-30).
+  Severidad BAJA: el dato que se guarda es el que ya estaba en local, no dato externo, y no hay vía
+  de explotación por un tercero.
+- **Estado:** abierta. Es deuda de limpieza, no de pérdida de datos: la red de rescate existe
+  precisamente para no perder nada.
+- **Qué la reabre:** nada; se cierra cuando el rescate conserve las N últimas copias en vez de
+  todas. Va bien con la copia rotativa de la **Fase 2**, que ya tiene que resolver ese mismo
+  problema.
 
 ### D-11 · `worker.js` es un proxy obsoleto
 - **Qué es:** proxy de precios de Yahoo, sin uso desde que se quitó la obtención automática de
