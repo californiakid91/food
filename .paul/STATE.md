@@ -11,27 +11,28 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 
 Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — en curso
-Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 APPLY hecho (`77f8cef` +
-`56795eb`), UNIFY pendiente
-Status: 01-02 ejecutado y revisado, SIN cerrar y SIN desplegar
-Last activity: 2026-08-29 — APPLY de 01-02 + arreglo de los 8 hallazgos de la revisión del diff
+Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 CERRADO (`77f8cef` +
+`56795eb` + acta)
+Status: los DOS ciclos de la fase cerrados. La FASE NO se cierra: nada desplegado ni visto en
+navegador (ver «Blockers»)
+Last activity: 2026-08-30 — UNIFY de 01-02: acta escrita, 4 AC en PASS, puerta rc=0
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [█████░░░░░] 50% (01-01 cerrado; 01-02 ejecutado, sin acta)
+- Phase: [█████████░] 90% (los 2 ciclos cerrados; falta desplegar y comprobar en navegador)
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ○     [01-02: falta cerrar el ciclo]
+  ✓        ✓        ✓     [01-02 cerrado. Fase 1 pendiente de despliegue + navegador]
 ```
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
+- Total plans completed: 3
 - Average duration: —
 - Total execution time: —
 
@@ -40,7 +41,7 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | Phase | Plans | Total Time | Avg/Plan |
 |-------|-------|------------|----------|
 | 00-hotfix-decimal | 1/1 | — | — |
-| 01-guardado-fiable | 1/2 | — | — |
+| 01-guardado-fiable | 2/2 | — | — |
 
 ## Accumulated Context
 
@@ -59,6 +60,7 @@ PLAN ──▶ APPLY ──▶ UNIFY
 | Un único juez para las dos guardas de no-vaciado | 01-02 | `vaciariaElLibro` + `opsDelDocumento`: la misma función en los dos lados, no el mismo criterio escrito dos veces |
 | Fallar CERRADO si no se puede leer la nube | 01-02 | Se prefiere perder sincronía a perder el libro; y se ve en naranja, no en verde |
 | Los controles de las autopruebas viven en el ARNÉS | 01-02 | Uno dentro de la suite sería juez y parte; el de datos reales está en `run_selftests.py` |
+| Cerrar el ciclo 01-02 sin cerrar la FASE 1 | 01-02 UNIFY | Los 3 objetivos del scope están en el código, medidos uno a uno; pero ningún eslabón se ha visto en un navegador y nada está desplegado. Una sonda verde no supera a un intento real |
 
 ### Deferred Issues
 
@@ -69,7 +71,8 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 
 | Blocker | Impact | Resolution Path |
 |---------|--------|-----------------|
-| Ninguno | — | — |
+| Nada de la Fase 1 está desplegado | El fallo del `?selftest=1` que borra el libro **sigue vivo en producción**. No abrir esa dirección con `?selftest=1` | `git push` (el enganche `pre-push` vuelve a correr la puerta) |
+| La Fase 1 no se ha visto en un navegador | La puerta ejerce funciones puras en node; no prueba la interfaz ni Firestore | Abrir la app desplegada recargando DOS veces y comprobar: punto verde al guardar, aviso ROJO cuando el guardado falla, `?selftest=1` deja los datos intactos |
 
 ## Boundaries (Active)
 
@@ -86,10 +89,12 @@ Permanentes del proyecto:
 
 ## Session Continuity
 
-Last session: 2026-08-29
-Stopped at: 01-02 ejecutado y revisado; NADA desplegado (no se hizo push a propósito)
-Next action: `/paul:resume` y leer el handoff
-Resume file: .paul/HANDOFF-01-02-apply.md
+Last session: 2026-08-30
+Stopped at: ciclo 01-02 cerrado con acta. Los dos ciclos de la Fase 1 están cerrados, pero la
+FASE sigue abierta: falta desplegar y comprobarlo en el navegador.
+Next action: `git push`, y acto seguido la verificación manual en la app desplegada. Sólo
+después se puede transicionar la Fase 1.
+Resume file: .paul/phases/01-guardado-fiable/01-02-SUMMARY.md
 
 ---
 *STATE.md — Updated after every significant action*
