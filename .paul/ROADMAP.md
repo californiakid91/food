@@ -77,7 +77,11 @@ casos conocidos. Fichas: **D-33** y **D-34**. Acta: `01-TRANSICION-2.md`.
 brazos adversarios disjuntos; el brazo de seguridad no encontró nada y el de objetivos encontró el
 hallazgo que paró la fase. Un solo brazo la habría cerrado.
 
-**Planes:** 01-01, 01-02 y 01-03 cerrados; **01-04 pendiente de planificar**.
+**Planes:** 01-01, 01-02 y 01-03 cerrados; **01-04 planificado y revisado** (`01-04-PLAN.md`,
+versión 2). La revisión adversaria del plan tumbó cuatro de sus ocho afirmaciones antes de
+ejecutarlo — entre ellas un cruce sin medir que la primera versión habría convertido en una
+escritura destructiva nueva, y un instrumento que habría degenerado en la lista blanca que la
+propia ficha D-33 prohíbe. El ciclo cubre D-33, D-34 y D-31.
 
 ### Phase 2: Backup y restauración
 

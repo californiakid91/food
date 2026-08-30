@@ -13,7 +13,7 @@ Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — **ABIERTA tras la segunda transición**
 Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 CERRADO (`77f8cef` +
 `56795eb` + acta); 01-03 CERRADO (`96c7a3e`, desplegado y verificado en el navegador);
-**01-04 PENDIENTE DE PLANIFICAR**
+**01-04 PLANIFICADO Y REVISADO** (`01-04-PLAN.md`, versión 2)
 Status: la SEGUNDA transición de la Fase 1 midió los tres objetivos del alcance contra el código
 sobre el diff completo `69f728e..HEAD`: los tres en **PASS**. Pero la **META de la fase FALLA**:
 hay tres escrituras a la nube y sólo dos pasan por la guarda de no-vaciado. La tercera, en el
@@ -35,11 +35,13 @@ Progress:
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [01-04 — sin planificar]
+  ✓        ○        ○     [01-04 — plan revisado, listo para APPLY]
 ```
 
 Ciclos 01-01, 01-02 y 01-03: cerrados. La transición de fase NO cerró la fase: devolvió un hallazgo
-de correctness que contradice su meta. Lo siguiente es `/paul:plan 01-04`, **en contexto limpio**.
+de correctness que contradice su meta. El PLAN 01-04 está escrito y **ya pasó la revisión
+adversaria**: se le dieron ocho frases concretas a demoler y tumbó CUATRO, todas verificadas
+después contra el código. El plan se reescribió entero (versión 2, diez enmiendas E-1..E-10).
 
 ## Performance Metrics
 
@@ -83,6 +85,14 @@ de correctness que contradice su meta. Lo siguiente es `/paul:plan 01-04`, **en 
 | La segunda transición tampoco cierra la FASE 1: abre el ciclo 01-04 | Fase 1 transición 2 | Los tres objetivos del alcance están en PASS, pero la META no: la guarda de no-vaciado cubre dos de las tres escrituras a la nube. Es la misma forma del defecto que abrió el 01-03. Ficharlo como deuda lo blanquearía como «fase hecha» (§5.10) |
 | El 01-04 cierra la CLASE, no los dos casos | Fase 1 transición 2 | Enumerar a mano las tres escrituras repetiría el defecto: una lista blanca sólo protege de lo que ya conoce (§5.15). El conjunto se deriva del código y hace falta un control que muerda si aparece una cuarta |
 | Los números de línea del libro de deudas se declaran NO fiables en vez de actualizarse | Fase 1 transición 2 | La auditoría encontró casi todas desfasadas. Corregirlas una a una las deja mal otra vez mañana — es la trampa de §9. Se cierra la clase: para localizar código se usa el NOMBRE y `grep` |
+| El juez de subida falla CERRADO también cuando no puede mirar los ACTIVOS | 01-04 PLAN | La revisión adversaria destapó un cruce sin medir: libro con operaciones, sin activos, y la lectura de la nube fallando. Hoy no sube por accidente —la excepción aborta el push—; la primera versión del plan lo habría convertido en «subir». El fallo cerrado estaba escrito para las operaciones y no para los activos: **la asimetría ERA el defecto** (§5.16) |
+| La nube es un TRI-ESTADO, no un booleano | 01-04 PLAN | «Leída y vacía», «ilegible» y «no consultada» son tres cosas distintas. Colapsarlas en un booleano pierde exactamente la distinción que causó D-33 |
+| El censo de escrituras usa DOS redes disjuntas, no una regla más lista | 01-04 PLAN | La regla «descartar receptores ligados a `new Map`/`new Set`» aplicada a `.add(` daba falso rojo con `root.classList.add`, y arreglarlo por nombre habría sido la lista blanca que la propia ficha D-33 prohíbe. Se derivan los enlaces a referencias de Firestore (red A) Y se vigila el método (red B): cazan fallos distintos |
+| El manejador de inicio de sesión se extrae para poder EJECUTARLO en node | 01-04 PLAN | Hoy es una flecha anónima que ni siquiera se registra fuera del navegador. Sin extraerlo, el sabotaje de su aviso no tenía oráculo posible y declararlo mordiente habría sido §5.1 con uniforme de test |
+| El sabotaje del eslabón PRODUCTOR es obligatorio, no opcional | 01-04 PLAN | Los sabotajes del juez y del censo pasan los dos aunque la marca de «paquete incompleto» no se ponga NUNCA. La inyección tiene que caer donde el error PROPAGA (§5.9): una clave corrupta sembrada en el arnés |
+| D-31 se cierra por la CLASE: cero llamadas literales `setSyncUI('ok')` | 01-04 PLAN | La ficha nombraba un `catch`, pero había dos miembros más vivos —el callback de error vacío del `onSnapshot` y el verde incondicional del arranque—. Cerrar sólo el caso habría sido §5.10 en pequeño |
+| Se cruzan dos boundaries y se dice en voz alta | 01-04 PLAN | `buildSyncPayload` (sólo su manejo de errores) y `funcsize.py` (extraer el localizador de funciones para no tener dos escáneres). Un boundary cruzado sin decirlo es deriva; dicho, es una decisión |
+| El coste del arreglo se ficha como deuda antes de construirlo | 01-04 PLAN | Rechazar la subida por un paquete incompleto deja el libro sin copia en la nube mientras dure el fallo, sin salida en la interfaz. Es el gemelo de D-23. Mejor para el dato y peor para el operador: se escribe o no existe |
 | Cuatro brazos adversarios disjuntos sustituyen a G7, que sigue ciego | Fase 1 transición 2 | El de seguridad no encontró nada y el de objetivos encontró el hallazgo que paró la fase. Brazos que miden lo mismo se corroboran en su punto ciego; éstos midieron cosas distintas |
 
 ### Deferred Issues
@@ -153,11 +163,10 @@ Stopped at: SEGUNDA transición de la Fase 1 terminada. Puerta VERDE por sus dos
 exclusiva (`HEAD^{tree}` idéntico antes y después de medir), y lo desplegado en Pages idéntico a lo
 medido (`md5 661acd6b17aed4808c9d8367a2cd72b4`). Cuatro brazos adversarios disjuntos. **La fase NO
 se cerró**: D-33 contradice su meta. Ocho fichas nuevas en el libro: D-27 a D-34.
-Next action: **`/paul:plan 01-04`**, en contexto LIMPIO. Objetivo: cerrar la CLASE «escritura a la
-nube sin guarda» —derivar el conjunto del código, no enumerarlo— cubriendo D-33 y D-34, con su
-control positivo y su caso en el banco de sabotaje; y decidir si D-31 (el indicador verde tras un
-error) entra en el mismo ciclo, porque cubrir el mecanismo no cubre su aviso (§5.6).
-Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION-2.md
+Next action: **`/paul:apply .paul/phases/01-guardado-fiable/01-04-PLAN.md`**, en contexto LIMPIO.
+El plan ya incorpora la decisión sobre D-31: entra en este ciclo y se cierra por la CLASE, no por
+el caso. Cuatro tareas; la 4 es la revisión adversaria del diff, y es BLOQUEANTE.
+Resume file: .paul/phases/01-guardado-fiable/01-04-PLAN.md
 
 ---
 *STATE.md — Updated after every significant action*
