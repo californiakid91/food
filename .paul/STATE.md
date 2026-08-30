@@ -21,7 +21,13 @@ manejador de inicio de sesión, se recorre también cuando la lectura de la nube
 libro vacío encima de uno completo, con el indicador en verde. Fichado como **D-33** (y **D-34**,
 dos `catch` vacíos dentro de `buildSyncPayload`), y **son el objetivo del ciclo 01-04**, no deuda
 diferida: ficharlos y cerrar la fase la blanquearía como hecha.
-Last activity: 2026-08-30 — segunda transición de la Fase 1. Puerta verde por sus DOS variantes,
+Last activity: 2026-08-30 — **APPLY del ciclo 01-04 completo**. Cuatro tareas ejecutadas; la
+puerta VERDE por sus DOS variantes, byte a byte idénticas, con el árbol en exclusiva. 44 sabotajes
+mordiendo, 15 de este ciclo. Los cuatro brazos adversarios devolvieron veredicto: correctness no
+pudo demoler su frase; los otros tres SÍ, con mutantes ejecutados que sobrevivían a la puerta
+entera. Los tres bloqueantes arreglados y con test permanente. D-33, D-34 y D-31 cerradas; D-35,
+D-36 y D-37 abiertas; `onScreenshotPicked` añadida a D-09.
+Actividad anterior: 2026-08-30 — segunda transición de la Fase 1. Puerta verde por sus DOS variantes,
 árbol en exclusiva, despliegue idéntico a lo medido. Cuatro brazos adversarios disjuntos (radio de
 impacto, objetivos contra código, seguridad, documentos contra evidencia). Acta:
 `01-TRANSICION-2.md`. Ocho fichas nuevas: D-27 a D-34.
@@ -35,7 +41,7 @@ Progress:
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ○        ○     [01-04 — plan revisado, listo para APPLY]
+  ✓        ✓        ○     [01-04 — APPLY completo, listo para UNIFY]
 ```
 
 Ciclos 01-01, 01-02 y 01-03: cerrados. La transición de fase NO cerró la fase: devolvió un hallazgo

@@ -6,10 +6,16 @@ La app es un fichero unico por decision de proyecto, asi que no se puede exigir
 funcion nueva pasa del umbral, y las que ya lo pasaban solo pueden encoger.
 
 CEGUERAS DECLARADAS (antes de que alguien las descubra):
-  - Solo ve funciones declaradas como `function NOMBRE(` a nivel superior del
-    bloque <script> inline. NO ve funciones flecha, metodos de objeto, funciones
-    anonimas asignadas a variables ni closures anidadas. Una funcion de 300
-    lineas escrita como `const f = () => {...}` es INVISIBLE a este instrumento.
+  - Solo ve funciones declaradas como `function NOMBRE(` o `async function
+    NOMBRE(` a nivel superior del bloque <script> inline. NO ve funciones
+    flecha, metodos de objeto, funciones anonimas asignadas a variables ni
+    closures anidadas. Una funcion de 300 lineas escrita como
+    `const f = () => {...}` es INVISIBLE a este instrumento.
+    Las `async function` se anadieron al ambito en el 01-04 (version 2 de la
+    semantica) porque volver `runSelfTests` asincrona la habia sacado de la
+    medida SIN QUE NADA se pusiera rojo: el banco de sabotaje lo destapo al
+    engordarla 80 lineas y ver que la puerta seguia verde. Es un APRIETE de la
+    vara, y por eso obliga a resellar la foto a proposito.
   - Cuenta lineas crudas del cuerpo, comentarios y blancos incluidos.
   - La huella no lleva numero de linea: reordenar el fichero no la mueve.
   - Al contar llaves salta cadenas, plantillas, comentarios y expresiones
@@ -36,9 +42,10 @@ BASELINE = ROOT / '.paul' / 'baseline-funcs.json'
 # La SEMANTICA de la medida. Si esto cambia, la foto anterior no es comparable.
 SEMANTICA = {
     'umbral_lineas': 60,
-    'ambito': 'funciones `function NOMBRE(` de primer nivel del <script> inline de index.html',
+    'ambito': 'funciones `function NOMBRE(` y `async function NOMBRE(` de primer nivel '
+              'del <script> inline de index.html',
     'metrica': 'lineas crudas del cuerpo, comentarios y blancos incluidos',
-    'version': 1,
+    'version': 2,
 }
 
 
@@ -134,25 +141,53 @@ def roto(msg):
     sys.exit(2)
 
 
-def medir():
-    """Devuelve {nombre: [lineas, ...]} de las funciones que exceden el umbral."""
-    if not INDEX.is_file():
-        roto(f"no existe {INDEX}")
-    html = INDEX.read_text(encoding='utf-8')
+class EscanerRoto(Exception):
+    """El escaner no pudo decidir. Se propaga para que cada instrumento le ponga
+    SU mensaje de rc=2: "no pude medir" y "0 hallazgos" no comparten salida."""
+
+
+def extraer_js(ruta):
+    """Devuelve el JS del UNICO bloque <script> inline de ese fichero.
+
+    Descubre el bloque en vez de enumerar nada. Lanza EscanerRoto en cuanto algo
+    no cuadra: fichero ausente, vacio, o un numero de bloques distinto de uno.
+    """
+    if not ruta.is_file():
+        raise EscanerRoto(f"no existe {ruta}")
+    html = ruta.read_text(encoding='utf-8')
     if not html.strip():
-        roto(f"{INDEX} esta vacio")
+        raise EscanerRoto(f"{ruta} esta vacio")
     bloques = re.findall(r'<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>', html, re.DOTALL)
     if len(bloques) != 1:
-        roto(f"esperaba 1 bloque <script> inline, encontre {len(bloques)}")
-    js = bloques[0]
+        raise EscanerRoto(f"esperaba 1 bloque <script> inline, encontre {len(bloques)}")
+    return bloques[0]
 
-    excede = {}
-    vistas = 0
-    for m in re.finditer(r'^function\s+(\w+)\s*\(', js, re.MULTILINE):
+
+def localizar_funciones(js, incluir_async=False):
+    """[(nombre, inicio, fin), ...] de las `function NOMBRE(` de primer nivel.
+
+    `inicio` es el desplazamiento de la `f` de `function`; `fin`, el de la llave
+    que cierra el cuerpo (inclusive). Salta cadenas, plantillas, comentarios y
+    expresiones regulares al contar llaves.
+
+    Extraida de `medir()` en el ciclo 01-04 para que `cloudwrites.py` y
+    `emptycatch.py` usen ESTE escaner y no una copia: dos escaneres se
+    desincronizan a la primera. El boundary se cruzo a proposito y se dijo en
+    voz alta en el PLAN 01-04.
+
+    `incluir_async=True` amplia el ambito a `async function NOMBRE(`. Desde el
+    01-04 lo usan TODOS los instrumentos, `medir()` incluido: ampliarlo cambio
+    lo que se MIDE, se declaro DERIVA (rc=3), se subio la version de la
+    SEMANTICA de 1 a 2 y se resello la foto a proposito. Este parrafo decia
+    antes lo contrario que el codigo, que es la trampa 5.1 con otro disfraz.
+    """
+    patron = r'^(?:async\s+)?function\s+(\w+)\s*\(' if incluir_async else r'^function\s+(\w+)\s*\('
+    encontradas = []
+    for m in re.finditer(patron, js, re.MULTILINE):
         try:
             j = js.index('{', m.end() - 1)
         except ValueError:
-            roto(f"no encuentro el cuerpo de {m.group(1)}")
+            raise EscanerRoto(f"no encuentro el cuerpo de {m.group(1)}") from None
         prof, k = 0, j
         while k < len(js):
             c = js[k]
@@ -176,15 +211,78 @@ def medir():
                     break
             k += 1
         else:
-            roto(f"llave sin cerrar en {m.group(1)}")
-        vistas += 1
-        lineas = js[m.start():k + 1].count('\n') + 1
-        if lineas > SEMANTICA['umbral_lineas']:
-            excede.setdefault(m.group(1), []).append(lineas)
+            raise EscanerRoto(f"llave sin cerrar en {m.group(1)}")
+        encontradas.append((m.group(1), m.start(), k))
+    if not encontradas:
+        raise EscanerRoto("no encontre ninguna funcion: el patron de busqueda no casa")
+    return encontradas
 
-    if vistas == 0:
-        roto("no encontre ninguna funcion: el patron de busqueda no casa")
-    return {n: sorted(v, reverse=True) for n, v in excede.items()}, vistas
+
+def enmascarar(js, cadenas=False):
+    """Copia de `js` del MISMO largo con los comentarios pasados a espacios.
+
+    Con `cadenas=True` vacia ademas el interior de cadenas, plantillas y
+    expresiones regulares, dejando en su sitio las comillas y las barras.
+
+    Los desplazamientos se conservan, asi que lo que se encuentre en la copia
+    esta en la misma posicion del original. Existe porque un instrumento que
+    busca patrones sobre el texto crudo mide PROSA: un comentario que menciona
+    `catch {}` contaba como un catch vacio de verdad (medido el 2026-08-30).
+    """
+    out = list(js)
+    k = 0
+    n = len(js)
+    while k < n:
+        c = js[k]
+        if c == '/' and k + 1 < n and js[k + 1] in '/*':
+            fin = fin_de_comentario(js, k)
+            for i in range(k, min(fin, n)):
+                if js[i] != '\n':
+                    out[i] = ' '
+            k = fin
+            continue
+        if c in '"\'`':
+            fin = fin_de_cadena(js, k)
+            if cadenas:
+                for i in range(k + 1, min(fin - 1, n)):
+                    if js[i] != '\n':
+                        out[i] = ' '
+            k = fin
+            continue
+        if c == '/' and es_regex(js, k):
+            fin = fin_de_regex(js, k)
+            if cadenas:
+                for i in range(k + 1, min(fin, n)):
+                    if js[i] != '\n':
+                        out[i] = ' '
+            k = fin
+            continue
+        k += 1
+    return ''.join(out)
+
+
+def funcion_de(funciones, pos):
+    """Nombre de la funcion de primer nivel que contiene ese desplazamiento."""
+    for nombre, ini, fin in funciones:
+        if ini <= pos <= fin:
+            return nombre
+    return None
+
+
+def medir():
+    """Devuelve {nombre: [lineas, ...]} de las funciones que exceden el umbral."""
+    try:
+        js = extraer_js(INDEX)
+        funciones = localizar_funciones(js, incluir_async=True)
+    except EscanerRoto as e:
+        roto(str(e))
+
+    excede = {}
+    for nombre, ini, fin in funciones:
+        lineas = js[ini:fin + 1].count('\n') + 1
+        if lineas > SEMANTICA['umbral_lineas']:
+            excede.setdefault(nombre, []).append(lineas)
+    return {n: sorted(v, reverse=True) for n, v in excede.items()}, len(funciones)
 
 
 def cargar_baseline():

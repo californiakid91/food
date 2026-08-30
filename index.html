@@ -2911,6 +2911,13 @@ function setSyncUI(state) {
     dot.title = 'Cambios sin subir';
     status.textContent = 'Cambios sin subir: este dispositivo no tiene operaciones y no se pisa el libro de la nube.';
     status.style.display = 'block';
+  } else if (state === 'error') {
+    // Rojo propio: NO se reutiliza 'auth' porque su mensaje mentiría sobre la
+    // causa. Un resultado que no se entiende llega aquí, nunca a verde.
+    dot.style.background = '#e74c3c';
+    dot.title = 'No se pudo sincronizar';
+    status.textContent = 'No se pudo sincronizar: los cambios siguen guardados en este dispositivo.';
+    status.style.display = 'block';
   } else if (state === 'auth') {
     dot.style.background = '#e74c3c';
     dot.title = 'Error de autenticación';
@@ -2957,27 +2964,32 @@ function userDocRef() {
   return db.collection('users').doc(currentUser.uid);
 }
 
+// Construye el paquete y NOMBRA lo que no pudo leer. Antes se tragaba los
+// fallos con dos `catch {}` vacíos (D-34): una cartera cuyo blob no parsea
+// desaparecía del paquete, y como `ref.set` REEMPLAZA el documento entero, se
+// borraba de la nube en silencio. `incompleto` no viaja dentro del payload:
+// es información para el juez, no dato del usuario.
 function buildSyncPayload() {
+  const incompleto = [];
   const portfolioData = {};
   portfolios.forEach(p => {
-    if (p.id === currentPortId) {
-      portfolioData[p.id] = { rows, nextId };
-    } else {
-      try {
-        const raw = localStorage.getItem(rowsKey(p.id));
-        if (raw) portfolioData[p.id] = JSON.parse(raw);
-      } catch {}
-    }
+    if (p.id === currentPortId) { portfolioData[p.id] = { rows, nextId }; return; }
+    const clave = rowsKey(p.id);
+    try {
+      const raw = localStorage.getItem(clave);
+      if (raw) portfolioData[p.id] = JSON.parse(raw);
+    } catch (e) { incompleto.push(clave); }
   });
   const historyData = {};
   portfolios.forEach(p => {
+    const clave = histKey(p.id);
     try {
-      const raw = localStorage.getItem(histKey(p.id));
+      const raw = localStorage.getItem(clave);
       if (raw) historyData[p.id] = JSON.parse(raw);
-    } catch {}
+    } catch (e) { incompleto.push(clave); }
   });
-  return { portfolios, currentPortId, nextId, portfolioData, historyData,
-           opsAll: ops, savedAt: Date.now() };
+  return { payload: { portfolios, currentPortId, nextId, portfolioData, historyData,
+                      opsAll: ops, savedAt: Date.now() }, incompleto };
 }
 
 function applySyncPayload(data) {
@@ -3081,64 +3093,129 @@ async function pullFromFirestore() {
     // recién creadas con un savedAt "de ahora"), la nube debe ganar siempre.
     // La comparación de fechas solo aplica cuando hay datos locales que proteger.
     if (!hasRealLocalData() || (data.savedAt || 0) >= localSaved) applySyncPayload(data);
-    setSyncUI('ok');
+    setSyncUI(estadoSync('ok'));
     return true;
   } catch(e) { console.error('pullFromFirestore:', e); return false; }
+}
+
+// ¿Cuántos activos reales tiene ese documento de la nube?
+function activosDelDocumento(data) {
+  if (!data) return 0;
+  return Object.values(data.portfolioData || {})
+    .reduce((s, pd) => s + (((pd && pd.rows) || []).length), 0);
+}
+
+// EL JUEZ ÚNICO DE LA SUBIDA. Función pura: sin red, sin DOM y sin globales,
+// para poder ejercer la MATRIZ entera fuera del navegador.
+//
+// `nube` es un TRI-ESTADO más un cuarto caso, a propósito:
+//   'con-datos' · 'vacia' · 'ilegible' · 'no-consultada'
+// Colapsarlos en un booleano es exactamente lo que causó D-33: el `catch` de la
+// lectura devolvía `false`, indistinguible de «arriba no hay nada», y con eso
+// se subía un libro vacío encima de uno completo.
+//
+// Falla CERRADO de forma SIMÉTRICA: si para decidir hace falta mirar la nube y
+// la nube no se pudo mirar, no se sube. Vale para las operaciones Y para los
+// activos: tenerlo escrito sólo para las operaciones ERA el defecto (§5.16).
+function decidirSubida(estado) {
+  const nube = estado.nube || { estado: 'no-consultada', ops: [], activos: 0 };
+  const incompleto = Array.isArray(estado.incompleto) ? estado.incompleto : [];
+  if (incompleto.length) {
+    return { subir: false, aviso: 'error', clave: 'incompleto',
+             motivo: 'paquete incompleto: ' + incompleto.join(', ') };
+  }
+  // Un cerrojo puesto NO es un libro vacío: subir `opsAll: []` con un `savedAt`
+  // fresco mientras el libro real duerme ilegible en el disco sería el mismo
+  // daño por otra puerta.
+  if (estado.libroIlegible) {
+    return { subir: false, aviso: 'pendiente', clave: 'libro-ilegible',
+             motivo: 'el libro local está ilegible' };
+  }
+  const hacenFaltaDatosDeLaNube = !tieneOperaciones(estado.opsLocales) || !estado.hayActivosLocales;
+  if (hacenFaltaDatosDeLaNube && (nube.estado === 'ilegible' || nube.estado === 'no-consultada')) {
+    return { subir: false, aviso: 'pendiente', clave: 'nube-ilegible',
+             motivo: 'la nube no se pudo leer (' + nube.estado + ')' };
+  }
+  if (vaciariaElLibro(estado.opsLocales, nube.ops)) {
+    return { subir: false, aviso: 'pendiente', clave: 'vaciaria',
+             motivo: 'vaciaría el libro de la nube, que tiene ' + (nube.ops || []).length };
+  }
+  if (!estado.hayActivosLocales && (nube.activos || 0) > 0) {
+    return { subir: false, aviso: 'pendiente', clave: 'activos',
+             motivo: 'sin activos locales y la nube tiene ' + nube.activos };
+  }
+  return { subir: true, aviso: 'ok', clave: 'ok', motivo: 'ok' };
+}
+
+// Resultado → indicador. Mapa CERRADO y función pura: lo que no está
+// contemplado da ROJO, jamás verde. El verde del fichero sólo se alcanza por
+// aquí; `tools/cloudwrites.py` prohíbe que vuelva a existir una llamada
+// literal a setSyncUI con 'ok' (D-31, cerrada por la CLASE).
+function estadoSync(resultado) {
+  if (resultado === 'ok')        return 'ok';
+  if (resultado === 'pendiente') return 'pendiente';
+  if (resultado === 'offline')   return 'offline';
+  if (resultado === 'auth')      return 'auth';
+  return 'error';
+}
+
+// Mira la nube y devuelve el tri-estado. Si la lectura LANZA, devuelve
+// 'ilegible' en vez de dejar escapar la excepción: quien decide tiene que
+// poder distinguir «no hay nada arriba» de «no pude mirar».
+async function observarNube(ref) {
+  try {
+    const snap = await ref.get();
+    if (!snap.exists) return { estado: 'vacia', ops: [], activos: 0 };
+    const data = snap.data();
+    return { estado: 'con-datos', ops: opsDelDocumento(data), activos: activosDelDocumento(data) };
+  } catch (e) {
+    console.warn('[SYNC] la nube no se pudo leer:', e && e.message);
+    return { estado: 'ilegible', ops: [], activos: 0 };
+  }
+}
+
+// LA ÚNICA FUNCIÓN DEL FICHERO CON UNA ESCRITURA A LA NUBE. No contiene
+// ninguna regla: observa, pregunta al juez y actúa. Sin transacciones a
+// propósito: fallan sin conexión y romperían el guardado offline (01-02).
+async function subirALaNube(motivo, deps) {
+  // Dependencias inyectables por la MISMA razón que en `alIniciarSesion`: sin
+  // ellas, el cable entre el productor del paquete y el juez no lo medía nadie.
+  // Medido el 2026-08-30: cambiar `incompleto` por `[]` aquí sobrevivía a la
+  // puerta ENTERA, con el productor y el juez cada uno con su control.
+  const d = deps || { ref: userDocRef(), paquete: buildSyncPayload,
+                      mirar: observarNube, cerrojo: () => opsIlegible,
+                      activos: hasRealLocalData };
+  const ref = d.ref;
+  if (!ref) return { subido: false, aviso: 'offline', motivo: 'sin sesión' };
+  const construido = d.paquete();
+  const nube = await d.mirar(ref);
+  const decision = decidirSubida({
+    opsLocales: construido.payload.opsAll,
+    libroIlegible: d.cerrojo(),
+    nube: nube,
+    hayActivosLocales: d.activos(),
+    incompleto: construido.incompleto
+  });
+  if (!decision.subir) {
+    console.warn('[SYNC] subida omitida (' + motivo + '):', decision.motivo);
+    setSyncUI(estadoSync(decision.aviso));
+    return { subido: false, aviso: decision.aviso, motivo: decision.motivo };
+  }
+  try {
+    await ref.set(construido.payload);
+  } catch (e) {
+    console.error('[SYNC] la escritura falló (' + motivo + '):', e);
+    setSyncUI(estadoSync('error'));
+    return { subido: false, aviso: 'error', motivo: 'la escritura falló' };
+  }
+  setSyncUI(estadoSync('ok'));
+  return { subido: true, aviso: 'ok', motivo: 'ok' };
 }
 
 function schedulePush() {
   if (!currentUser) return;
   clearTimeout(pushTimer);
-  pushTimer = setTimeout(async () => {
-    const ref = userDocRef();
-    if (!ref) return;
-    try {
-      const payload = buildSyncPayload();
-      // Nadie vacía el libro de nadie, en el sentido contrario: un dispositivo
-      // con el libro vacío (o ilegible) no sube ese vacío encima de la nube.
-      // Mismo predicado que en applySyncPayload, a propósito.
-      if (!tieneOperaciones(payload.opsAll)) {
-        let cloudOps;
-        try {
-          const snapOps = await ref.get();
-          cloudOps = opsDelDocumento(snapOps.exists ? snapOps.data() : null);
-        } catch (e) {
-          // Sin poder leer la nube no se puede afirmar que subir sea inocuo, y
-          // el libro es el dato más caro de reconstruir: se falla CERRADO. Es
-          // lo que pasa sin conexión y sin caché, así que TIENE que verse.
-          console.warn('[SYNC] push omitido: libro local vacío y la nube no se pudo leer:', e);
-          setSyncUI('pendiente');
-          return;
-        }
-        if (vaciariaElLibro(payload.opsAll, cloudOps)) {
-          console.warn('[SYNC] push omitido: libro local vacío, la nube tiene',
-                       cloudOps.length, 'operaciones');
-          setSyncUI('pendiente');
-          return; // el libro de la nube se conserva
-        }
-      }
-      if (hasRealLocalData()) {
-        // Caso normal: set directo. Firestore lo encola si estás offline y
-        // lo sincroniza solo al recuperar conexión (no usar transacción aquí:
-        // las transacciones fallan offline y romperían el auto-sync).
-        await ref.set(payload);
-      } else {
-        // Estado local vacío: NUNCA pisar una nube con activos reales.
-        // Comprobación sin transacción para no romper el guardado offline.
-        const snap = await ref.get();
-        const cloudAssets = snap.exists
-          ? Object.values(snap.data().portfolioData || {}).reduce((s, pd) => s + ((pd.rows || []).length), 0)
-          : 0;
-        if (cloudAssets > 0) {
-          console.warn('[SYNC] push omitido: estado local vacío, la nube tiene', cloudAssets, 'activos');
-          setSyncUI('pendiente');
-          return; // la nube se conserva
-        }
-        await ref.set(payload);
-      }
-      setSyncUI('ok');
-    } catch(e) { console.error('schedulePush:', e); }
-  }, 800);
+  pushTimer = setTimeout(() => { subirALaNube('guardado local'); }, 800);
 }
 
 function listenFirestore() {
@@ -3152,40 +3229,61 @@ function listenFirestore() {
     const localSaved = localMeta ? (JSON.parse(localMeta).savedAt || 0) : 0;
     if ((data.savedAt || 0) > localSaved) {
       applySyncPayload(data);
-      setNewMoneyInput();
-      renderTabs();
-      render();
-      setTimeout(resizeCharts, 50);
+      repintarTrasSync();
     }
-  }, () => {});
+  }, e => {
+    // El escucha ha muerto. Con el callback vacío que había aquí el punto se
+    // quedaba VERDE para siempre mientras la app dejaba de recibir cambios.
+    console.error('[SYNC] el escucha de la nube falló:', e);
+    setSyncUI(estadoSync('error'));
+  });
 }
 
-if (firebaseReady && auth) auth.onAuthStateChanged(async user => {
+// Lo que hay que repintar cuando llegan datos de la nube. Extraído para poder
+// inyectarlo en `alIniciarSesion` y ejecutarla en node.
+function repintarTrasSync() {
+  setNewMoneyInput();
+  renderTabs();
+  render();
+  setTimeout(resizeCharts, 50);
+}
+
+// El manejador de inicio de sesión, EXTRAÍDO a una función con nombre. Mientras
+// fue una flecha anónima registrada dentro de `if (firebaseReady && auth)` no
+// se registraba fuera del navegador y NO HABÍA FORMA DE LLAMARLO: cualquier
+// prueba sobre él habría sido una aserción por subcadena sobre su fuente, que
+// se satisface por accidente (§5.8). Las dependencias se inyectan para poder
+// darle una `leerNube` que LANCE y medir qué hace.
+//
+// Aquí vivía D-33: la tercera escritura a la nube, que esquivaba la guarda de
+// no-vaciado. Ahora la subida es `subir(...)`, o sea `subirALaNube`, o sea el
+// juez único. Y ya no se pinta verde al entrar: se pinta al terminar, con el
+// resultado real.
+async function alIniciarSesion(user, deps) {
+  const d = deps || { leerNube: pullFromFirestore, subir: subirALaNube,
+                      escuchar: listenFirestore, pintar: repintarTrasSync };
   currentUser = user;
-  if (user) {
-    setSyncUI('ok');
-    try {
-      const synced = await pullFromFirestore();
-      if (!synced) {
-        if (hasRealLocalData()) {
-          const ref = userDocRef();
-          if (ref) await ref.set(buildSyncPayload());
-        }
-      }
-      listenFirestore();
-      setNewMoneyInput();
-      renderTabs();
-      render();
-      setTimeout(resizeCharts, 50);
-    } catch(e) {
-      console.error('onAuthStateChanged:', e);
-      setSyncUI('ok');
-    }
-  } else {
+  if (!user) {
     if (unsubFirestore) { unsubFirestore(); unsubFirestore = null; }
-    setSyncUI('offline');
+    setSyncUI(estadoSync('offline'));
+    return 'offline';
   }
-});
+  let resultado;
+  try {
+    const sincronizado = await d.leerNube();
+    resultado = sincronizado ? 'ok' : (await d.subir('inicio de sesión')).aviso;
+    d.escuchar();
+    d.pintar();
+  } catch (e) {
+    console.error('alIniciarSesion:', e);
+    resultado = 'error';
+  }
+  const aviso = estadoSync(resultado);
+  setSyncUI(aviso);
+  return aviso;
+}
+
+if (firebaseReady && auth) auth.onAuthStateChanged(user => alIniciarSesion(user));
 
 // ── Estado ──
 let rows    = [];
@@ -3453,7 +3551,8 @@ window.addEventListener('load', () => {
   render();
   setTimeout(resizeCharts, 50);
   initChartInteractivity();
-  if (currentUser) setSyncUI('ok');
+  // Aquí había un verde incondicional del indicador. Se elimina: si ya hay
+  // sesión, `alIniciarSesion` ya pintó con el resultado REAL, y este lo borraba.
 
   // PWA: registra el service worker para uso offline / instalable.
   if ('serviceWorker' in navigator) {
@@ -4969,8 +5068,11 @@ function pruebasNoVaciar(check, base) {
   // de los dos sitios, la asimetría vuelve y esto se pone rojo.
   check('AC-4 la guarda de aplicar llama al juez único',
         /vaciariaElLibro\(/.test(String(applySyncPayload)), true);
+  // Re-anclado en el 01-04: la guarda ya no vive en `schedulePush`, que ahora
+  // sólo agenda. El juez de la subida es `decidirSubida`, y sigue llamando al
+  // MISMO `vaciariaElLibro` que la guarda de aplicar.
   check('AC-4 la guarda de subir llama al juez único',
-        /vaciariaElLibro\(/.test(String(schedulePush)), true);
+        /vaciariaElLibro\(/.test(String(decidirSubida)), true);
 }
 
 // Cuántas operaciones hay en disco, o la cadena 'ilegible' si el blob no parsea.
@@ -5109,7 +5211,7 @@ function pruebasReparacionFallida(check, base) {
 // Sincronización (plan 01-02). Escriben en localStorage y tocan los globales,
 // así que se guarda todo y se devuelve al final pase lo que pase: ?selftest=1
 // también corre en el navegador del usuario, con sus datos reales delante.
-function pruebasSincronizacion(check) {
+async function pruebasSincronizacion(check) {
   const base = { date: '2026-03-01', type: 'buy', ticker: 'AAA',
                  titulos: 1, price: 10, currency: 'EUR' };
   const centinelas = sembrarCentinelas();
@@ -5119,6 +5221,20 @@ function pruebasSincronizacion(check) {
         Object.keys(copiaSeguridad).length >= 3, true);
   const previo = { ops: ops, ilegible: opsIlegible, portfolios: portfolios,
                    currentPortId: currentPortId, nextId: nextId, rows: rows };
+  // Un `await` perdido dejaría una suite asíncrona SIN EJERCER y la puerta
+  // saldría verde y sorda: medido el 2026-08-30, sin el await el sabotaje del
+  // manejador de sesión dejaba de morder y todo seguía en verde. Esto lo caza
+  // sin enumerar nada: una suite que no ejerce ni un control es una suite que
+  // no llegó a correr. Cubrir el mecanismo no cubre su cable (§5.6).
+  let ejercidos = 0;
+  const contado = (n, g, w) => { ejercidos++; check(n, g, w); };
+  const ejercida = async (nombre, fn) => {
+    const antes = ejercidos;
+    await fn();
+    if (ejercidos === antes) {
+      check(`${nombre} no ejerció ni un control (¿falta un await?)`, false, true);
+    }
+  };
   try {
     pruebasIdentificadores(check);
     pruebasDeduplicacion(check, base);
@@ -5127,6 +5243,12 @@ function pruebasSincronizacion(check) {
     pruebasCerrojoIlegible(check, base);
     pruebasPrecedenciaDeGuardas(check, base);
     pruebasReparacionFallida(check, base);
+    pruebasPuertaDeSubida(check, base);
+    pruebasPaqueteIncompleto(check);
+    pruebasIndicador(check);
+    await ejercida('pruebasTuberiaDeSubida', () => pruebasTuberiaDeSubida(contado));
+    await ejercida('pruebasInicioDeSesion', () => pruebasInicioDeSesion(contado));
+    await ejercida('pruebasCierreDeSesion', () => pruebasCierreDeSesion(contado));
   } finally {
     localStorage.clear();
     Object.keys(copiaSeguridad).forEach(k => localStorage.setItem(k, copiaSeguridad[k]));
@@ -5142,7 +5264,259 @@ function pruebasSincronizacion(check) {
   Object.keys(centinelas).forEach(k => localStorage.removeItem(k));
 }
 
-function runSelfTests() {
+// LA TUBERÍA de la puerta de subida, ejecutada de verdad. El productor tenía su
+// control y el juez el suyo, y NADIE medía el cable entre ambos: cambiar el
+// argumento que lleva la marca de «paquete incompleto» sobrevivía a la puerta
+// entera y en producción se habría subido un paquete a medias, todo en verde.
+// Cada argumento de la llamada al juez tiene aquí su fila y su mutante.
+function arnesDeSubida(sobre) {
+  const t = { escrituras: [], avisos: [] };
+  const paquete = { payload: { opsAll: [{ id: 'x' }], savedAt: 1 }, incompleto: [] };
+  t.deps = {
+    ref: { set: async (p) => { t.escrituras.push(p); } },
+    paquete: () => paquete,
+    mirar: async () => ({ estado: 'con-datos', ops: [{ id: 'x' }], activos: 2 }),
+    cerrojo: () => false,
+    activos: () => true,
+  };
+  Object.keys(sobre || {}).forEach(k => {
+    if (k === 'incompleto') { paquete.incompleto = sobre[k]; return; }
+    t.deps[k] = sobre[k];
+  });
+  return t;
+}
+
+async function pruebasTuberiaDeSubida(check) {
+  const t0 = arnesDeSubida({});
+  const r0 = await subirALaNube('prueba', t0.deps);
+  check('AC-1 el camino feliz escribe exactamente una vez', t0.escrituras.length, 1);
+  check('AC-1 y sube el paquete, no la marca de incompleto',
+        typeof t0.escrituras[0].incompleto, 'undefined');
+  check('AC-3 y el aviso es verde', r0.aviso, 'ok');
+
+  // Un mutante que corte CUALQUIERA de estos tres cables tiene que morir aquí.
+  const t1 = arnesDeSubida({ incompleto: ['balance-rows-7'] });
+  const r1 = await subirALaNube('prueba', t1.deps);
+  check('AC-2 con el paquete incompleto NO escribe', t1.escrituras.length, 0);
+  check('AC-2 y el motivo llega hasta el aviso', r1.aviso, 'error');
+
+  const t2 = arnesDeSubida({ cerrojo: () => true });
+  await subirALaNube('prueba', t2.deps);
+  check('AC-1 con el cerrojo puesto NO escribe', t2.escrituras.length, 0);
+
+  const t3 = arnesDeSubida({ activos: () => false });
+  await subirALaNube('prueba', t3.deps);
+  check('AC-1 sin activos locales y con la nube llena NO escribe', t3.escrituras.length, 0);
+
+  // La nube ilegible sólo bloquea cuando HACE FALTA mirarla. Con el libro y los
+  // activos locales completos, escribir encima de una nube que no se pudo leer
+  // no destruye nada, y negarse dejaría el dispositivo sin sincronizar para
+  // siempre. Las dos filas van juntas: la decisión se lee de un vistazo.
+  const t4 = arnesDeSubida({ mirar: async () => ({ estado: 'ilegible', ops: [], activos: 0 }),
+                             activos: () => false });
+  await subirALaNube('prueba', t4.deps);
+  check('AC-1 nube ilegible y falta algo local: NO escribe', t4.escrituras.length, 0);
+
+  const t4b = arnesDeSubida({ mirar: async () => ({ estado: 'ilegible', ops: [], activos: 0 }) });
+  await subirALaNube('prueba', t4b.deps);
+  check('AC-1 nube ilegible pero lo local completo: SÍ escribe', t4b.escrituras.length, 1);
+
+  // Si la escritura LANZA, ni verde ni silencio.
+  const errReal = console.error;
+  const t5 = arnesDeSubida({ ref: { set: async () => { throw new Error('sin red'); } } });
+  let r5;
+  try { console.error = () => {}; r5 = await subirALaNube('prueba', t5.deps); }
+  finally { console.error = errReal; }
+  check('AC-3 una escritura que lanza no acaba en verde', r5.aviso, 'error');
+
+  const t6 = arnesDeSubida({ ref: null });
+  check('AC-3 sin sesión, offline', (await subirALaNube('prueba', t6.deps)).aviso, 'offline');
+}
+
+// LA MATRIZ del juez de subida (01-04). No las condiciones por separado: el
+// CRUCE de dos guardas es justo lo que no medía nada la última vez (§5.5).
+// Se recorre el producto cartesiano entero — 3 libros × 4 estados de nube × 2
+// de activos × 2 de paquete = 48 filas — y se exige la CLAVE del motivo, no
+// sólo el booleano: un `subir:false` por la razón equivocada pasaría igual.
+function pruebasPuertaDeSubida(check, base) {
+  // `estado`, `ops` y `activos` son TRES entradas independientes del juez, y
+  // `observarNube` puede producirlas descorrelacionadas de verdad (un documento
+  // con filas y sin libro, o al revés). Atarlas al nombre del estado regalaba
+  // una correlación que hacía indistinguible una guarda falsa —«mira sólo si el
+  // estado es con-datos»— de la guarda real. Medido con un mutante que
+  // sobrevivía a la puerta entera el 2026-08-30. Las tres filas mixtas son las
+  // que lo matan.
+  const nubes = {
+    'con-todo':      { estado: 'con-datos',     ops: [base], activos: 3 },
+    'con-libro':     { estado: 'con-datos',     ops: [base], activos: 0 },
+    'con-activos':   { estado: 'con-datos',     ops: [],     activos: 3 },
+    'con-datos-pero-nada': { estado: 'con-datos', ops: [],   activos: 0 },
+    'vacia':         { estado: 'vacia',         ops: [],     activos: 0 },
+    'ilegible':      { estado: 'ilegible',      ops: [],     activos: 0 },
+    'no-consultada': { estado: 'no-consultada', ops: [],     activos: 0 },
+  };
+  const libros = { 'vacio':    { ops: [],     ilegible: false },
+                   'con-ops':  { ops: [base], ilegible: false },
+                   'ilegible': { ops: [],     ilegible: true  } };
+  // El oráculo se escribe APARTE, como una lista de prioridades. Si fuera una
+  // llamada a `decidirSubida` mediría su propio reflejo.
+  const esperado = (l, n, activos, incompleto) => {
+    if (incompleto.length) return 'incompleto';
+    if (libros[l].ilegible) return 'libro-ilegible';
+    const hacenFaltaDatos = libros[l].ops.length === 0 || !activos;
+    const e = nubes[n].estado;
+    if (hacenFaltaDatos && (e === 'ilegible' || e === 'no-consultada')) return 'nube-ilegible';
+    if (libros[l].ops.length === 0 && nubes[n].ops.length > 0) return 'vaciaria';
+    if (!activos && nubes[n].activos > 0) return 'activos';
+    return 'ok';
+  };
+  let filas = 0;
+  Object.keys(libros).forEach(l => Object.keys(nubes).forEach(n =>
+    [true, false].forEach(activos => [[], ['balance-rows-9']].forEach(incompleto => {
+      const d = decidirSubida({ opsLocales: libros[l].ops, libroIlegible: libros[l].ilegible,
+                                nube: nubes[n], hayActivosLocales: activos,
+                                incompleto: incompleto });
+      const q = esperado(l, n, activos, incompleto);
+      const id = `${l}/${n}/activos=${activos}/inc=${incompleto.length}`;
+      check(`AC-1 matriz ${id}: motivo`, d.clave, q);
+      check(`AC-1 matriz ${id}: subir`, d.subir, q === 'ok');
+      filas++;
+    }))));
+  check('AC-1 la matriz recorre las 84 combinaciones', filas, 84);
+
+  // EL CRUCE que destapó la revisión adversaria, con fila y nombre propios:
+  // libro con operaciones, SIN activos, y la nube que no se pudo leer. Hasta
+  // hoy fallaba cerrado por accidente (la excepción abortaba el push).
+  const cruce = decidirSubida({ opsLocales: [base], libroIlegible: false,
+                                nube: nubes['ilegible'], hayActivosLocales: false,
+                                incompleto: [] });
+  check('AC-1 CRUCE ops sí · activos no · nube ilegible: NO sube', cruce.subir, false);
+  check('AC-1 CRUCE y por el motivo correcto, no por otro', cruce.clave, 'nube-ilegible');
+
+}
+
+// El indicador es un juez DISTINTO del de la subida: mapa CERRADO, y lo
+// desconocido es ROJO, jamás verde.
+function pruebasIndicador(check) {
+  check('AC-3 ok es ok', estadoSync('ok'), 'ok');
+  check('AC-3 pendiente es pendiente', estadoSync('pendiente'), 'pendiente');
+  check('AC-3 offline es offline', estadoSync('offline'), 'offline');
+  check('AC-3 un resultado desconocido da ROJO', estadoSync('vete a saber'), 'error');
+  check('AC-3 y undefined también da ROJO', estadoSync(undefined), 'error');
+}
+
+// EL ESLABÓN PRODUCTOR de D-34 (§5.9). Se siembra una clave corrupta en el
+// almacenamiento y se exige que el paquete salga NOMBRÁNDOLA. Sin esto, los
+// mutantes del juez y del censo pasan aunque la marca no se ponga NUNCA: al
+// juez se le alimenta un `incompleto` sintético y el censo no ve catches
+// porque no los hay. La inyección tiene que caer donde el error PROPAGA.
+function pruebasPaqueteIncompleto(check) {
+  portfolios    = [{ id: 'pA', name: 'sana' }, { id: 'pB', name: 'corrupta' }];
+  currentPortId = 'pA';
+  rows = []; nextId = 1;
+  localStorage.setItem(rowsKey('pA'), JSON.stringify({ rows: [], nextId: 1 }));
+  localStorage.setItem(histKey('pA'), JSON.stringify({}));
+  localStorage.setItem(rowsKey('pB'), '{esto no parsea');
+  localStorage.setItem(histKey('pB'), '{esto tampoco');
+  const r = buildSyncPayload();
+  check('AC-2 el paquete nombra la clave de FILAS que no pudo leer',
+        r.incompleto.indexOf(rowsKey('pB')) >= 0, true);
+  check('AC-2 el paquete nombra la clave de HISTÓRICO que no pudo leer',
+        r.incompleto.indexOf(histKey('pB')) >= 0, true);
+  check('AC-2 y no nombra la cartera que sí se leyó',
+        r.incompleto.indexOf(rowsKey('pA')) >= 0, false);
+  check('AC-2 la marca no viaja dentro de lo que se escribe en la nube',
+        typeof r.payload.incompleto, 'undefined');
+  // Y el juez lo rechaza, por ESE motivo.
+  const d = decidirSubida({ opsLocales: [{ id: 'x' }], libroIlegible: false,
+                            nube: { estado: 'con-datos', ops: [{ id: 'x' }], activos: 1 },
+                            hayActivosLocales: true, incompleto: r.incompleto });
+  check('AC-2 un paquete incompleto no se sube', d.subir, false);
+  check('AC-2 y el indicador no se pone verde', d.aviso, 'error');
+}
+
+// El manejador de inicio de sesión, EJECUTADO de verdad. Aquí vivía D-33.
+// Fuera del navegador no se registraba siquiera, así que hasta el 01-04 no
+// había oráculo posible: cualquier prueba habría sido una aserción por
+// subcadena sobre su fuente, que se satisface por accidente (§5.8).
+async function pruebasInicioDeSesion(check) {
+  const previo = { user: currentUser, unsub: unsubFirestore };
+  unsubFirestore = null;
+  const arnes = (leerNube, avisoDeSubida) => {
+    const t = { subidas: 0, escuchas: 0, pintados: 0 };
+    t.deps = { leerNube: leerNube,
+               subir: async () => { t.subidas++; return { aviso: avisoDeSubida }; },
+               escuchar: () => { t.escuchas++; },
+               pintar: () => { t.pintados++; } };
+    return t;
+  };
+  // Espía del indicador. Sin él, borrar el `setSyncUI(aviso)` del manejador
+  // sobrevivía: el valor de RETORNO seguía siendo el correcto y nadie miraba
+  // si además se pintaba. Cubrir el mecanismo no cubre su cableado (§5.6).
+  const pintadoReal = setSyncUI;
+  const pintado = [];
+  setSyncUI = (estado) => { pintado.push(estado); };
+  try {
+    const errReal = console.error;
+    const t1 = arnes(async () => { throw new Error('la nube no responde'); }, 'ok');
+    let a1;
+    try { console.error = () => {}; a1 = await alIniciarSesion({ uid: 'u1' }, t1.deps); }
+    finally { console.error = errReal; }
+    check('AC-3 una lectura de nube que LANZA no acaba en verde', a1, 'error');
+    check('AC-1 y no intenta escribir nada', t1.subidas, 0);
+
+    const t2 = arnes(async () => false, 'pendiente');
+    pintado.length = 0;
+    check('AC-3 sin datos arriba delega en la puerta única y adopta SU aviso',
+          await alIniciarSesion({ uid: 'u2' }, t2.deps), 'pendiente');
+    check('AC-1 y sube exactamente una vez, por la puerta', t2.subidas, 1);
+    check('AC-3 y además PINTA el indicador, no sólo lo devuelve',
+          pintado[pintado.length - 1], 'pendiente');
+    check('AC-1 y deja el escucha de la nube puesto', t2.escuchas, 1);
+    check('AC-1 y repinta la pantalla con lo que llegó', t2.pintados, 1);
+
+    const t3 = arnes(async () => true, 'ok');
+    check('AC-3 con datos arriba el resultado es verde',
+          await alIniciarSesion({ uid: 'u3' }, t3.deps), 'ok');
+    check('AC-1 y no sube nada encima', t3.subidas, 0);
+
+    // Cubrir el mecanismo no cubre su CABLEADO (§5.6): si el manejador dejara
+    // de pasar por `estadoSync`, un aviso desconocido llegaría crudo al
+    // indicador. Sólo esta fila lo distingue.
+    const t4 = arnes(async () => false, 'vete a saber');
+    check('AC-3 un aviso desconocido pasa por estadoSync y sale ROJO',
+          await alIniciarSesion({ uid: 'u4' }, t4.deps), 'error');
+
+  } finally {
+    setSyncUI = pintadoReal;
+    currentUser = previo.user; unsubFirestore = previo.unsub;
+  }
+}
+
+// Cerrar sesión es el OTRO camino del mismo manejador, y su rama —soltar el
+// escucha de la nube— no la recorría ninguna prueba: todas entraban con
+// `unsubFirestore` ya a null.
+async function pruebasCierreDeSesion(check) {
+  const previo = { user: currentUser, unsub: unsubFirestore };
+  const pintadoReal = setSyncUI;
+  const pintado = [];
+  let soltados = 0;
+  try {
+    setSyncUI = (estado) => { pintado.push(estado); };
+    unsubFirestore = () => { soltados++; };
+    const deps = { leerNube: async () => true, subir: async () => ({ aviso: 'ok' }),
+                   escuchar: () => {}, pintar: () => {} };
+    check('AC-3 sin usuario, offline', await alIniciarSesion(null, deps), 'offline');
+    check('AC-1 y al salir se suelta el escucha de la nube', soltados, 1);
+    check('AC-1 y no queda ninguno colgando', unsubFirestore, null);
+    check('AC-3 y el indicador se pinta como offline', pintado[pintado.length - 1], 'offline');
+  } finally {
+    setSyncUI = pintadoReal;
+    currentUser = previo.user; unsubFirestore = previo.unsub;
+  }
+}
+
+async function runSelfTests() {
   const fails = [];
   const check = (name, got, want) => {
     if (got !== want) fails.push(`${name}: esperaba ${want}, obtuve ${got}`);
@@ -5150,7 +5524,7 @@ function runSelfTests() {
 
   pruebasNumeros(check);
   pruebasGuardado(check);
-  pruebasSincronizacion(check);
+  await pruebasSincronizacion(check);
 
   if (fails.length) {
     console.error(`❌ ${fails.length} autopruebas fallidas:\n` + fails.join('\n'));
@@ -5160,7 +5534,13 @@ function runSelfTests() {
   return fails;
 }
 
-if (location.search.includes('selftest=1')) runSelfTests();
+// `runSelfTests` es asíncrona desde el 01-04. Sin este `.catch`, una suite que
+// LANZARA dejaría un rechazo silencioso en la consola del navegador y la
+// pantalla no diría nada: en node el arnés lo convierte en rc=2, aquí no había
+// nadie escuchando. El silencio nunca es «limpio».
+if (location.search.includes('selftest=1')) {
+  runSelfTests().catch(e => console.error('❌ Las autopruebas LANZARON y no llegaron a terminar:', e));
+}
 
 </script>
 </body>

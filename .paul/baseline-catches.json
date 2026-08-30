@@ -1,0 +1,35 @@
+{
+  "motivos": {
+    "<nivel superior>": "`loadCachedFx`, una IIFE de arranque: la tasa EUR/USD cacheada no parsea y se sigue con la de por defecto. El dato es de conveniencia y se reconstruye con una peticion de red. Fuera del camino de subida.",
+    "fetchEurUsd": "2 casos: el guardado de la tasa en la cache local, y el `catch` de la peticion de red (que lleva un comentario, pero el cuerpo sigue vacio y este censo lo cuenta igual). Sin red la app se queda con la tasa cacheada, que es el comportamiento querido del modo avion. Ninguno toca datos del usuario.",
+    "onFxUpdated": "Repintado tras cambiar la tasa de cambio. Si falla, el peor caso es una pantalla desactualizada hasta el siguiente render; no se pierde ningun dato.",
+    "syncAllPortfoliosFromOps": "Recalculo FIFO de una cartera cuyo blob de filas no parsea: se salta esa cartera y se siguen recalculando las demas. Deuda REAL y de la misma familia que D-34, pero arreglarla exige decidir que hacer con una cartera ilegible en el recalculo, y eso no es este ciclo. Queda NOMBRADA, que es distinto de amnistiarla."
+  },
+  "semantica": {
+    "ambito": "<script> inline de index.html, atribuido a la function/async function de primer nivel",
+    "camino_subida": [
+      "alIniciarSesion",
+      "applySyncPayload",
+      "buildSyncPayload",
+      "decidirSubida",
+      "estadoSync",
+      "observarNube",
+      "pullFromFirestore",
+      "schedulePush",
+      "subirALaNube"
+    ],
+    "metrica": "multiconjunto {funcion: cuantos catch vacios}, sin numero de linea",
+    "variantes": [
+      "catch (x) {}",
+      "catch {}"
+    ],
+    "version": 1
+  },
+  "tolerados": {
+    "<nivel superior>": 1,
+    "fetchEurUsd": 2,
+    "onFxUpdated": 1,
+    "syncAllPortfoliosFromOps": 1
+  },
+  "total": 5
+}

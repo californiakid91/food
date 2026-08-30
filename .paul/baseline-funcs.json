@@ -15,6 +15,9 @@
     "exportTaxExcel": [
       449
     ],
+    "onScreenshotPicked": [
+      67
+    ],
     "parseRevolutStatement": [
       96
     ],
@@ -37,11 +40,11 @@
       132
     ]
   },
-  "funciones_vistas": 168,
+  "funciones_vistas": 186,
   "semantica": {
-    "ambito": "funciones `function NOMBRE(` de primer nivel del <script> inline de index.html",
+    "ambito": "funciones `function NOMBRE(` y `async function NOMBRE(` de primer nivel del <script> inline de index.html",
     "metrica": "lineas crudas del cuerpo, comentarios y blancos incluidos",
     "umbral_lineas": 60,
-    "version": 1
+    "version": 2
   }
 }

@@ -59,33 +59,45 @@ if (__perdidas.length) {
   process.exit(1);
 }
 """
+    # runSelfTests es ASINCRONA desde el 01-04: el manejador de inicio de sesion
+    # lo es, y partir el veredicto en dos sitios seria justo la puerta por donde
+    # entra un falso verde. Se espera de verdad; una promesa que se rechaza o
+    # que no resuelve una lista da rc=2, no "0 hallazgos".
     runner = harness + siembra + "\n" + js + """
 if (typeof runSelfTests !== 'function') {
   console.error('INSTRUMENTO ROTO: runSelfTests no quedo definida tras cargar el script');
   process.exit(2);
 }
-let fails;
-try { fails = runSelfTests(); }
-catch (e) {
-  console.error('INSTRUMENTO ROTO: runSelfTests lanzo: ' + (e && e.stack || e));
-  process.exit(2);
-}
-if (!Array.isArray(fails)) {
-  console.error('INSTRUMENTO ROTO: runSelfTests no devolvio la lista de fallos');
-  process.exit(2);
-}
-if (fails.length) process.exit(1);
+(async () => {
+  let fails;
+  try { fails = await runSelfTests(); }
+  catch (e) {
+    console.error('INSTRUMENTO ROTO: runSelfTests lanzo: ' + (e && e.stack || e));
+    process.exit(2);
+  }
+  if (!Array.isArray(fails)) {
+    console.error('INSTRUMENTO ROTO: runSelfTests no devolvio la lista de fallos');
+    process.exit(2);
+  }
+  if (fails.length) process.exit(1);
 """ + comprobacion + """
-process.exit(0);
+  process.exit(0);
+})();
 """
     with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-8') as f:
         f.write(runner)
         tmp = f.name
     try:
         # check=False a proposito: el rc del hijo ES el veredicto.
-        r = subprocess.run(['node', tmp], capture_output=True, text=True, check=False)
+        # Con timeout: una promesa que nunca resuelve dejaba el arnes COLGADO
+        # para siempre, sin salida y sin rc. Colgarse no es un veredicto; hay
+        # que fallar CERRADO con nombre.
+        r = subprocess.run(['node', tmp], capture_output=True, text=True,
+                           check=False, timeout=120)
     except FileNotFoundError:
         broken("node no esta instalado")
+    except subprocess.TimeoutExpired:
+        broken("runSelfTests no termino en 120s: alguna promesa no resuelve")
     finally:
         pathlib.Path(tmp).unlink(missing_ok=True)
     sys.stdout.write(r.stdout)

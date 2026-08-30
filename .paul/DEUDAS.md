@@ -6,10 +6,11 @@
 >
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
-Última medición contra el código: **2026-08-30**, revisión `85d56bb` (SEGUNDA transición de la
-Fase 1: cuatro brazos adversarios disjuntos —radio de impacto, objetivos contra código, seguridad
-y documentos contra evidencia— sobre el diff completo `69f728e..HEAD`). Acta:
-`.paul/phases/01-guardado-fiable/01-TRANSICION-2.md`.
+Última medición contra el código: **2026-08-30**, ciclo **01-04** (cuatro brazos adversarios
+disjuntos —correctness, falsos verdes, calidad del oráculo y cableado— sobre el diff del ciclo).
+Cerró D-33, D-34 y D-31; abrió D-35, D-36 y D-37, y añadió `onScreenshotPicked` a D-09. Acta del
+ciclo: `.paul/phases/01-guardado-fiable/01-04-SUMMARY.md`. La medición anterior (SEGUNDA
+transición de la Fase 1) está en `.paul/phases/01-guardado-fiable/01-TRANSICION-2.md`.
 D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditoría inicial.
 
 > ### ⚠️ Los números de línea de este libro son de la revisión en que se MIDIÓ, no de HEAD.
@@ -24,46 +25,47 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 
 ## Abiertas — riesgo de pérdida de datos
 
-### D-33 · Una tercera escritura a la nube esquiva la guarda de no-vaciado
-- **Qué es:** hay tres escrituras al documento de Firestore. Dos viven en `schedulePush` y pasan
-  por el juez `vaciariaElLibro`. La tercera está en el manejador de inicio de sesión
-  (`onAuthStateChanged`) y **no pasa por ninguna guarda**. Se recorre cuando `pullFromFirestore`
-  devuelve `false`, que ocurre tanto si la nube está vacía como **si la lectura FALLA**: su `catch`
-  hace `console.error` y devuelve `false`, así que un fallo de red es indistinguible de «no hay
-  nada arriba». Acto seguido comprueba `hasRealLocalData()`, que mira **las filas de activos, no
-  las operaciones**, y sube `buildSyncPayload()`, cuyo `opsAll` es `ops` — vacío si el libro está
-  vacío o si el cerrojo de D-23 está puesto. Resultado: un libro vacío encima de una nube con el
-  libro completo, encolado offline por Firestore y aplicado al reconectar. Y el `catch` exterior
-  termina en `setSyncUI('ok')`: **el indicador se queda verde** (ver D-31).
-- **Cómo se midió:** brazo adversario de objetivos de la segunda transición de la Fase 1
-  (2026-08-30), confirmado a mano después: `grep -n "\.set(" index.html` devuelve exactamente tres
-  escrituras a la nube y sólo dos están dentro de la guarda. **No reproducido en vivo:** está
-  trazado eslabón a eslabón leyendo el código, no ejecutado contra un Firestore real.
-  **No es una regresión:** `git show 69f728e:index.html` muestra ese bloque idéntico antes de la
-  fase. Lo que falla es la COBERTURA de la guarda que la fase puso.
-- **Estado:** **OBJETIVO DEL CICLO 01-04**, no deuda diferida. Contradice directamente la meta de
-  la Fase 1 («ningún fallo de guardado ni de arranque puede borrar el libro en silencio») y por eso
-  la fase no se cerró. Es la misma forma del defecto que abrió el 01-03: el mecanismo existe y hay
-  un camino que no lo atraviesa. **Presencia ≠ precedencia** (`CLAUDE.md` §5.11).
-- **Qué la reabre:** se cierra cuando las tres escrituras pasen por el mismo juez **y** exista un
-  control que se ponga rojo si aparece una CUARTA. Enumerar las tres a mano repetiría el defecto:
-  una lista blanca sólo protege de lo que ya conoce (§5.15). Si el arreglo enumera en vez de
-  derivar, esta ficha sigue abierta.
+### D-35 · Un paquete incompleto bloquea TODAS las subidas y no hay salida en pantalla
+- **Qué es:** desde el ciclo 01-04, si una sola clave del almacenamiento no se puede leer o
+  parsear, `buildSyncPayload` marca el paquete como incompleto y **la subida se rechaza entera**,
+  incluido el libro de operaciones. Mientras dure el fallo el dispositivo queda sin copia en la
+  nube, y **no hay ninguna salida en la interfaz**: el operador ve el punto en rojo con «No se
+  pudo sincronizar» y nada más. Es el gemelo exacto de **D-23**: mejor para el dato y peor para el
+  operador. La primera versión del PLAN 01-04 afirmaba que el arreglo «no introduce un modo de
+  fallo nuevo peor»; era falso, y lo destapó la revisión adversaria del plan.
+- **Cómo se midió:** razonado sobre el código y ejercido en las autopruebas
+  (`pruebasTuberiaDeSubida`: con el paquete incompleto no se escribe). **No reproducido con un
+  almacenamiento corrupto real en el navegador.**
+- **Estado:** ABIERTA y aceptada a sabiendas. Rechazar es lo correcto para el dato: `ref.set`
+  reemplaza el documento entero, así que subir un paquete a medias borra de la nube lo que falte.
+- **Qué la reabre:** nada la cierra sola. Se cierra cuando la pantalla diga QUÉ clave falló y
+  ofrezca una salida sin abrir la consola. Es Fase 5 (interfaz) y arrastra a D-18 y a D-23: las
+  tres son el mismo agujero —un bloqueo correcto que el operador no puede ni ver ni resolver—.
 
-### D-34 · Dos `catch` vacíos dentro de la función que construye lo que se sube a la nube
-- **Qué es:** `buildSyncPayload` lee los activos y el histórico de cada cartera con `try { … }
-  catch {}`. Si el `getItem` o el `JSON.parse` de una cartera falla, esa cartera **se omite del
-  paquete en silencio** y se sube un documento incompleto encima del bueno. Misma clase de daño que
-  D-33, sobre los activos en vez de sobre el libro.
-- **Cómo se midió:** auditoría de documentos de la segunda transición (2026-08-30). Destapó de paso
-  que el censo de `catch` vacíos del acta anterior era **falso: dijo 4 y son 6**. El patrón usado
-  sólo casaba `catch (e) {}` y no la variante `catch {}` sin parámetro. Es la trampa de los dos
-  predicados asimétricos sobre el mismo conjunto (`CLAUDE.md` §5.16). Censo correcto:
-  `grep -nE "catch *(\([a-zA-Z_$]*\))? *\{ *\}" index.html` → **6**.
-- **Estado:** **OBJETIVO DEL CICLO 01-04**, junto con D-33: son la misma clase.
-- **Qué la reabre:** que vuelva a aparecer un `catch` vacío en cualquier camino que alimente la
-  subida. El censo de `catch` vacíos debería ser un control del banco, no un grep de un acta.
+### D-36 · El veredicto de las autopruebas puede imprimirse antes que sus fallos
+- **Qué es:** `runSelfTests` es asíncrona desde el 01-04. Si una suite quedara sin `await`, sus
+  checks llegarían por microtarea **después** del mensaje de veredicto pero antes del código de
+  salida: la consola imprimiría «✅ Autopruebas OK» y el proceso saldría con rc=1 **sin listar ni
+  un fallo**, mandando a mirar a ciegas.
+- **Cómo se midió:** brazo adversario de falsos verdes del ciclo 01-04 (2026-08-30), ejecutado en
+  una copia del repo, 3 corridas de 3.
+- **Estado:** ABIERTA, pero acotada. El `await` que falta lo caza ahora un control propio (una
+  suite que no ejerce ni un solo check es una suite que no corrió) y su sabotaje. Lo que queda sin
+  cerrar es la carrera del MENSAJE, no la del veredicto: el rc siempre es correcto.
+- **Qué la reabre:** se cierra cuando el veredicto se calcule y se imprima después de haber
+  drenado todas las promesas, o cuando `check` deje de poder ejecutarse tras el resumen.
 
+### D-37 · Cambiar de cuenta de Google en el mismo navegador sube el libro de la cuenta anterior
+- **Qué es:** los datos locales no están separados por usuario. Si se cierra sesión con la cuenta
+  A y se entra con la B en el mismo navegador, el libro de A sigue en el almacenamiento local y el
+  juez de subida lo aprueba —ninguno de los dos lados está vacío— y lo escribe en el documento
+  de B.
+- **Cómo se midió:** brazo adversario de correctness del ciclo 01-04 (2026-08-30), leyendo el
+  código. **No reproducido.**
+- **Estado:** ABIERTA, prioridad baja: la app es personal y de un solo usuario. Se ficha porque no
+  estaba dicho en ningún sitio, y porque el juez de subida no puede protegerla — el problema es
+  que las claves de almacenamiento no llevan el identificador de la cuenta.
+- **Qué la reabre:** que se use la app con más de una cuenta, o que se comparta el dispositivo.
 
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
 - **Qué es:** `applySyncPayload` sustituye `ops` entero por lo que venga de la nube, con
@@ -253,7 +255,12 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   **Salida manual mientras tanto:** en las herramientas del navegador, comprobar primero que
   existe una clave `balance-ops-rescate-*` con el contenido original y **sólo entonces** borrar la
   clave `balance-ops`; al recargar, `loadOpsAll` leerá «no hay nada» en vez de «ilegible» y bajará
-  el cerrojo. Ligada a **D-18** (el aviso en rojo no se pinta en ninguna prueba) y a **D-15**.
+  el cerrojo. Ligada a **D-18** (el aviso en rojo no se pinta en ninguna prueba), a **D-15** y,
+  desde el 01-04, a **D-35**: son la misma familia —un bloqueo correcto para el dato que el
+  operador no puede ni ver ni resolver—. **Revisada en el 01-04 y NO cambia de forma:** el cerrojo
+  pasó a ser entrada explícita del juez de subida (`libroIlegible`), lo que hace el bloqueo más
+  visible en el código y le añade un aviso naranja en pantalla, pero **no le da salida**. Sigue
+  igual de abierta y por el mismo motivo.
 - **Qué la reabre:** nada la cierra sola. Se cierra cuando exista un aviso en pantalla que diga al
   operador que el libro está bloqueado y le ofrezca la salida sin abrir la consola. Si alguien
   quita el `if (opsIlegible)` de `saveOpsAll` para «desatascarlo», el sabotaje «saveOpsAll deja de
@@ -336,17 +343,6 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   que es lo que se lee al arrancar.
 - **Qué la reabre:** nada; va con la Fase 3.
 
-### D-31 · El indicador de sincronía se pinta VERDE después de un error
-- **Qué es:** el `catch` que envuelve el manejador de inicio de sesión hace `console.error` y
-  después `setSyncUI('ok')`. Sea cual sea el fallo —lectura, escritura, aplicación del documento—
-  el operador ve el puntito verde. Es la fábrica de silencio que hace invisible a **D-33**: el caso
-  destructivo ocurre y la pantalla dice que todo va bien.
-- **Cómo se midió:** brazo de objetivos de la segunda transición (2026-08-30).
-- **Estado:** abierta. Es la mitad «aviso» del mismo defecto que D-33, y **cubrir el mecanismo no
-  cubre su aviso** (`CLAUDE.md` §5.6): el arreglo de D-33 debe traer su propio control para éste, o
-  quedará un camino que repara el dato y sigue mintiendo en pantalla.
-- **Qué la reabre:** se cierra con D-33, y sólo si el aviso tiene control propio.
-
 ---
 
 ## Abiertas — corrección fiscal
@@ -395,7 +391,7 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 
 ## Abiertas — tamaño del código
 
-### D-09 · Doce funciones por encima del presupuesto de 60 líneas
+### D-09 · Trece funciones por encima del presupuesto de 60 líneas
 - **Qué es:** deuda de tamaño declarada y congelada. Sólo pueden encoger; ninguna función nueva
   puede unirse a la lista.
 - **Cómo se midió:** `tools/funcsize.py`, re-medido el 2026-08-29 tras el plan 01-01. La cifra de
@@ -417,10 +413,18 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   | `refreshRowDerived` | 80 | recálculo incremental de una fila |
   | `drawPie` | 75 | gráfico de tarta en canvas |
   | `drawGlobalSpark` | 66 | sparkline global |
+  | `onScreenshotPicked` | 67 | OCR de capturas de pantalla; se toca en la Fase 5 |
 
 - **Estado:** congelada. El trinquete impide que empeore.
+- **Añadida el 2026-08-30 (ciclo 01-04): `onScreenshotPicked`, 67 líneas.** No es código nuevo:
+  ya excedía, pero el trinquete **no la veía** porque es una `async function` y su ámbito sólo
+  cubría `function NOMBRE(`. El ciclo 01-04 amplió el ámbito (semántica versión 1 → 2, es un
+  APRIETE de la vara) y apareció. Lo destapó el banco de sabotaje, no el razonamiento: al volver
+  `runSelfTests` asíncrona, el mutante «el monolito engorda» dejó de morder porque la función
+  había salido de la medida. **Sellarla sin nombrarla aquí habría sido aflojar en silencio**, y lo
+  cazó el brazo adversario de cableado del propio ciclo.
 - **Qué la reabre:** tocar cualquiera de esas funciones en su fase correspondiente — es la
-  ocasión de bajarla del listado.
+  ocasión de bajarla del listado. Y si aparece una decimocuarta, el trinquete se pone rojo.
 
 ### D-26 · `funciones_vistas` es una cifra sellada que nadie vuelve a derivar
 - **Qué es:** `tools/funcsize.py` **escribe** `funciones_vistas` en la foto al hacer `--update` y
@@ -504,7 +508,62 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 
 ---
 
-## Cerradas
+## Cerradas en el ciclo 01-04 (2026-08-30)
+
+### D-33 · Una tercera escritura a la nube esquivaba la guarda de no-vaciado — CERRADA 2026-08-30
+- **Qué era:** tres escrituras al documento de Firestore y sólo dos pasaban por el juez. La
+  tercera vivía en el manejador de inicio de sesión y se recorría también cuando la lectura de la
+  nube **fallaba**, porque su `catch` devolvía `false`, indistinguible de «arriba no hay nada».
+- **Cómo se cerró (ciclo 01-04):** se cerró la CLASE, no los tres casos. Ahora existe **una sola
+  función con una escritura a la nube** (`subirALaNube`), quien decide es la función pura
+  `decidirSubida`, y la nube es un **tri-estado explícito** (`con-datos` / `vacia` / `ilegible`)
+  más un cuarto caso (`no-consultada`): la distinción que se perdía al colapsarla en un booleano
+  es exactamente la que causaba el daño. El juez **falla CERRADO de forma simétrica**: si para
+  decidir hace falta mirar la nube y no se pudo mirar, no se sube — para las operaciones **y**
+  para los activos.
+- **Qué lo demuestra mañana:** `tools/cloudwrites.py`, cableado como paso de `tools/verify.sh` en
+  el mismo commit, con **dos redes disjuntas** (por el receptor y por el método) que se ponen
+  rojas si aparece una CUARTA escritura. No es una lista blanca: los enlaces a Firestore se
+  DERIVAN del código, y el instrumento da rc=2 si no consigue derivar ninguno. Más los sabotajes
+  «aparece una cuarta escritura a la nube fuera de la puerta» y «el manejador de inicio de sesión
+  vuelve a escribir por su cuenta» (control positivo literal de esta ficha), y las 84 filas de la
+  matriz de `decidirSubida`.
+
+### D-34 · Dos `catch` vacíos en la función que construye lo que se sube — CERRADA 2026-08-30
+- **Qué era:** `buildSyncPayload` se tragaba con `catch {}` el fallo de leer una cartera, la
+  omitía del paquete, y como `ref.set` **reemplaza el documento entero**, la borraba de la nube.
+- **Cómo se cerró (ciclo 01-04):** `buildSyncPayload` devuelve `{ payload, incompleto }` y NOMBRA
+  las claves que no pudo leer; la subida se rechaza con ese motivo y el indicador no se pone
+  verde. Decisión declarada: un fallo en el histórico bloquea igual que uno en los activos, porque
+  el histórico **no es reconstruible** y omitirlo lo borraría de la nube.
+- **Qué lo demuestra mañana:** `tools/emptycatch.py`, cableado a la puerta, con foto sellada que
+  **nombra uno a uno** los `catch` vacíos tolerados y **cero tolerados en el camino de subida**.
+  Cuenta las DOS variantes (`catch (e) {}` y `catch {}`): contar sólo una ERA el defecto. Más tres
+  sabotajes: el del censo, el del **eslabón productor** (una clave corrupta sembrada en el
+  almacenamiento, que exige que el paquete la nombre) y el del **cable** entre productor y juez.
+- **Corrección de una cifra publicada:** el censo del acta anterior decía 6 `catch` vacíos. Con el
+  instrumento —que además ignora los que sólo aparecen en comentarios— la cifra real es **5**, y
+  vive en `.paul/baseline-catches.json`, no copiada aquí.
+
+### D-31 · El indicador de sincronía se pintaba VERDE después de un error — CERRADA 2026-08-30
+- **Qué era:** el `catch` del manejador de inicio de sesión hacía `console.error` y después ponía
+  el punto en verde. Era la fábrica de silencio que hacía invisible a D-33.
+- **Cómo se cerró (ciclo 01-04): por la CLASE, no por el caso.** La ficha nombraba un `catch`,
+  pero había **dos miembros más vivos**: el callback de error del `onSnapshot` era `() => {}` —el
+  escucha moría y el punto seguía verde— y el arranque pintaba verde incondicionalmente,
+  borrando un naranja o un rojo legítimos. Hoy hay **cero llamadas literales** que pinten verde:
+  el verde sólo se alcanza por `estadoSync(resultado)`, un mapa CERRADO donde lo desconocido da
+  ROJO. Se añadió el estado `error` al indicador, con mensaje propio: reutilizar el de
+  autenticación habría mentido sobre la causa.
+- **Qué lo demuestra mañana:** la comprobación del aviso en `tools/cloudwrites.py` (cero verdes
+  escritos a mano), y tres sabotajes: «un resultado desconocido vuelve a pintar verde», «el fallo
+  del inicio de sesión vuelve a declararse verde» y «el manejador deja de pintar el indicador»
+  —este último porque el valor de retorno seguía siendo correcto y nadie miraba si además se
+  pintaba: cubrir el mecanismo no cubre su cableado.
+
+---
+
+## Cerradas ANTES de este ciclo
 
 ### D-00 · Un número tecleado con coma se multiplicaba por mil — CERRADA 2026-08-29
 - **Qué era:** `parseNum` aplicaba una heurística de miles y leía `0,123` como `123`. Afectaba a

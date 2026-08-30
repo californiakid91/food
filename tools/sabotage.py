@@ -29,12 +29,15 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 INDEX = ROOT / 'index.html'
 FUNCSIZE = ROOT / 'tools' / 'funcsize.py'
 BASELINE = ROOT / '.paul' / 'baseline-funcs.json'
+CLOUDWRITES = ROOT / 'tools' / 'cloudwrites.py'
+EMPTYCATCH = ROOT / 'tools' / 'emptycatch.py'
+CATCHES = ROOT / '.paul' / 'baseline-catches.json'
 
 
 def hash_arbol():
     """Huella de los ficheros que el banco puede tocar."""
     h = hashlib.sha256()
-    for p in sorted([INDEX, FUNCSIZE, BASELINE]):
+    for p in sorted([INDEX, FUNCSIZE, BASELINE, CLOUDWRITES, EMPTYCATCH, CATCHES]):
         h.update(p.read_bytes() if p.is_file() else b'<ausente>')
     return h.hexdigest()
 
@@ -139,9 +142,9 @@ CASOS = [
          "    if (false) {",
          1, "AC-4"),
     Caso("se quita la guarda de no-vaciado al subir", INDEX,
-         "        if (vaciariaElLibro(payload.opsAll, cloudOps)) {",
-         "        if (false) {",
-         1, "AC-4"),
+         "  if (vaciariaElLibro(estado.opsLocales, nube.ops)) {",
+         "  if (false) {",
+         1, "esperaba vaciaria"),
     # El fallo mas caro encontrado en la revision del 01-02: las autopruebas
     # sembraban centinelas SOBRE las claves reales, la foto de seguridad
     # retrataba a los centinelas y al final se borraban esas claves. Abrir
@@ -217,6 +220,96 @@ CASOS = [
          "  return escribirOpsAll(list);",
          "  return escribirOpsAll(list);",
          1, "AC-3 no se escribe encima del ilegible"),
+    # ── Controles positivos del plan 01-04 (la puerta unica de la nube). ────
+    # 1. Una CUARTA escritura fuera de la puerta. Es la clase que cierra D-33:
+    #    no hay lista de sitios permitidos, hay una puerta y todo lo demas es rojo.
+    Caso("aparece una cuarta escritura a la nube fuera de la puerta", INDEX,
+         "    const doc = await ref.get();\n    if (!doc.exists) return false;",
+         "    const doc = await ref.get();\n    await ref.set({ colado: 1 });\n    if (!doc.exists) return false;",
+         1, "ESCRITURA A LA NUBE FUERA DE LA PUERTA"),
+    # 2. CONTROL POSITIVO DE D-33: el manejador de inicio de sesion vuelve a
+    #    escribir por su cuenta, como hacia antes de este ciclo. Si esto no se
+    #    pusiera rojo, el arreglo no estaria medido por nada.
+    Caso("el manejador de inicio de sesion vuelve a escribir por su cuenta", INDEX,
+         "    resultado = sincronizado ? 'ok' : (await d.subir('inicio de sesión')).aviso;",
+         "    const refColada = userDocRef();\n"
+         "    if (refColada) await refColada.set(buildSyncPayload().payload);\n"
+         "    resultado = 'ok';",
+         1, "ESCRITURA A LA NUBE FUERA DE LA PUERTA"),
+    # 4. El juez deja de mirar si el paquete esta incompleto (D-34, lado juez).
+    Caso("el juez deja de mirar si el paquete esta incompleto", INDEX,
+         "  if (incompleto.length) {",
+         "  if (false) {",
+         1, "esperaba incompleto"),
+    # 5. `buildSyncPayload` recupera un catch vacio (D-34, lado censo).
+    Caso("buildSyncPayload recupera un catch vacio", INDEX,
+         "      if (raw) portfolioData[p.id] = JSON.parse(raw);\n    } catch (e) { incompleto.push(clave); }",
+         "      if (raw) portfolioData[p.id] = JSON.parse(raw);\n    } catch (e) {}",
+         1, "CATCH VACIO EN EL CAMINO DE SUBIDA"),
+    # 6. El mapa del indicador deja de ser cerrado y lo desconocido sale verde.
+    Caso("un resultado desconocido vuelve a pintar verde", INDEX,
+         "  if (resultado === 'auth')      return 'auth';\n  return 'error';",
+         "  if (resultado === 'auth')      return 'auth';\n  return 'ok';",
+         1, "AC-3 un resultado desconocido da ROJO"),
+    # 7. El `catch` del manejador vuelve a declararse verde, que es como D-31
+    #    tapaba a D-33 mientras ocurria. Sin la extraccion de la tarea 1(d) no
+    #    habia oraculo posible y declararlo mordiente habria sido 5.1 con
+    #    uniforme de test.
+    Caso("el fallo del inicio de sesion vuelve a declararse verde", INDEX,
+         "    console.error('alIniciarSesion:', e);\n    resultado = 'error';",
+         "    console.error('alIniciarSesion:', e);\n    resultado = 'ok';",
+         1, "AC-3 una lectura de nube que LANZA no acaba en verde"),
+    # 8. EL ESLABON PRODUCTOR de D-34. El catch NO queda vacio (asi el censo no
+    #    lo ve): simplemente deja de NOMBRAR la clave. Sin esta fila, los casos
+    #    4 y 5 pasan aunque la marca no se ponga nunca.
+    Caso("el productor deja de nombrar la clave que no pudo leer", INDEX,
+         "      if (raw) historyData[p.id] = JSON.parse(raw);\n    } catch (e) { incompleto.push(clave); }",
+         "      if (raw) historyData[p.id] = JSON.parse(raw);\n    } catch (e) { void clave; }",
+         1, "AC-2 el paquete nombra la clave de HIST"),
+    # 9. El manejador deja de pasar por `estadoSync`. Cubrir el mecanismo no
+    #    cubre su CABLEADO: sin esta fila, el caso 6 mide la funcion pura y
+    #    nadie mide que alguien la llame.
+    Caso("el manejador deja de pasar por estadoSync", INDEX,
+         "  const aviso = estadoSync(resultado);",
+         "  const aviso = resultado;",
+         1, "AC-3 un aviso desconocido pasa por estadoSync"),
+    # ── Hallazgos de la revision adversaria del propio ciclo 01-04. Cada uno
+    #    es un mutante que SOBREVIVIO a la puerta entera. Un sabotaje manual de
+    #    ayer es una anecdota fechada; esto es lo que lo demuestra manana.
+    # 10. La guarda de activos sustituida por un PROXY sobre el nombre del
+    #     estado de la nube. Sobrevivia porque el fixture ataba `activos` al
+    #     nombre: ahora hay filas mixtas que lo matan.
+    Caso("la guarda de activos se sustituye por un proxy del estado de la nube", INDEX,
+         "  if (!estado.hayActivosLocales && (nube.activos || 0) > 0) {",
+         "  if (!estado.hayActivosLocales && nube.estado === 'con-datos') {",
+         1, "esperaba ok, obtuve activos"),
+    # 11-13. LA TUBERIA entre el productor y el juez. El productor tenia su
+    #     control y el juez el suyo, y cortar el cable de en medio sobrevivia.
+    Caso("se corta el cable que lleva la marca de paquete incompleto", INDEX,
+         "    incompleto: construido.incompleto\n  });",
+         "    incompleto: []\n  });",
+         1, "AC-2 con el paquete incompleto NO escribe"),
+    Caso("se corta el cable que lleva el cerrojo del libro", INDEX,
+         "    libroIlegible: d.cerrojo(),",
+         "    libroIlegible: false,",
+         1, "AC-1 con el cerrojo puesto NO escribe"),
+    Caso("se corta el cable que lleva si hay activos locales", INDEX,
+         "    hayActivosLocales: d.activos(),",
+         "    hayActivosLocales: true,",
+         1, "AC-1 sin activos locales y con la nube llena NO escribe"),
+    # 14. El manejador deja de PINTAR el indicador. El valor de retorno seguia
+    #     siendo correcto, asi que sin el espia esto sobrevivia (5.6).
+    Caso("el manejador deja de pintar el indicador", INDEX,
+         "  const aviso = estadoSync(resultado);\n  setSyncUI(aviso);",
+         "  const aviso = estadoSync(resultado);",
+         1, "AC-3 y además PINTA el indicador"),
+    # 15. EL CABLEADO ASINCRONO. Sin el `await`, la suite del manejador deja de
+    #     ejercer y la puerta sale VERDE Y SORDA. Medido: con el await quitado,
+    #     el sabotaje 9 dejaba de morder. Cubrir el mecanismo no cubre su cable.
+    Caso("se pierde el await que cablea las suites asincronas", INDEX,
+         "    const antes = ejercidos;\n    await fn();",
+         "    const antes = ejercidos;\n    fn();",
+         1, "no ejerci\u00f3 ni un control"),
     Caso("deriva: se afloja la vara de medir", FUNCSIZE,
          "'umbral_lineas': 60,", "'umbral_lineas': 500,",
          3, "DERIVA"),
@@ -294,7 +387,16 @@ def main():
         print("  NO MUERDE: --check ha ESCRITO en la foto sellada")
         fallos.append("--check escribe")
     else:
-        print("  OK    --check no escribe en la foto sellada")
+        print("  OK    --check no escribe en la foto sellada (funcsize)")
+
+    antes = hashlib.sha256(CATCHES.read_bytes()).hexdigest()
+    subprocess.run([sys.executable, str(EMPTYCATCH), '--check'],
+                   capture_output=True, text=True, check=False, cwd=ROOT)
+    if hashlib.sha256(CATCHES.read_bytes()).hexdigest() != antes:
+        print("  NO MUERDE: emptycatch --check ha ESCRITO en su foto sellada")
+        fallos.append("emptycatch --check escribe")
+    else:
+        print("  OK    --check no escribe en la foto sellada (emptycatch)")
 
     # Aflojar tiene que costar decirlo en voz alta.
     original = INDEX.read_text(encoding='utf-8')

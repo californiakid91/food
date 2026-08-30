@@ -13,7 +13,11 @@
 #
 # Uso:
 #   tools/verify.sh            comprueba todo
-#   VERIFY_DEGRADED=1 ...      salta lo que necesite red (hay que teclearlo)
+#
+# NO hay interruptor de degradado. Aqui se anunciaba un VERIFY_DEGRADED=1 que
+# NINGUNA rama de este script leia: un comentario que promete un mecanismo sin
+# cablearlo no cablea nada (CLAUDE.md 5.1). Se borra en vez de implementarlo.
+# El unico interruptor real es VERIFY_INNER=1, y AVISA cuando actua.
 
 set -uo pipefail
 cd "$(dirname "$0")/.." || { echo "rc=2 INSTRUMENTO ROTO: no puedo situarme en el repo" >&2; exit 2; }
@@ -56,22 +60,37 @@ paso "autopruebas (runSelfTests)" python3 tools/run_selftests.py
 # 4. El monolito no engorda.
 paso "trinquete de tamano de funciones" python3 tools/funcsize.py --check
 
-# 5. El banco de sabotaje: demuestra que lo de arriba MUERDE.
+# 5. La puerta unica de escritura a la nube, y su aviso. Dos redes disjuntas.
+#    Va FUERA de cualquier interruptor de degradado: las comprobaciones nuevas
+#    no se saltan nunca.
+paso "puerta unica de escritura a la nube" python3 tools/cloudwrites.py
+
+# 6. Censo de catch vacios contra la foto sellada.
+paso "censo de catch vacios" python3 tools/emptycatch.py --check
+
+# 7. El banco de sabotaje: demuestra que lo de arriba MUERDE.
 #    Se salta cuando la puerta corre DENTRO del propio banco (VERIFY_INNER=1),
 #    que es la unica forma de que no se llame a si misma en bucle.
 #    Si algo de lo anterior ya esta rojo, el banco no puede medir nada (su
 #    control de vacuidad lo detectaria y gritaria "instrumento roto"), y ese
 #    aviso TAPARIA el hallazgo real mandando a mirar las herramientas en vez
 #    del codigo. Asi que se omite, ruidosamente, sin contar como verde.
+banco_omitido=""
 if [ "${VERIFY_INNER:-0}" = "1" ]; then
-  :
+  # El salto era MUDO y el resumen seguia diciendo "todo ejercido y en verde".
+  # Si esta variable quedara exportada en un entorno, la puerta dejaria de
+  # probar que los controles muerden sin decir ni una palabra. El silencio
+  # nunca es limpio.
+  echo "  OMITIDO banco de sabotaje: VERIFY_INNER=1 (la puerta corre DENTRO del banco)"
+  banco_omitido="si"
 elif [ "$rc_final" -ne 0 ]; then
+  banco_omitido="si"
   echo "  OMITIDO banco de sabotaje: la puerta ya esta roja, arregla primero lo de arriba"
 else
   paso "banco de sabotaje (los controles muerden)" python3 tools/sabotage.py
 fi
 
-# 6. Higiene de las herramientas de medida. Un instrumento sucio no mide.
+# 8. Higiene de las herramientas de medida. Un instrumento sucio no mide.
 if command -v ruff >/dev/null 2>&1; then
   paso "lint de tools/" ruff check tools/
 else
@@ -98,6 +117,10 @@ fi
 if [ ${#fallos[@]} -gt 0 ]; then
   echo "HALLAZGOS (rc=1): ${fallos[*]}"
   exit 1
+fi
+if [ -n "$banco_omitido" ]; then
+  echo "VERDE, PERO EL BANCO NO CORRIO: nada demuestra hoy que estos controles muerdan."
+  exit 0
 fi
 echo "VERDE — todo ejercido y en verde."
 exit 0
