@@ -144,6 +144,70 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué la reabre:** que se toque `migrateOpsToGlobal` o el formato antiguo `opsData`; y se cierra
   con una autoprueba que siembre una cartera antigua con blob ilegible.
 
+### D-25 · Una reparación desde la nube descarta en silencio lo tecleado con el cerrojo puesto
+- **Qué es:** con el cerrojo puesto, `saveOpsAll` lleva rato negándose, así que todo lo que el
+  operador haya apuntado desde que abrió la app vive **sólo en memoria y en la pantalla**. Cuando
+  llega de la nube un documento con operaciones, la reparación escribe **únicamente la lista de la
+  nube** y el `loadOpsAll` final sustituye la memoria por ella: lo tecleado desaparece de la
+  pantalla y del disco **sin ningún aviso**. La guarda de no-vaciado no protege aquí, porque la
+  nube no viene vacía.
+- **Cómo se midió:** revisión ligera del diff del ciclo 01-03 (2026-08-30). **No es una regresión**:
+  el código anterior al ciclo también pisaba. Lo que cambia es que ahora sabemos que existe.
+- **Estado:** ABIERTA, diferida por escrito. Es la misma familia que **D-01** (el sync reemplaza en
+  vez de fusionar) y se cierra con ella en la Fase 3: fusionar local y nube es exactamente lo que
+  este ciclo declaró fuera de alcance. Distinta de **D-23**, que se dispara al recargar; ésta se
+  dispara al sincronizar. `pruebasPrecedenciaDeGuardas` construye justo ese estado (cerrojo puesto
+  + memoria poblada) pero sólo ejercita la mitad de la nube vacía.
+- **Qué la reabre:** nada la cierra sola. Si la Fase 3 fusiona y esta ficha sigue abierta, es que
+  la fusión no cubrió el caso del cerrojo puesto.
+
+### D-24 · La rama moderna del sync decide el cerrojo con memoria rancia y puede pisar un blob ilegible sin rescatarlo
+- **Qué es:** `applySyncPayload` decide por `opsIlegible` **en memoria**, que sólo es tan fresco
+  como la última `loadOpsAll()`. Si el libro se corrompe en disco **después** de que la app haya
+  cargado (otra pestaña, corrupción del almacenamiento), la rama moderna cree que el cerrojo está
+  bajado y `saveOpsAll` **pisa el blob corrupto sin hacerle copia de rescate**. La rama del formato
+  antiguo NO tiene el problema: llama a `loadOpsAll()` dentro, así que re-deriva el cerrojo del
+  disco y sí rescata. Mismo estado de disco, resultado distinto según el formato del payload.
+  Arrastra dos asimetrías menores de aviso: una nube en formato antiguo vacía no emite ni el
+  `[SYNC] libro recibido vacío` ni el «no llega nada con que repararlo»; calla donde la moderna
+  es ruidosa.
+- **Cómo se midió:** brazo adversario de correctness sobre el diff del ciclo 01-03 (2026-08-30),
+  censando **todas** las asignaciones de `opsIlegible` del fichero, no sólo las del diff. Es un
+  defecto **anterior al ciclo**: el 01-03 no lo introdujo, lo destapó al preguntarse si las dos
+  ramas eran simétricas. **No reproducido en vivo**: exige corromper el almacenamiento entre la
+  carga y la sincronización.
+- **Estado:** ABIERTA, diferida por escrito. Cerrarla exige releer el disco antes de escribir —en
+  cada guardado, no sólo en el sync— o mover el rescate dentro de la escritura cruda. Las dos
+  opciones cambian el coste de `schedSave` y el contrato de `escribirOpsAll`, que este ciclo
+  acababa de fijar; hacerlo aquí sería rediseñar la pieza recién puesta sin plan. Va con **D-01**
+  (Fase 3), que ya tiene que revisar la semántica entera de `applySyncPayload`.
+- **Qué la reabre:** nada la cierra sola. La frase «las dos ramas son simétricas» queda REFUTADA
+  y no debe volver a escribirse hasta que exista una prueba que la sostenga. Si alguien afirma la
+  simetría en un acta o un comentario, esta ficha es la refutación.
+
+### D-23 · El cerrojo del libro ilegible no tiene salida visible para el operador
+- **Qué es:** el ciclo 01-03 arregló que el cerrojo `opsIlegible` se levantase antes de confirmar
+  la reparación. El precio es que ahora, con el libro local ilegible y una nube **vacía o
+  ausente**, el cerrojo queda puesto **indefinidamente**: nada fuera de `loadOpsAll` y
+  `repararLibroIlegible` lo baja, no hay interfaz para resolverlo, y el único aviso es un
+  `console.error` que el usuario no ve. Y encadena: `saveOpsAll` devuelve `false` → `guardarTodo`
+  devuelve `false` → no hay subida → **las operaciones nuevas viven sólo en memoria y se pierden
+  al recargar**. Antes del ciclo, ese mismo caso se «resolvía» escribiendo `[]` encima con la copia
+  de rescate a salvo: un reinicio con pérdida acotada. Ahora es un bloqueo silencioso. Es mejor
+  para el dato y peor para el operador, y por eso se escribe en vez de esconderse.
+- **Cómo se midió:** leyendo el código en la revisión adversaria del PLAN 01-03 (2026-08-30). Lo
+  encontró Fable atacando la frase «el arreglo no empeora nada»; no salió de ejecutar nada.
+- **Estado:** ABIERTA y aceptada a sabiendas. Construir la salida en pantalla es UX (Fase 5) y
+  arrastraría a **D-18**, así que el ciclo 01-03 la declaró fuera de alcance por escrito.
+  **Salida manual mientras tanto:** en las herramientas del navegador, comprobar primero que
+  existe una clave `balance-ops-rescate-*` con el contenido original y **sólo entonces** borrar la
+  clave `balance-ops`; al recargar, `loadOpsAll` leerá «no hay nada» en vez de «ilegible» y bajará
+  el cerrojo. Ligada a **D-18** (el aviso en rojo no se pinta en ninguna prueba) y a **D-15**.
+- **Qué la reabre:** nada la cierra sola. Se cierra cuando exista un aviso en pantalla que diga al
+  operador que el libro está bloqueado y le ofrezca la salida sin abrir la consola. Si alguien
+  quita el `if (opsIlegible)` de `saveOpsAll` para «desatascarlo», el sabotaje «saveOpsAll deja de
+  consultar el cerrojo» se pone rojo: esta deuda se paga con interfaz, no aflojando el cerrojo.
+
 ### D-15 · La guarda de subida está comprobada por presencia, no por precedencia
 - **Qué es:** la guarda que impide subir un libro vacío vive dentro de `schedulePush`, que es
   asíncrona, va detrás de un temporizador y habla con Firestore. Las autopruebas corren en node sin
@@ -235,6 +299,22 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Estado:** congelada. El trinquete impide que empeore.
 - **Qué la reabre:** tocar cualquiera de esas funciones en su fase correspondiente — es la
   ocasión de bajarla del listado.
+
+### D-26 · `funciones_vistas` es una cifra sellada que nadie vuelve a derivar
+- **Qué es:** `tools/funcsize.py` **escribe** `funciones_vistas` en la foto al hacer `--update` y
+  no la lee nunca; `--check` la ignora por completo. Es una cifra en un fichero que parece medida
+  y no vigila nada. Es la misma trampa que `CLAUDE.md` §9 describe para los recuentos copiados a
+  mano en un documento: se desfasan y luego se citan como si fueran ciertos.
+- **Cómo se midió:** revisión ligera del diff del 01-03 (2026-08-30). En la revisión `bbb0e9c` la
+  foto decía **153** cuando `index.html` tenía **162** funciones de primer nivel, **y la puerta
+  estaba verde**. El resellado de este ciclo la deja en 168, que hoy sí casa; nada impide que se
+  vuelva a desfasar.
+- **Estado:** ABIERTA. No se toca en el 01-03: cambiar qué compara `--check` es cambiar la regla de
+  medida, y eso el propio instrumento lo declara **deriva (rc=3)**. Hacerlo dentro de un ciclo que
+  va de otra cosa sería mover la vara sin plan. Ligada a **D-10** y **D-14**, que son las otras
+  cegueras declaradas del mismo instrumento.
+- **Qué la reabre:** nada la cierra sola. Se cierra cuando `--check` compare la cifra —y entonces
+  hace falta su sabotaje: desfasarla a mano tiene que poner la puerta roja.
 
 ### D-10 · El trinquete de tamaño no ve funciones flecha
 - **Qué es:** `funcsize.py` sólo ve `function NOMBRE(...)` de primer nivel. Una función de 300

@@ -1016,12 +1016,10 @@ function loadOpsAll() {
   return lista;
 }
 
-function saveOpsAll(list) {
-  // Con el libro ilegible ya rescatado, escribir encima solo añadiría pérdida.
-  if (opsIlegible) {
-    console.error('No se guarda el libro: el que hay en disco es ilegible y está rescatado.');
-    return false;
-  }
+// Escritura CRUDA del libro: NO consulta el cerrojo. Existe separada porque la
+// reparación necesita escribir con el cerrojo puesto, y darle a `saveOpsAll` un
+// parámetro «bypass» convertiría a la puerta en su propia excepción.
+function escribirOpsAll(list) {
   try {
     localStorage.setItem(OPS_KEY, JSON.stringify(list));
     return true;
@@ -1029,6 +1027,28 @@ function saveOpsAll(list) {
     console.error('No se pudo guardar el libro de operaciones:', e);
     return false;
   }
+}
+
+function saveOpsAll(list) {
+  // Con el libro ilegible ya rescatado, escribir encima solo añadiría pérdida.
+  if (opsIlegible) {
+    console.error('No se guarda el libro: el que hay en disco es ilegible y está rescatado.');
+    return false;
+  }
+  return escribirOpsAll(list);
+}
+
+// Repara un libro ilegible con lo que llega de la nube. El ORDEN es el arreglo:
+// el cerrojo sólo se levanta DESPUÉS de que la escritura se confirme. Levantarlo
+// antes deja el mecanismo desarmado — la escritura puede fallar y el siguiente
+// guardado escribiría una lista vacía encima del blob ilegible.
+function repararLibroIlegible(list) {
+  const ok = escribirOpsAll(list);
+  if (ok) {
+    opsIlegible = false;
+    console.warn('Libro local ilegible REPARADO con', list.length, 'operaciones de la nube.');
+  }
+  return ok;
 }
 
 // Huella de una operación para detectar la misma apuntada dos veces.
@@ -2975,25 +2995,34 @@ function applySyncPayload(data) {
   // `opsAll` es el libro único; `opsData` es el formato antiguo por cartera y
   // se fusiona al llegar de un dispositivo que aún no se ha actualizado.
   if (Array.isArray(data.opsAll)) {
-    // Si el libro local era ilegible, este de la nube lo repara: el original
-    // ya está a salvo en su copia de rescate, así que el cerrojo se levanta.
-    if (opsIlegible) {
-      console.error('Libro local ilegible: se repara con el que llega de la nube.');
-      opsIlegible = false;
-    }
+    const entrante = dedupeOpsById(data.opsAll);
     // Nadie vacía el libro de nadie: un libro vacío que llega de la nube no
     // sustituye a uno local con operaciones. Fusionarlos es la Fase 3; esto
-    // sólo impide el caso destructivo.
+    // sólo impide el caso destructivo. Va PRIMERO: es el juez único del 01-02.
     if (vaciariaElLibro(opsDelDocumento(data), ops)) {
       console.warn('[SYNC] libro recibido vacío: se conservan las', ops.length,
                    'operaciones locales');
-    } else if (!saveOpsAll(dedupeOpsById(data.opsAll))) {
+    } else if (opsIlegible) {
+      // El CRUCE: libro local ilegible + lo que llega. Una nube sin operaciones
+      // no es una reparación, así que el cerrojo se queda puesto.
+      if (!tieneOperaciones(entrante)) {
+        console.error('Libro local ilegible y no llega nada con que repararlo: el cerrojo sigue puesto.');
+      } else if (!repararLibroIlegible(entrante)) {
+        console.error('No se pudo reparar el libro ilegible: el cerrojo sigue puesto.');
+      }
+    } else if (!saveOpsAll(entrante)) {
       console.error('No se pudo guardar el libro recibido de la nube.');
     }
   } else if (data.opsData) {
     const juntas = [];
     Object.values(data.opsData).forEach(list => juntas.push(...(Array.isArray(list) ? list : [])));
-    if (juntas.length) saveOpsAll(dedupeOps([...loadOpsAll(), ...juntas]));
+    if (juntas.length) {
+      // El formato antiguo también repara: si no, un dispositivo sin actualizar
+      // no podría levantar el cerrojo jamás y `saveOpsAll` se negaría en silencio.
+      const fusionadas = dedupeOps([...loadOpsAll(), ...juntas]);
+      const ok = opsIlegible ? repararLibroIlegible(fusionadas) : saveOpsAll(fusionadas);
+      if (!ok) console.error('No se pudo guardar el libro recibido en formato antiguo.');
+    }
   }
   localStorage.setItem(META_KEY, JSON.stringify({ portfolios, currentPortId, nextId }));
   rows = loadRows(currentPortId);
@@ -4944,6 +4973,139 @@ function pruebasNoVaciar(check, base) {
         /vaciariaElLibro\(/.test(String(schedulePush)), true);
 }
 
+// Cuántas operaciones hay en disco, o la cadena 'ilegible' si el blob no parsea.
+// Devuelve un valor en vez de lanzar para que una regresión de la reparación se
+// vea como autoprueba fallida (rc=1) y no como instrumento roto (rc=2).
+function opsEnDisco() {
+  const d = parseOpsBlob(localStorage.getItem(OPS_KEY));
+  return d === null ? 'ilegible' : d.length;
+}
+
+// La guarda de no-vaciado va PRIMERO, delante del cerrojo. En el cruce las dos
+// órdenes escriben lo mismo (nada), así que la precedencia sólo se distingue por
+// el AVISO: sin esta prueba, reordenarlas pasaría la batería entera. Cubrir el
+// mecanismo no cubre su aviso.
+function pruebasPrecedenciaDeGuardas(check, base) {
+  const warnReal = console.warn;
+  const errReal = console.error;
+  localStorage.setItem(OPS_KEY, '{roto');
+  ops = loadOpsAll();
+  ops = [Object.assign({}, base, { id: 'p1' })];   // memoria poblada, disco ilegible
+  let warns = 0;
+  try {
+    console.warn = (m) => { if (String(m).includes('libro recibido vacío')) warns++; };
+    console.error = () => {};
+    applySyncPayload({ portfolios: [{ id: 1, name: 'P1' }], currentPortId: 1,
+                       nextId: 2, opsAll: [] });
+  } finally { console.warn = warnReal; console.error = errReal; }
+  check('AC-1 en el cruce gana el aviso de no-vaciado, no el del cerrojo', warns, 1);
+  check('AC-1 y el blob ilegible sigue intacto', localStorage.getItem(OPS_KEY), '{roto');
+}
+
+// El CRUCE del 01-03: «libro local ilegible» × «lo que llega de la nube». Las
+// dos condiciones tenían prueba por separado; su intersección no la medía nadie,
+// y justo ahí vivía el defecto: el cerrojo se levantaba antes de escribir nada.
+//
+// AVISO sobre los checks de `opsIlegible` que van DESPUÉS de un `applySyncPayload`
+// («NO se levanta con una nube vacía», «se vuelve a poder guardar», «AC-5 y también
+// levanta el cerrojo»): esa función termina en `ops = loadOpsAll()`, que vuelve a
+// decidir el cerrojo leyendo el disco. Son redundantes con los checks del disco y
+// NO muerden por sí solos. Lo que mide de verdad la reparación es la llamada
+// directa a `repararLibroIlegible` de más abajo. Se dejan porque documentan el
+// estado esperado, no porque protejan.
+function pruebasCerrojoIlegible(check, base) {
+  const errReal = console.error;
+  const carteras = { portfolios: [{ id: 1, name: 'P1' }], currentPortId: 1, nextId: 2 };
+
+  // AC-1: una nube vacía NO repara. Las tres afirmaciones van por separado a
+  // propósito: «no escribió», «el cerrojo sigue puesto» y «avisó» son cosas
+  // distintas, y el defecto fallaba la segunda mientras la primera colaba.
+  localStorage.setItem(OPS_KEY, '{roto');
+  ops = loadOpsAll();
+  check('AC-1 un libro que no parsea deja el cerrojo puesto', opsIlegible, true);
+  let avisos = 0;
+  try {
+    // El MENSAJE, no el mero hecho de que algo se queje: el `loadOpsAll` con que
+    // termina `applySyncPayload` emite su propio error siempre, y contar «hubo
+    // algún error» dejaba este aviso sin control ninguno.
+    console.error = (m) => { if (String(m).includes('no llega nada con que repararlo')) avisos++; };
+    applySyncPayload(Object.assign({ opsAll: [] }, carteras));
+  } finally { console.error = errReal; }
+  check('AC-1 el blob ilegible sigue en disco byte a byte',
+        localStorage.getItem(OPS_KEY), '{roto');
+  check('AC-1 el cerrojo NO se levanta con una nube vacía', opsIlegible, true);
+  check('AC-1 se avisa de que no había con qué reparar', avisos > 0, true);
+
+  // AC-2: una nube CON operaciones sí repara, y sólo entonces se levanta.
+  localStorage.setItem(OPS_KEY, '{roto');
+  ops = loadOpsAll();
+  applySyncPayload(Object.assign({ opsAll: [Object.assign({}, base, { id: 'n1' })] }, carteras));
+  // Un blob que no parsea devuelve `null`, y `.length` sobre null LANZA: la
+  // regresión saldría como «instrumento roto» (rc=2) tapando el hallazgo (rc=1).
+  check('AC-2 la reparación escribe lo que llegó', opsEnDisco(), 1);
+  check('AC-2 y sólo entonces se levanta el cerrojo', opsIlegible, false);
+  check('AC-2 con el cerrojo levantado se vuelve a poder guardar', saveOpsAll(ops), true);
+
+  // El `applySyncPayload` de arriba acaba en `loadOpsAll()`, que vuelve a decidir
+  // el cerrojo leyendo el disco YA reparado: enmascara si fue la reparación quien
+  // lo bajó. Medido el 2026-08-30: el mutante que quita el `opsIlegible = false`
+  // de `repararLibroIlegible` pasaba la batería entera. Se mide la función a solas.
+  localStorage.setItem(OPS_KEY, '{roto');
+  ops = loadOpsAll();
+  const warnPrev = console.warn;
+  let reparaciones = 0;
+  try {
+    console.warn = (m) => { if (String(m).includes('REPARADO')) reparaciones++; };
+    check('AC-2 la reparación devuelve true cuando la escritura entra',
+          repararLibroIlegible([Object.assign({}, base, { id: 'd1' })]), true);
+  } finally { console.warn = warnPrev; }
+  check('AC-2 y baja el cerrojo ella misma, sin releer el disco', opsIlegible, false);
+  check('AC-2 la reparación deja constancia de que ocurrió', reparaciones, 1);
+
+  // AC-5: el formato ANTIGUO también repara. Sin esto se cerraría el CASO y no
+  // la CLASE: un dispositivo sin actualizar no podría levantar el cerrojo jamás.
+  localStorage.setItem(OPS_KEY, '{roto');
+  ops = loadOpsAll();
+  applySyncPayload(Object.assign({ opsData: { 1: [Object.assign({}, base, { id: 'v1' })] } }, carteras));
+  check('AC-5 el formato antiguo también escribe la reparación', opsEnDisco(), 1);
+  check('AC-5 y también levanta el cerrojo', opsIlegible, false);
+}
+
+// AC-3: si la escritura de reparación FALLA, el cerrojo se queda puesto.
+// Criterio de parada del troceo, con sujeto explícito: ESTA función es la única
+// que muta `localStorage.setItem`, y por eso lleva su PROPIO `finally`. Si el
+// `setItem` roto sobreviviera a la prueba, el `finally` exterior haría
+// `clear()` y luego no podría reponer nada: vaciaría los datos del operador.
+// El ORDEN también es parte de la prueba: se siembra el blob y se deja que
+// `loadOpsAll` guarde su copia de rescate ANTES de romper `setItem`.
+function pruebasReparacionFallida(check, base) {
+  localStorage.setItem(OPS_KEY, '{roto');
+  ops = loadOpsAll();
+  check('AC-3 punto de partida: el cerrojo está puesto', opsIlegible, true);
+  const setReal = localStorage.setItem.bind(localStorage);
+  const errReal = console.error;
+  let errores = 0;
+  try {
+    localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+    console.error = () => { errores++; };
+    check('AC-3 una reparación que no puede escribir devuelve false',
+          repararLibroIlegible([Object.assign({}, base, { id: 'f1' })]), false);
+    // Este check va AQUÍ, antes de tocar `saveOpsAll`: el rechazo por cerrojo
+    // también escribe en la consola y contaba como «el fallo se registró»,
+    // dejando sin control el error de la escritura, que es lo que dice medir.
+    check('AC-3 el fallo de reparación se registra', errores > 0, true);
+    check('AC-3 el cerrojo sigue puesto tras la escritura fallida', opsIlegible, true);
+  } finally {
+    localStorage.setItem = setReal;
+    console.error = errReal;
+  }
+  // Y éste va FUERA, con la escritura ya reparada: con `setItem` roto, un
+  // `saveOpsAll` que ignorase el cerrojo devolvería `false` igualmente, y el
+  // check no distinguiría «me negué» de «no pude escribir».
+  check('AC-3 y el guardado normal sigue negándose', saveOpsAll([]), false);
+  check('AC-3 el blob ilegible sigue intacto', localStorage.getItem(OPS_KEY), '{roto');
+}
+
 // Sincronización (plan 01-02). Escriben en localStorage y tocan los globales,
 // así que se guarda todo y se devuelve al final pase lo que pase: ?selftest=1
 // también corre en el navegador del usuario, con sus datos reales delante.
@@ -4962,6 +5124,9 @@ function pruebasSincronizacion(check) {
     pruebasDeduplicacion(check, base);
     pruebasPayloadAntiguo(check, base);
     pruebasNoVaciar(check, base);
+    pruebasCerrojoIlegible(check, base);
+    pruebasPrecedenciaDeGuardas(check, base);
+    pruebasReparacionFallida(check, base);
   } finally {
     localStorage.clear();
     Object.keys(copiaSeguridad).forEach(k => localStorage.setItem(k, copiaSeguridad[k]));

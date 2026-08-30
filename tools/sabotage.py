@@ -127,9 +127,12 @@ CASOS = [
          "  return 'o' + Date.now().toString(36) + seq + Math.random().toString(36).slice(2, 5);",
          "  return 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);",
          1, "AC-1"),
+    # Ancla REDISENADA en el 01-03: la llamada `saveOpsAll(dedupeOpsById(...))`
+    # desaparecio al separar el cerrojo de la escritura. El criterio de deduplicacion
+    # vive ahora en la primera linea de la rama, y sigue siendo lo que se sabotea.
     Caso("el sync vuelve a deduplicar por huella y se come operaciones", INDEX,
-         "saveOpsAll(dedupeOpsById(data.opsAll))",
-         "saveOpsAll(dedupeOps(data.opsAll))",
+         "    const entrante = dedupeOpsById(data.opsAll);",
+         "    const entrante = dedupeOps(data.opsAll);",
          1, "AC-2"),
     Caso("se quita la guarda de no-vaciado al aplicar", INDEX,
          "    if (vaciariaElLibro(opsDelDocumento(data), ops)) {",
@@ -165,6 +168,55 @@ CASOS = [
          "  const seq = (opIdSeq++).toString(36).padStart(6, '0');",
          "  const seq = (opIdSeq++).toString(36).padStart(2, '0');",
          1, "AC-1 el identificador no cambia de anchura"),
+    # Controles positivos del plan 01-03 (el cerrojo del libro ilegible). Cada
+    # pieza del arreglo, revertida, tiene que matar su propia prueba. El caso 4
+    # existe porque sin el ningun mutante tocaria el UNICO camino que LEVANTA el
+    # cerrojo: todos caerian dentro de la rama que ya se mira.
+    Caso("el cerrojo vuelve a levantarse antes de reparar", INDEX,
+         "    const entrante = dedupeOpsById(data.opsAll);",
+         "    const entrante = dedupeOpsById(data.opsAll);\n    opsIlegible = false;",
+         1, "AC-1 el blob ilegible sigue en disco byte a byte"),
+    Caso("una nube vacia vuelve a contar como reparacion", INDEX,
+         "      if (!tieneOperaciones(entrante)) {",
+         "      if (false) {",
+         1, "AC-1 el blob ilegible sigue en disco byte a byte"),
+    Caso("la reparacion levanta el cerrojo aunque la escritura falle", INDEX,
+         "  const ok = escribirOpsAll(list);\n  if (ok) {",
+         "  opsIlegible = false;\n  const ok = escribirOpsAll(list);\n  if (ok) {",
+         1, "AC-3 el cerrojo sigue puesto tras la escritura fallida"),
+    Caso("la reparacion buena NO levanta el cerrojo", INDEX,
+         "    opsIlegible = false;\n    console.warn('Libro local ilegible REPARADO",
+         "    console.warn('Libro local ilegible REPARADO",
+         1, "AC-2 y baja el cerrojo ella misma, sin releer el disco"),
+    # H3 de la revision: nada demostraba que la reparacion use la escritura CRUDA.
+    # Si usara la puerta, con el cerrojo puesto no podria escribir jamas y el libro
+    # quedaria bloqueado para siempre. Es la pieza (a) del arreglo.
+    Caso("la reparacion vuelve a pasar por la puerta y no puede escribir", INDEX,
+         "  const ok = escribirOpsAll(list);",
+         "  const ok = saveOpsAll(list);",
+         1, "AC-2 la reparaci\u00f3n devuelve true cuando la escritura entra"),
+    # H2 de la revision: los checks de AC-5 (formato antiguo) nunca se habian
+    # visto rojos. Un test que pasa CON y SIN el arreglo no mide nada.
+    Caso("el formato antiguo vuelve a reparar por la puerta", INDEX,
+         "      const ok = opsIlegible ? repararLibroIlegible(fusionadas) : saveOpsAll(fusionadas);",
+         "      const ok = saveOpsAll(fusionadas);",
+         1, "AC-5 el formato antiguo tambi\u00e9n escribe la reparaci\u00f3n"),
+    Caso("se invierte la PRECEDENCIA de las dos guardas del cruce", INDEX,
+         "    if (vaciariaElLibro(opsDelDocumento(data), ops)) {\n      console.warn('[SYNC] libro recibido vacío: se conservan las', ops.length,\n                   'operaciones locales');\n    } else if (opsIlegible) {\n      // El CRUCE: libro local ilegible + lo que llega. Una nube sin operaciones\n      // no es una reparación, así que el cerrojo se queda puesto.\n      if (!tieneOperaciones(entrante)) {\n        console.error('Libro local ilegible y no llega nada con que repararlo: el cerrojo sigue puesto.');\n      } else if (!repararLibroIlegible(entrante)) {\n        console.error('No se pudo reparar el libro ilegible: el cerrojo sigue puesto.');\n      }\n",
+         "    if (opsIlegible) {\n      // El CRUCE: libro local ilegible + lo que llega. Una nube sin operaciones\n      // no es una reparación, así que el cerrojo se queda puesto.\n      if (!tieneOperaciones(entrante)) {\n        console.error('Libro local ilegible y no llega nada con que repararlo: el cerrojo sigue puesto.');\n      } else if (!repararLibroIlegible(entrante)) {\n        console.error('No se pudo reparar el libro ilegible: el cerrojo sigue puesto.');\n      }\n    } else if (vaciariaElLibro(opsDelDocumento(data), ops)) {\n      console.warn('[SYNC] libro recibido vacío: se conservan las', ops.length,\n                   'operaciones locales');\n",
+         1, "AC-1 en el cruce gana el aviso de no-vaciado"),
+    Caso("la reparacion buena deja de dejar constancia", INDEX,
+         "    console.warn('Libro local ilegible REPARADO con', list.length, 'operaciones de la nube.');\n",
+         "",
+         1, "AC-2 la reparaci\u00f3n deja constancia de que ocurri\u00f3"),
+    Caso("saveOpsAll deja de consultar el cerrojo", INDEX,
+         "  if (opsIlegible) {\n"
+         "    console.error('No se guarda el libro: el que hay en disco es ilegible y est\u00e1 rescatado.');\n"
+         "    return false;\n"
+         "  }\n"
+         "  return escribirOpsAll(list);",
+         "  return escribirOpsAll(list);",
+         1, "AC-3 no se escribe encima del ilegible"),
     Caso("deriva: se afloja la vara de medir", FUNCSIZE,
          "'umbral_lineas': 60,", "'umbral_lineas': 500,",
          3, "DERIVA"),

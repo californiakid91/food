@@ -37,7 +37,7 @@
       132
     ]
   },
-  "funciones_vistas": 153,
+  "funciones_vistas": 168,
   "semantica": {
     "ambito": "funciones `function NOMBRE(` de primer nivel del <script> inline de index.html",
     "metrica": "lineas crudas del cuerpo, comentarios y blancos incluidos",
