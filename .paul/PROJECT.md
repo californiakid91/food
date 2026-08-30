@@ -40,11 +40,14 @@ Llevar al día tus carteras con precios manuales y sacar de ahí una declaració
 
 ### Active (In Progress)
 
-Ninguno — listo para planificar la Fase 1.
+**Fase 1 — Guardado que no miente.** Tres ciclos cerrados y desplegados: 01-01 (arranque y guardado
+honestos), 01-02 (sincronización que no destruye) y 01-03 (el cerrojo del libro ilegible, `96c7a3e`).
+Los tres objetivos del scope están en el código y verificados en el navegador real.
+**Sigue abierta**: falta repetir la transición de fase midiendo los objetivos contra el código
+sobre `abe5e80..96c7a3e`. El cierre de un ciclo nunca autoriza el de una fase.
 
 ### Planned (Next)
 
-- [ ] Fase 1 — Guardado que no miente (carga incondicional de `ops`, errores visibles, dedupe por `id`)
 - [ ] Fase 2 — Backup/restore JSON
 - [ ] Fase 3 — Sync que fusiona en vez de reemplazar
 - [ ] Fase 4 — Corrección fiscal del FIFO

@@ -52,14 +52,23 @@ Phases: 1 of 7 complete (Fase 0)
 - [x] 01-01: Arranque y guardado honestos — cerrado 2026-08-29 (`dd13e42`, `86ad865`) — carga incondicional de `ops`, rescate de un libro ilegible, errores de guardado visibles
 - [x] 01-02: Sincronización que no destruye — cerrado 2026-08-30 (`77f8cef`, `56795eb`) — identificadores sin colisión, deduplicación por identificador Y huella, guardas simétricas de no-vaciado (añadido por la revisión adversaria del 01-01)
 
-- [ ] 01-03: El cerrojo del libro ilegible — abierto por la transición de fase del 2026-08-30; PLAN escrito 2026-08-30 (`01-03-PLAN.md`), sin ejecutar
+- [x] 01-03: El cerrojo del libro ilegible — cerrado 2026-08-30 (`96c7a3e`) — la escritura del libro separada de
+  su cerrojo, que ahora sólo se levanta tras confirmar la reparación; el cruce «ilegible × nube vacía» con
+  autoprueba propia; el formato antiguo también repara; 10 controles positivos nuevos en el banco
 
-**La fase NO está cerrada.** Los tres objetivos del scope están en el código, medidos uno a uno
-contra él, desplegados y verificados en el navegador real. Lo que la mantiene abierta es otra cosa:
-la **transición de fase** (2026-08-30) encontró un defecto de correctness introducido en la propia
-fase — el cerrojo que impide escribir sobre un libro ilegible se levanta antes de confirmar la
-reparación, y el cruce de esas dos condiciones no lo mide ninguna autoprueba. Se arregla en el
-ciclo 01-03. Acta completa: `.paul/phases/01-guardado-fiable/01-TRANSICION.md`.
+**La fase SIGUE abierta.** Los tres objetivos del scope están en el código, medidos uno a uno
+contra él, desplegados y verificados en el navegador real; y el defecto de correctness que encontró
+la transición del 2026-08-30 —el cerrojo que se levantaba antes de confirmar la reparación— está
+arreglado y desplegado en el ciclo 01-03 (`96c7a3e`).
+
+Lo que la mantiene abierta es que **el cierre de un CICLO no autoriza el cierre de una FASE**
+(`CLAUDE.md` §7): el disparador es medir los objetivos **contra el código otra vez**, sobre el diff
+resultante, y la transición anterior ya demostró que medir cambia el resultado. Hace falta repetirla
+sobre `abe5e80..96c7a3e`. Actas: `01-TRANSICION.md` (la que abrió el ciclo) y `01-03-SUMMARY.md`.
+
+Aviso para quien repita la transición: **G7 (radio de impacto) sigue DEGRADADO** — `code-review-graph`
+no ve el JS dentro de `index.html` y sobre este commit informó de «0 funciones cambiadas» ante un
+diff de 265 líneas. Un verde suyo sobre esta fase sería un falso verde (**D-22**).
 
 ### Phase 2: Backup y restauración
 
