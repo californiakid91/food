@@ -7,7 +7,7 @@
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
 Último ciclo cerrado: **01-05** (2026-08-31), la vara de medir. Cerró **D-39, D-40 y D-41**,
-abrió **D-42** y re-midió **D-26** (186 sellado vs **190** derivadas: se ha vuelto a desfasar y la
+abrió **D-42** (y **D-43** al cerrarlo) y re-midió **D-26** (186 sellado vs **190** derivadas: se ha vuelto a desfasar y la
 puerta sigue verde). La revisión adversaria del diff destapó **dos falsos verdes del propio
 arreglo** —un enganche sin bit de ejecución que git ignora dejando pasar el push, y suponer
 `.git/hooks` con `core.hooksPath` puesto— y **un daño colateral**: cablear el vigilante del
@@ -209,6 +209,24 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   declarada.
 - **Qué la reabre:** que se añada a una foto sellada una clave que `cargar_baseline` no valide;
   entonces el envoltorio pasa a ser alcanzable y hay que darle sabotaje propio.
+
+### D-43 · Un mutador del banco sustituye texto SIN afirmar que su ancla sea única
+- **Qué es:** de los seis mutadores del bloque de `hookcheck` en `tools/sabotage.py`, cinco no
+  necesitan ancla (borran el fichero, le quitan el bit de ejecución, le añaden una línea, le
+  cambian los permisos) y `sin_unset` **sí** afirma la unicidad de la suya. El sexto,
+  `sin_heredoc`, sustituye `<<'HOOK'` **sin afirmar que aparezca exactamente una vez**. La doctrina
+  lo exige explícitamente (§4.5.5 y §5.4): el sabotaje afirma la unicidad de su ancla **antes** de
+  mutar, porque un meta-instrumento falla inventando agujeros, no ignorándolos.
+- **Cómo se midió:** UNIFY del ciclo 01-05 (2026-08-31), leyendo los seis mutadores uno a uno
+  contra el texto del AC-7 del propio plan, que dice «cada caso afirma la UNICIDAD DE SU ANCLA
+  antes de mutar».
+- **Estado:** ABIERTA, y **no es un falso verde**: si el ancla dejara de casar, la copia quedaría
+  intacta, `hookcheck` daría rc=0 en vez del rc=2 esperado y el caso gritaría **NO MUERDE**. O sea
+  que falla **ruidosamente**, que es la propiedad que importa. Es una desviación **nominal** del
+  AC-7, escrita en vez de callada, no un agujero medido.
+- **Qué la reabre:** que `install-hooks.sh` pase a contener más de un heredoc, momento en el que el
+  mutador mutaría los dos y el caso dejaría de medir lo que dice medir. Se cierra con dos líneas:
+  la misma afirmación que ya tiene `sin_unset`.
 
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
 - **Qué es:** `applySyncPayload` sustituye `ops` entero por lo que venga de la nube, con

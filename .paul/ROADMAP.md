@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 6 | In progress (4 cerrados; 01-05 en PLAN, 01-06 pendiente) | - |
+| 1 | Guardado que no miente | 6 | In progress (5 cerrados; 01-06 pendiente, cierra D-38 y desbloquea la fase) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -90,22 +90,28 @@ documentos no vio un mutante, y el del oráculo no vio una cifra falsa.
 **Planes:** 01-01, 01-02, 01-03 y 01-04 cerrados. La tercera transición abre **DOS** ciclos, y se
 partieron a propósito tras la revisión adversaria del primer borrador:
 
-- [ ] **01-05: La vara de medir** — que ningún instrumento pueda romperse y salir rotulado como un
-  hallazgo del código (D-39), que la puerta no pueda salir verde con el banco apagado ni por su
-  código de salida ni por el entorno (D-40), y que la variante automática esté vigilada en vez de
-  supuesta (D-41). **No toca `index.html`.** Va primero porque es la vara con la que se medirá el
-  01-06. PLAN escrito.
+- [x] **01-05: La vara de medir** — cerrado 2026-08-31 (`4e81e6c`). Cierra **D-39** (los trinquetes
+  fallan CERRADO, rc=2 con nombre, clave y remedio), **D-40** (la variante interior devuelve rc=4,
+  que no es verde para nadie salvo el banco, **y** el enganche limpia la variable: dos capas) y
+  **D-41** (`tools/hookcheck.py`, cableado a la puerta, deriva lo esperado del instalador).
+  **`index.html` intacto byte a byte** y ninguna foto resellada, que es la prueba de que los
+  instrumentos siguen midiendo lo mismo. Abre **D-42** y **D-43**. Re-derivadas en fresco: 9 pasos
+  en la puerta, 52 mordidas del banco, 61 controles verdes, **11 de este ciclo**.
+  Acta: `01-05-SUMMARY.md`.
 - [ ] **01-06: El aviso que no miente** — cierra **D-38** ENTERA: las tres familias de mutantes
   (color y duración del aviso local · el `aviso` de las ramas de rechazo · los tres mensajes de
   consola) y **los DOS pintores que deciden**, `showSaveIndicator` y `setSyncUI`. Es el que
   desbloquea el cierre de la fase, y el que exige verificación en navegador (§7 bis).
+
+Con el 01-05 cerrado, **lo único que impide cerrar la Fase 1 es D-38**: la capa de aviso sin
+oráculo. La cuarta transición sólo puede intentarse después del 01-06.
 
 El borrador que juntaba ambas cosas cubría seis de los nueve mutantes y llamaba a eso «cerrar la
 clase». La revisión adversaria lo demolió, y además destapó que exigir «rc≠0 con `VERIFY_INNER=1`»
 tal cual **mataba el banco de sabotaje**, porque el banco ejecuta la puerta con esa misma variable.
 Los dos hallazgos se verificaron con comando propio antes de aceptarlos.
 
-Actas: `01-04-SUMMARY.md` y `01-TRANSICION-3.md`.
+Actas: `01-04-SUMMARY.md`, `01-TRANSICION-3.md` y `01-05-SUMMARY.md`.
 
 ### Phase 2: Backup y restauración
 

@@ -51,9 +51,16 @@ Firestore y sólo dos pasaban por la guarda de no-vaciado. Ahora hay **una**, de
 función pura que falla cerrado —de forma simétrica para operaciones y activos— cuando no puede
 mirar la nube, y dos instrumentos nuevos ponen la puerta roja si aparece otra.
 
-**Sigue abierta** por dos razones: falta su TERCERA transición (el cierre de un ciclo nunca
-autoriza el de una fase) y **nada del último ciclo se ha visto en un navegador** — está sin
-desplegar y añade un estado visual nuevo.
+El **01-05** (`4e81e6c`, 2026-08-31) es el quinto ciclo cerrado y **no toca la app**: arregla la
+vara de medir antes de medir con ella. Los trinquetes ya no pueden reventar y salir rotulados como
+«el código ha engordado»; la puerta ya no puede terminar en verde con el banco de sabotaje apagado,
+ni por su código de salida ni por un entorno contaminado; y la variante automática (el enganche
+`pre-push`) está vigilada en vez de supuesta. Por eso no necesita verificación en navegador — y por
+eso el 01-06 sí la necesitará.
+
+**Sigue abierta** por una sola razón, medida tres veces contra el código: la meta dice «en
+silencio», y **la capa de AVISO no tiene oráculo** (D-38). Un guardado que ha fallado pintado en
+VERDE pasa hoy la puerta entera. Es el ciclo **01-06**, y es lo único que queda.
 
 ### Planned (Next)
 
