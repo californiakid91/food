@@ -24,6 +24,11 @@ import os
 import pathlib
 import subprocess
 import sys
+import tempfile
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+import hookcheck  # tras ajustar sys.path arriba, como hace emptycatch con funcsize
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 INDEX = ROOT / 'index.html'
@@ -32,12 +37,30 @@ BASELINE = ROOT / '.paul' / 'baseline-funcs.json'
 CLOUDWRITES = ROOT / 'tools' / 'cloudwrites.py'
 EMPTYCATCH = ROOT / 'tools' / 'emptycatch.py'
 CATCHES = ROOT / '.paul' / 'baseline-catches.json'
+VERIFY = ROOT / 'tools' / 'verify.sh'
+SABOTAGE = ROOT / 'tools' / 'sabotage.py'
+INSTALLHOOKS = ROOT / 'tools' / 'install-hooks.sh'
+HOOKCHECK = ROOT / 'tools' / 'hookcheck.py'
+PREPUSH = ROOT / '.git' / 'hooks' / 'pre-push'
+
+# Verde de la puerta corrida DESDE DENTRO del banco. Desde el ciclo 01-05 esa
+# variante devuelve 4 y no 0: un 0 ahi era una puerta verde con el banco
+# apagado, y bastaba tener VERIFY_INNER=1 exportado para que todos los push
+# pasaran sin que nada demostrara que los controles muerden (D-40).
+# Este es el UNICO consumidor que acepta el 4 como base verde.
+VERDE_INTERIOR = 4
+
+# Ficheros cuya huella se toma antes y despues. Hasta el 01-05 eran seis fijos
+# y NO incluian ni la puerta, ni el banco, ni el enganche: el "arbol identico"
+# de un sabotaje que los mutara no probaba nada sobre ellos.
+TOCABLES = [INDEX, FUNCSIZE, BASELINE, CLOUDWRITES, EMPTYCATCH, CATCHES,
+            VERIFY, SABOTAGE, INSTALLHOOKS, HOOKCHECK, PREPUSH]
 
 
 def hash_arbol():
     """Huella de los ficheros que el banco puede tocar."""
     h = hashlib.sha256()
-    for p in sorted([INDEX, FUNCSIZE, BASELINE, CLOUDWRITES, EMPTYCATCH, CATCHES]):
+    for p in sorted(TOCABLES):
         h.update(p.read_bytes() if p.is_file() else b'<ausente>')
     return h.hexdigest()
 
@@ -45,9 +68,28 @@ def hash_arbol():
 def puerta():
     """Corre la puerta marcandola como interna, para que no reentre en el banco."""
     env = dict(os.environ, VERIFY_INNER='1')
-    r = subprocess.run([str(ROOT / 'tools' / 'verify.sh')],
+    r = subprocess.run([str(VERIFY)],
                        capture_output=True, text=True, check=False, cwd=ROOT, env=env)
     return r.returncode, r.stdout + r.stderr
+
+
+def sustituir_unico_mismo_largo(fichero, viejo, nuevo):
+    """Como `sustituir_unico`, pero AFIRMA que la mutacion no mueve los bytes.
+
+    Existe para el unico caso en que se mutila un script que se esta EJECUTANDO:
+    `verify.sh`, cuyo proceso bash padre lo lee por trozos y recuerda su
+    desplazamiento. Cambiar su longitud a media corrida le haria leer basura.
+    Aqui no basta con escribirlo en un comentario -- un comentario que promete
+    un freno no cablea ninguno (CLAUDE.md 5.1) --, asi que se comprueba: si
+    alguien edita este sabotaje y descuadra la longitud, el banco dice que el
+    defecto esta en el BANCO en vez de romper la puerta por debajo.
+    """
+    if len(viejo) != len(nuevo):
+        raise AssertionError(
+            f"sabotaje sobre {fichero.name}, que se esta ejecutando: la sustitucion "
+            f"cambia la longitud ({len(viejo)} -> {len(nuevo)} bytes) y desplazaria "
+            "lo que el bash padre aun no ha leido. El defecto esta en el BANCO.")
+    return sustituir_unico(fichero, viejo, nuevo)
 
 
 def sustituir_unico(fichero, viejo, nuevo):
@@ -310,6 +352,18 @@ CASOS = [
          "    const antes = ejercidos;\n    await fn();",
          "    const antes = ejercidos;\n    fn();",
          1, "no ejerci\u00f3 ni un control"),
+    # ── Controles del ciclo 01-05: la vara de medir. ────────────────────────
+    # N1/N2. Una foto sellada MALFORMADA tiene que decir "no pude medir" con su
+    #     nombre, no reventar con un traceback y rc=1 disfrazado de hallazgo del
+    #     codigo. El ancla deja el JSON valido a proposito: se quiere una foto
+    #     con la CLAVE de tipo equivocado, no un fichero que no parsea (eso ya
+    #     lo cazaba el `except` de lectura).
+    Caso("la foto de funcsize tiene 'excede' del tipo equivocado", BASELINE,
+         '"excede": {', '"excede": null,\n  "_sabotaje": {',
+         2, "la clave 'excede' es NoneType"),
+    Caso("la foto de emptycatch tiene 'motivos' del tipo equivocado", CATCHES,
+         '"motivos": {', '"motivos": null,\n  "_sabotaje": {',
+         2, "la clave 'motivos' es NoneType"),
     Caso("deriva: se afloja la vara de medir", FUNCSIZE,
          "'umbral_lineas': 60,", "'umbral_lineas': 500,",
          3, "DERIVA"),
@@ -325,12 +379,19 @@ def main():
 
     # CONTROL DE VACUIDAD. Sin el, una puerta siempre-roja aprobaria este banco.
     rc, salida = puerta()
-    if rc != 0:
-        print("CONTROL DE VACUIDAD FALLIDO: la puerta ya esta roja SIN sabotaje.")
-        print("   Nada de lo que siga significaria nada.")
+    if rc != VERDE_INTERIOR:
+        if rc == 0:
+            print("CONTROL DE VACUIDAD FALLIDO: la puerta interior devuelve 0.")
+            print("   Deberia devolver 4 ('verde, pero el banco no corrio'). Un 0 ahi")
+            print("   es una puerta que sale VERDE con el banco apagado (D-40).")
+        else:
+            print(f"CONTROL DE VACUIDAD FALLIDO: la puerta ya esta roja SIN sabotaje "
+                  f"(rc={rc}, esperaba {VERDE_INTERIOR}).")
+            print("   Nada de lo que siga significaria nada.")
         print(salida)
         return 2
-    print("  OK    control de vacuidad: sin sabotaje, la puerta esta verde")
+    print(f"  OK    control de vacuidad: sin sabotaje, la puerta interior da "
+          f"rc={VERDE_INTERIOR} (verde con el banco omitido)")
 
     for c in CASOS:
         original = c.fichero.read_text(encoding='utf-8')
@@ -412,6 +473,156 @@ def main():
             print("  OK    --update se niega a sellar un empeoramiento sin --amnesty")
     finally:
         INDEX.write_text(original, encoding='utf-8')
+
+    # ── Ciclo 01-05: controles que no caben como Caso, y por que. ──────────
+
+    # (a) CONTROL POSITIVO del rc=4. El control de vacuidad de arriba exige que
+    #     la puerta interior devuelva 4. Hay que demostrar que ESE control muere
+    #     si el arreglo se revierte: si no, pasaria con y sin el (CLAUDE.md 5.9).
+    #     No cabe como Caso porque un Caso compara el rc de la puerta, y aqui lo
+    #     que se mide es justamente que la puerta deja de distinguirse.
+    original = VERIFY.read_bytes()
+    # El MODO se guarda con el contenido. Restaurar por os.replace desde un
+    # temporal recien creado dejaba la puerta SIN bit de ejecucion, que es la
+    # misma clase de fallo que este ciclo arreglo en el enganche: un fichero
+    # que sigue ahi y ya no ejecuta nada.
+    modo_original = VERIFY.stat().st_mode
+    try:
+        sustituir_unico_mismo_largo(VERIFY, "\n  exit 4\n", "\n  exit 0\n")
+        rc, _ = puerta()
+        if rc == VERDE_INTERIOR:
+            print("  NO MUERDE: la puerta interior sigue dando 4 con el `exit 4` quitado; "
+                  "el sabotaje no llego")
+            fallos.append("el estimulo del rc=4 no llego")
+        elif rc != 0:
+            print(f"  NO MUERDE: esperaba que la puerta interior cayera a 0, dio rc={rc}")
+            fallos.append("control positivo del rc=4")
+        else:
+            print("  OK    control positivo: sin el `exit 4`, la puerta interior vuelve "
+                  "a dar 0 y la vacuidad lo caza")
+    finally:
+        # Restauracion ATOMICA: escribir en un temporal del mismo directorio y
+        # renombrar, para que la puerta nunca quede a medio escribir. Queda una
+        # ventana entre la mutacion y esta linea si el proceso muere de forma
+        # que no ejecute el `finally`; NO se tapa con un comentario que prometa
+        # un freno: quien lo caza es el control de vacuidad de la proxima
+        # corrida, que ve la puerta interior en 0 y lo dice con esas palabras.
+        tmp = VERIFY.with_name(VERIFY.name + '.restaurando')
+        tmp.write_bytes(original)
+        os.chmod(tmp, modo_original)
+        os.replace(tmp, VERIFY)
+
+    # (b) Los tres desenlaces de hookcheck, SOBRE COPIAS. No se mutila el
+    #     enganche instalado: cuando la puerta corre desde el pre-push, borrarlo
+    #     o reescribirlo seria pisar el script que se esta ejecutando. Lo que
+    #     mide el enganche REAL es el paso de la puerta (y el caso N3, que
+    #     mutila el instalador, que si es seguro tocar).
+    with tempfile.TemporaryDirectory() as tmp:
+        d = pathlib.Path(tmp)
+        inst, hook = d / 'install-hooks.sh', d / 'pre-push'
+        def hk(h, i):
+            r = subprocess.run([sys.executable, str(HOOKCHECK), '--hook', str(h),
+                                '--installer', str(i)],
+                               capture_output=True, text=True, check=False, cwd=ROOT)
+            return r.returncode, r.stdout + r.stderr
+
+        def sano():
+            """Deja la copia EXACTAMENTE como la deberia dejar el instalador.
+
+            El contenido se DERIVA del instalador con el mismo extractor que usa
+            `hookcheck`, no del enganche instalado en esta maquina. Leer el
+            instalado hacia que el banco reventara con un traceback -- y rc=1,
+            o sea rotulado como fallo del CODIGO -- en una maquina donde el
+            enganche no existe todavia, que es justo el caso que este ciclo
+            existe para cazar.
+            """
+            inst.write_bytes(INSTALLHOOKS.read_bytes())
+            try:
+                cuerpo = hookcheck.esperado(INSTALLHOOKS)
+            except SystemExit as e:
+                raise AssertionError(
+                    "no pude derivar el enganche esperado del instalador "
+                    f"(hookcheck salio con {e.code}). El defecto esta en el BANCO "
+                    "o en el instalador, no en el comprobador.") from None
+            hook.write_text(cuerpo, encoding='utf-8')
+            hook.chmod(0o755)
+
+        # Control de VACUIDAD de este bloque: una copia sana tiene que salir
+        # VERDE. Sin el, un comprobador siempre-rojo pasaria los cuatro casos
+        # de abajo y pareceria perfecto.
+        sano()
+        rc, salida = hk(hook, inst)
+        if rc != 0:
+            print(f"  NO MUERDE: hookcheck da rc={rc} sobre una copia SANA; "
+                  "nada de lo que sigue significa nada")
+            fallos.append("hookcheck vacuidad")
+        else:
+            print("  OK    control de vacuidad: hookcheck verde sobre una copia sana")
+
+        def sin_bit():
+            hook.chmod(0o644)
+
+        def distinto():
+            hook.write_text(hook.read_text(encoding='utf-8') + "colado\n",
+                            encoding='utf-8')
+
+        def sin_heredoc():
+            inst.write_text(
+                INSTALLHOOKS.read_text(encoding='utf-8').replace("<<'HOOK'", "<<'OTRO'"),
+                encoding='utf-8')
+
+        def sin_unset():
+            """El enganche deja de limpiar VERIFY_INNER: la SEGUNDA capa de D-40.
+
+            Se mutila el INSTALADOR de la copia y se compara contra el enganche
+            REAL: si alguien quitara esa linea, el comprobador lo cantaria como
+            DISTINTO en la proxima puerta. No cabe como Caso porque hookcheck ya
+            no corre en la puerta interior, y no se toca el enganche instalado
+            porque mutarlo mientras el propio enganche corre seria pisar el
+            script en marcha.
+            """
+            texto = INSTALLHOOKS.read_text(encoding='utf-8')
+            if texto.count("unset VERIFY_INNER\n") != 1:
+                raise AssertionError(
+                    "ancla no unica: 'unset VERIFY_INNER' no aparece exactamente "
+                    "una vez en install-hooks.sh. El defecto esta en el BANCO.")
+            inst.write_text(texto.replace("unset VERIFY_INNER\n", ""), encoding='utf-8')
+
+        for etiqueta, rc_esp, txt_esp, prepara in (
+            ("AUSENTE", 1, "ENGANCHE AUSENTE", lambda: hook.unlink()),
+            ("NO EJECUTABLE", 1, "ENGANCHE NO EJECUTABLE", sin_bit),
+            ("DISTINTO", 1, "ENGANCHE DISTINTO", distinto),
+            ("FORMA (el instalador cambio de forma)", 2, "INSTRUMENTO ROTO", sin_heredoc),
+            ("ILEGIBLE (no puedo leer el instalador)", 2, "INSTRUMENTO ROTO",
+             lambda: inst.chmod(0o000)),
+            ("el enganche deja de limpiar VERIFY_INNER", 1, "ENGANCHE DISTINTO", sin_unset),
+        ):
+            try:
+                sano()
+                prepara()
+            except AssertionError as e:
+                print(f"  BANCO ROTO: hookcheck {etiqueta} — {e}")
+                fallos.append(f"hookcheck {etiqueta} (banco)")
+                continue
+            rc, salida = hk(hook, inst)
+            inst.chmod(0o644)
+            if rc != rc_esp or txt_esp not in salida:
+                print(f"  NO MUERDE: hookcheck {etiqueta} — esperaba rc={rc_esp} y "
+                      f"{txt_esp!r}, dio rc={rc}")
+                fallos.append(f"hookcheck {etiqueta}")
+            else:
+                print(f"  OK    muerde: hookcheck distingue {etiqueta} (rc={rc})")
+
+    # El hash del arbol mira el CONTENIDO, no el modo. Un fichero que sigue
+    # ahi byte a byte y ya no ejecuta nada es la misma clase de fallo que el
+    # enganche sin permiso, y el hash lo daba por identico. Medido: la
+    # restauracion atomica del control positivo de arriba perdia este bit.
+    for ejecutable in (VERIFY, INSTALLHOOKS):
+        if not os.access(ejecutable, os.X_OK):
+            print(f"  ARBOL SUCIO: {ejecutable.name} ha perdido el bit de ejecucion")
+            fallos.append(f"{ejecutable.name} sin bit de ejecucion")
+    if not fallos or all('bit de ejecucion' not in f for f in fallos):
+        print("  OK    la puerta y el instalador siguen siendo ejecutables")
 
     h1 = hash_arbol()
     if h0 != h1:

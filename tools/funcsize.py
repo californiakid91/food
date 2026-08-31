@@ -17,6 +17,10 @@ CEGUERAS DECLARADAS (antes de que alguien las descubra):
     engordarla 80 lineas y ver que la puerta seguia verde. Es un APRIETE de la
     vara, y por eso obliga a resellar la foto a proposito.
   - Cuenta lineas crudas del cuerpo, comentarios y blancos incluidos.
+  - De la foto sellada valida la PRESENCIA y el TIPO de `semantica`, `excede` y
+    de cada lista de `excede`. NO valida `funciones_vistas` (es informativa y
+    no dirige ninguna decision) ni el contenido de `semantica` clave por clave:
+    esa se compara ENTERA contra SEMANTICA, y cualquier diferencia es deriva.
   - La huella no lleva numero de linea: reordenar el fichero no la mueve.
   - Al contar llaves salta cadenas, plantillas, comentarios y expresiones
     regulares. Distinguir una regex de una division se hace por heuristica
@@ -136,9 +140,20 @@ def fin_de_comentario(js, i):
     return len(js) if n == -1 else n + 2
 
 
-def roto(msg):
+def roto(msg, remedio=None):
     print(f"rc=2 INSTRUMENTO ROTO: {msg}", file=sys.stderr)
+    if remedio:
+        print(f"   {remedio}", file=sys.stderr)
     sys.exit(2)
+
+
+# Una foto MALFORMADA bloquea los DOS modos: `--update` tambien la lee antes de
+# escribir, asi que sin esto el instrumento nombraba la clave rota y no ofrecia
+# ninguna salida. Un mensaje que nombra el defecto y no el remedio deja al
+# operador editando JSON a mano, que es como se afloja una vara sin querer.
+REMEDIO_FOTO = ("Si la foto esta corrupta y quieres volver a sellarla desde cero: "
+                "borra el fichero y corre --update (con el fichero ausente, "
+                "--update sella sin comparar).")
 
 
 class EscanerRoto(Exception):
@@ -286,15 +301,57 @@ def medir():
 
 
 def cargar_baseline():
+    """Lee la foto sellada validando el TIPO de cada clave, no solo su presencia.
+
+    `"excede": null` es JSON valido y pasaba el chequeo de forma anterior: el
+    instrumento reventaba DESPUES con un TypeError sin capturar y rc=1, o sea
+    rotulado como "el codigo ha engordado". Un instrumento roto que se disfraza
+    de hallazgo manda a mirar el sitio equivocado (CLAUDE.md 4.3).
+    """
     if not BASELINE.is_file():
         roto(f"no existe la foto sellada {BASELINE}; sellala con --update")
     try:
         d = json.loads(BASELINE.read_text(encoding='utf-8'))
     except Exception as e:  # noqa: BLE001 - fallar CERRADO ante cualquier lectura mala
-        roto(f"la foto sellada no se puede leer: {e}")
-    if not isinstance(d, dict) or 'semantica' not in d or 'excede' not in d:
-        roto("la foto sellada no tiene la forma esperada")
+        roto(f"la foto sellada no se puede leer: {e}", REMEDIO_FOTO)
+    if not isinstance(d, dict):
+        roto(f"funcsize: la foto sellada {BASELINE.name} no es un objeto JSON, "
+             f"es {type(d).__name__}", REMEDIO_FOTO)
+    for clave in ('semantica', 'excede'):
+        if clave not in d:
+            roto(f"funcsize: la foto sellada {BASELINE.name} no tiene la clave "
+                 f"'{clave}'", REMEDIO_FOTO)
+        if not isinstance(d[clave], dict):
+            roto(f"funcsize: la foto sellada {BASELINE.name}: la clave '{clave}' "
+                 f"es {type(d[clave]).__name__}, se esperaba un objeto", REMEDIO_FOTO)
+    for nombre, valores in d['excede'].items():
+        if not isinstance(valores, list) or not all(
+                isinstance(v, int) and not isinstance(v, bool) for v in valores):
+            roto(f"funcsize: la foto sellada {BASELINE.name}: la clave "
+                 f"'excede[{nombre}]' deberia ser una lista de enteros")
     return d
+
+
+def comparar_o_roto(actual, sellado, clave):
+    """`comparar` fallando CERRADO: cualquier sorpresa sale como rc=2 CON NOMBRE.
+
+    El `except` es ESTRECHO a proposito. `SystemExit` no esta en la lista, asi
+    que un hallazgo real (rc=1) NUNCA se convierte en rc=2: capturar demasiado
+    ancho taparia el hallazgo con el aviso y mandaria a mirar las herramientas
+    en vez del codigo. Ese defecto ya se cometio una vez, el 2026-08-29.
+
+    SIN ORACULO, Y SE DICE: hoy este `except` es INALCANZABLE por construccion.
+    `cargar_baseline` ya valida los tipos de todo lo que llega aqui, asi que
+    `comparar` no puede lanzar ninguna de esas excepciones, y los sabotajes de
+    la foto malformada pasan CON y SIN este envoltorio -- lo que miden es la
+    validacion, no esto. Se deja como red por si manana se anade una clave sin
+    validarla, pero NO cuenta como control medido: esta fichado en .paul/DEUDAS.md.
+    """
+    try:
+        return comparar(actual, sellado)
+    except (TypeError, AttributeError, KeyError, ValueError) as e:
+        roto(f"funcsize: no pude comparar contra la clave '{clave}' de "
+             f"{BASELINE.name}: {type(e).__name__}: {e}")
 
 
 def comparar(actual, sellado):
@@ -343,7 +400,7 @@ def main():
                 print("   La foto anterior no es comparable. Revisa POR QUE cambio la regla")
                 print("   antes de sellar nada: aflojar la vara borra hallazgos en silencio.")
                 sys.exit(3)
-            peor, mejor = comparar(actual, sellado['excede'])
+            peor, mejor = comparar_o_roto(actual, sellado['excede'], 'excede')
         if peor and not args.amnesty:
             print("NO SE SELLA: esto es un EMPEORAMIENTO, no una mejora.")
             for p in peor:
@@ -372,7 +429,7 @@ def main():
         print("   comparar las cifras no significa nada. Esto NO se arregla resellando.")
         sys.exit(3)
 
-    peor, mejor = comparar(actual, sellado['excede'])
+    peor, mejor = comparar_o_roto(actual, sellado['excede'], 'excede')
 
     # El orden del veredicto es una decision: ante un delta mixto gana el
     # EMPEORAMIENTO, para que el mensaje no dirija la mano hacia un sellado que

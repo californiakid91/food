@@ -6,6 +6,14 @@
 >
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
+Último ciclo cerrado: **01-05** (2026-08-31), la vara de medir. Cerró **D-39, D-40 y D-41**,
+abrió **D-42** y re-midió **D-26** (186 sellado vs **190** derivadas: se ha vuelto a desfasar y la
+puerta sigue verde). La revisión adversaria del diff destapó **dos falsos verdes del propio
+arreglo** —un enganche sin bit de ejecución que git ignora dejando pasar el push, y suponer
+`.git/hooks` con `core.hooksPath` puesto— y **un daño colateral**: cablear el vigilante del
+enganche antes del banco dejaba sin correr el banco en cualquier máquina sin instalar.
+Acta: `.paul/phases/01-guardado-fiable/01-05-SUMMARY.md`.
+
 Última medición contra el código: **2026-08-31**, **TERCERA transición de la Fase 1**
 (cuatro brazos adversarios disjuntos: caminos de pérdida, calidad del oráculo, cableado, y
 documentos contra evidencia). Abrió **D-38, D-39, D-40 y D-41**, marcó **D-15 y D-03 a
@@ -119,9 +127,18 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   leyendo `['motivos']` sin validarlo).
 - **Cómo se midió:** TERCERA transición (2026-08-31), brazo de cableado; **re-verificado a mano**
   por el orquestador sobre copia aislada: rc obtenido **1**, rc debido **2**.
-- **Estado:** ABIERTA · entra en el ciclo 01-05. Viola directamente `CLAUDE.md` §4.3: «un traceback
-  sin capturar también da rc≠0, así que un control que sólo mire el rc pasa con y sin el manejo de
-  errores».
+- **Estado:** **CERRADA** en el ciclo **01-05** (2026-08-31). `cargar_baseline()` de los dos
+  instrumentos valida ahora **el TIPO de cada clave**, y `emptycatch` valida además `motivos`, que
+  sólo lee `--update`: antes `--check` salía **VERDE** con una foto que `--update` no podía leer —
+  la forma que validaba el chequeo no era la forma que el instrumento necesita (§5.16). Rojo
+  literal reproducido antes y después:
+  - antes: `TypeError: 'NoneType' object is not iterable` + **rc=1**, rotulado por la puerta como
+    «el monolito ha engordado»
+  - después: `rc=2 INSTRUMENTO ROTO: funcsize: la foto sellada baseline-funcs.json: la clave
+    'excede' es NoneType, se esperaba un objeto` + **rc=2**
+  Dos sabotajes permanentes en el banco (uno por instrumento). El `except` de la comparación es
+  **estrecho a propósito**: comprobado que un hallazgo real sigue en **rc=1** (`EL MONOLITO HA
+  ENGORDADO`, `CATCH VACIO EN EL CAMINO DE SUBIDA`), no tapado por el aviso.
 - **Qué la reabre:** cualquier instrumento nuevo que lea una foto sellada sin validar sus tipos.
 
 ### D-40 · `VERIFY_INNER=1` deja la puerta en `rc=0` con el banco de sabotaje sin correr
@@ -132,8 +149,19 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   línea de texto que alguien tiene que leer** (§4.1).
 - **Cómo se midió:** TERCERA transición (2026-08-31); **re-verificado a mano**: `VERIFY_INNER=1
   bash tools/verify.sh` sobre copia aislada → `rc=0`.
-- **Estado:** ABIERTA · entra en el ciclo 01-05. Arreglo natural: que esa variante salga con rc≠0,
-  o que el enganche limpie la variable del entorno antes de llamar a la puerta.
+- **Estado:** **CERRADA** en el ciclo **01-05** (2026-08-31), con **las DOS capas, no una**:
+  1. La puerta corrida con `VERIFY_INNER=1` devuelve ahora **rc=4** («verde, pero el banco no
+     corrió»), nunca 0. Un 4 es verde para **un solo consumidor**, `sabotage.py::puerta()`; para
+     el operador y para el enganche es no-verde. La tabla de códigos está escrita en la cabecera
+     de `verify.sh`.
+  2. El enganche **limpia la variable** (`unset VERIFY_INNER`) antes de llamar a la puerta, así
+     que un perfil contaminado no la hereda.
+  Con una sola capa el agujero seguía abierto por el otro lado. **Medido con la variable
+  exportada:** a mano `rc=4`; por el enganche, puerta COMPLETA con el banco corrido, `rc=0` con
+  código sano y **`rc=1` PUSH BLOQUEADO** con una regresión real.
+  Cambiar este contrato tenía un **consumidor vivo**: el control de vacuidad del banco exigía que
+  esa corrida fuera verde. Se cambió el consumidor en el mismo commit, y hay **control positivo**:
+  revertido el `exit 4`, la puerta interior vuelve a dar 0 y la vacuidad lo caza.
 - **Qué la reabre:** cualquier interruptor nuevo que reduzca lo que se ejerce sin cambiar el rc.
 
 ### D-41 · Nada vigila que el enganche `pre-push` exista ni que esté al día
@@ -146,8 +174,41 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Cómo se midió:** TERCERA transición (2026-08-31), brazo de cableado: comparó el enganche
   instalado contra el heredoc del instalador (idénticos) y comprobó que ni `verify.sh` ni
   `sabotage.py` lo miran.
-- **Estado:** ABIERTA · entra en el ciclo 01-05.
-- **Qué la reabre:** trabajar el proyecto en una máquina nueva sin correr el instalador.
+- **Estado:** **CERRADA** en el ciclo **01-05** (2026-08-31) con `tools/hookcheck.py`, cableado
+  como paso de la puerta. Distingue **seis desenlaces**, cada uno con su sabotaje sobre copias:
+  **AUSENTE** · **NO EJECUTABLE** · **DISTINTO** · **FORMA** (el instalador cambió de forma, rc=2)
+  · **ILEGIBLE** (rc=2) · y el positivo de que el enganche siga limpiando `VERIFY_INNER`. Más un
+  **control de vacuidad**: sobre una copia sana, verde.
+  El contenido esperado se **deriva del instalador** (se extrae su heredoc), no de una copia
+  pegada en el comprobador: dos copias se desincronizan a la primera.
+  **La revisión adversaria del diff destapó dos falsos verdes de este mismo arreglo**, los dos
+  reproducidos a mano en un repo de usar y tirar antes de creérselos:
+  - un enganche **sin bit de ejecución** hace que git lo **ignore** (avisa con un `hint:`
+    silenciable) y **el push sale con rc=0** — la variante automática muerta con el fichero ahí;
+  - suponer `.git/hooks` es falso con `core.hooksPath` puesto o en un `git worktree`: el enganche
+    se ignora entero. Ahora la ruta **se le pregunta a git** (`git rev-parse --git-path hooks`),
+    en el comprobador **y** en el instalador.
+- **Nota de diseño:** el paso va **después del banco y fuera de la corrida interior**, a propósito.
+  Mide la MÁQUINA, no el código. Cableado antes, un clon recién hecho o un CI ponía la puerta en
+  rojo por el enganche y **el banco no llegaba a correr**: en esa máquina nada demostraba que
+  ninguno de los otros controles muerde. Lo destapó la revisión del diff.
+- **Qué la reabre:** que aparezca otro enganche de git sin su fila en `hookcheck.py` (la lista de
+  enganches es enumerada, no derivada), o que el instalador cambie de forma sin reinstalar.
+
+### D-42 · `comparar_o_roto` es una red SIN ORÁCULO: pasa con y sin ella
+- **Qué es:** el envoltorio que hace fallar cerrado la comparación de los dos trinquetes es hoy
+  **inalcanzable por construcción**. `cargar_baseline()` ya valida los tipos de todo lo que le
+  llega, así que `comparar` no puede lanzar ninguna de las excepciones que captura. Los dos
+  sabotajes de la foto malformada **miden la validación, no el envoltorio**: dan el mismo rc y el
+  mismo mensaje con él y sin él. Es §5.9 en pequeño, y está **escrito en su propio docstring** en
+  vez de contarse como control medido.
+- **Cómo se midió:** revisión adversaria del diff del ciclo 01-05 (2026-08-31), hallazgo #3,
+  reproducido revirtiendo las dos llamadas a `comparar(...)` a pelo: mensaje y rc **idénticos**.
+- **Estado:** ABIERTA, y **deliberadamente no se arregla ahora**. Quitarlo devolvería el rc=1 con
+  traceback en cuanto alguien añada una clave sin validarla, que es justo D-39. Se queda como red
+  declarada.
+- **Qué la reabre:** que se añada a una foto sellada una clave que `cargar_baseline` no valide;
+  entonces el envoltorio pasa a ser alcanzable y hay que darle sabotaje propio.
 
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
 - **Qué es:** `applySyncPayload` sustituye `ops` entero por lo que venga de la nube, con
@@ -537,6 +598,11 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   medida, y eso el propio instrumento lo declara **deriva (rc=3)**. Hacerlo dentro de un ciclo que
   va de otra cosa sería mover la vara sin plan. Ligada a **D-10** y **D-14**, que son las otras
   cegueras declaradas del mismo instrumento.
+- **Medición nueva, 2026-08-31 (ciclo 01-05):** la foto sella **186** y el código tiene **190**.
+  Ya se ha vuelto a desfasar, como decía la ficha, **y la puerta sigue verde**. Se derivó de
+  rebote al comprobar el remedio del mensaje de foto corrupta: borrar la foto y resellar produce
+  un fichero que difiere del original **exactamente en esa cifra**. No se resella: el 01-05 tiene
+  esto en sus límites de alcance por escrito, y resellar aquí escondería la munición de D-26.
 - **Qué la reabre:** nada la cierra sola. Se cierra cuando `--check` compare la cifra —y entonces
   hace falta su sabotaje: desfasarla a mano tiene que poner la puerta roja.
 
