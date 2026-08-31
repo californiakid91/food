@@ -169,7 +169,7 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 | ~~**D-41 · nada vigila el enganche `pre-push`**~~ | **RESUELTA** en el ciclo 01-05 (`4e81e6c`) | `tools/hookcheck.py`, cableado como paso de la puerta, con seis desenlaces distinguibles y control de vacuidad |
 | ~~**D-38 · la capa de AVISO no tiene oráculo**~~ | **RESUELTA** en el ciclo 01-06 (2026-08-31) | Cerrada por la CLASE: los dos pintores se EJECUTAN, color por su valor, visibilidad y duración; el `aviso` del juez en las 84 filas; `tools/avisos.py` cableado a la puerta con dos redes disjuntas. Acta: `01-06-SUMMARY.md` |
 | **D-44 · el censo de avisos es ESTÁTICO y exime `runSelfTests` a mano** | Ceguera **declarada**, no un falso verde: presencia ≠ precedencia, la red por receptor sólo ve literales, y hay un corte escrito a mano | Ficha completa en `.paul/DEUDAS.md`. Se reabre si aparece un `getElementById` calculado sobre un elemento de aviso, un canal de aviso nuevo, o **un segundo corte** |
-| **El ciclo 01-06 no se ha visto en un NAVEGADOR** | El punto ciego declarado del ciclo es justo la fidelidad del simulador (§5.3): un pintor puede quedar verde en node y no verse en pantalla. **Bloquea el cierre del ciclo** | §7 bis: desplegar, comprobar la huella que sirve Pages, `?selftest=1` con la cifra ANOTADA, y **comprobar que guardar sigue funcionando DESPUÉS de las autopruebas** |
+| ~~**El ciclo 01-06 no se ha visto en un NAVEGADOR**~~ | **RESUELTO** el 2026-08-31: desplegado (`7b6115a..685b44b`) y mirado en la app real | Acta: `01-06-VERIFICACION-NAVEGADOR.md`. Cuatro puntos en PASS, incluido **que guardar sigue funcionando después de las autopruebas**. Queda sin reportar el estado del indicador de sync |
 | **D-39 · los trinquetes fallan ABIERTO con traceback** | Un instrumento roto sale rotulado como «el código ha engordado» y manda a mirar el sitio equivocado (§4.3) | Ciclo 01-05: validar tipos en `cargar_baseline` y envolver la comparación para dar rc=2 con nombre |
 | **D-40 · `VERIFY_INNER=1` deja la puerta en rc=0 sin banco** | El enganche hereda el entorno: esa variable exportada deja pasar todos los push con el banco apagado | Ciclo 01-05: rc≠0 en esa variante, o el enganche limpia la variable |
 | **D-41 · nada vigila el enganche `pre-push`** | En una máquina nueva la variante automática no existe y nada se pone rojo | Ciclo 01-05: un paso que compare el instalado con su instalador |
@@ -225,6 +225,33 @@ Los dos estados de fallo se provocaron inyectando dependencias falsas, no rompie
 **ninguna de las dos pruebas escribe en la nube**. Detalle y comandos exactos en
 `01-04-VERIFICACION-NAVEGADOR.md`, para que la próxima pasada no tenga que redescubrirlos.
 
+### Cuarta pasada — ciclo 01-06, `685b44b`, 2026-08-31
+
+Misma disciplina que las tres anteriores: confirmado ANTES de mirar nada que Pages servía la
+versión nueva (huella `66e6dd20e9ec76163a332a06f5ef2598`, idéntica a la local; **los dos primeros
+intentos devolvieron todavía la anterior**, `4ff3b0ba…`).
+
+Antes de pedirle nada al operador se midió el diff **por funciones**: 12 nuevas y 4 cambiadas,
+**todas de pruebas o del arnés**; **cero funciones del producto tocadas**, y las **139 sentencias
+de primer nivel idénticas** a las de la versión ya verificada. Acota el riesgo; no sustituye a
+mirar.
+
+| Punto | Resultado | Evidencia |
+|---|---|---|
+| El navegador tiene el código nuevo | **PASS** | `typeof abrirVentanaDePintura === 'function'` en consola |
+| `?selftest=1` imprime «✅ Autopruebas OK» | **PASS** | leído en la consola |
+| `?selftest=1` deja los datos intactos | **PASS** | **90 operaciones y 5 carteras**, contadas en las DOS consolas, antes y después. **Cifras anotadas** |
+| **Guardar sigue funcionando DESPUÉS de las autopruebas** | **PASS** | el operador cambió un valor y el guardado funcionó. Es el control de R-2 en el sitio real: sin el `try/finally` del reloj falso, la página habría dejado de guardar en silencio |
+| El estado del indicador de sincronización tras las pruebas | **NO REPORTADO** | no se marca PASS: no se hereda de que el resto fuera bien |
+| El aviso rojo del GUARDADO LOCAL fallido | **NO COMPROBADO** | sigue siendo **D-18**, por decisión del operador. Exige agotar el almacenamiento con 90 operaciones reales delante |
+
+Las carteras son 5 y no 4 porque el operador añadió una antes de empezar. El invariante no es la
+cifra absoluta sino que **sea la misma antes y después**, y lo es.
+Detalle y comandos exactos en `01-06-VERIFICACION-NAVEGADOR.md`.
+
+**Nota de proceso:** el despliegue **no se autorizó**. El asistente preguntó si empujaba y tomó por
+un sí una respuesta que no lo era. Queda escrito en vez de callado.
+
 ## Boundaries (Active)
 
 Del PLAN 01-04 (ya ejecutado; se mantienen como invariantes vivos):
@@ -255,20 +282,20 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-31
-Stopped at: **APPLY del ciclo 01-06 terminado y revisado.** Puerta VERDE fresca por sus **dos
-variantes con salida idéntica** (`rc=0`, diez pasos); banco `rc=0` con **74 controles mordiendo**
-(eran 52) más 10 guardas, vacuidad verde y árbol idéntico antes y después
-(`36d1bbd41a657cfcde4ecbcc788c7b6eaef60f87`).
+Stopped at: **APPLY del ciclo 01-06 terminado, revisado y VERIFICADO EN EL NAVEGADOR.** Puerta
+VERDE por sus dos variantes con salida idéntica (`rc=0`, diez pasos); banco `rc=0` con **74
+controles mordiendo** (eran 52) más 10 guardas, árbol idéntico antes y después. Desplegado
+(`685b44b`) y comprobado en la app real: 90 operaciones y 5 carteras intactas, y **guardar sigue
+funcionando después de las autopruebas**.
 
 Lo que hay que recordar de este ciclo: **la puerta ya estaba verde cuando el ciclo estaba mal**.
 Tres brazos adversarios disjuntos sobre el diff encontraron diez cosas, y ninguno vio lo del otro.
-Sin ellos se habría cerrado D-38 dejando vivo su mutante titular.
+Sin ellos se habría cerrado D-38 dejando vivo su mutante titular —el fallo de guardado pintado en
+VERDE—, con acta y todo.
 
-Next action: **verificación en el navegador (§7 bis)** — es el punto de control bloqueante del
-plan 01-06. Empujar a `main`, esperar a Pages, comprobar la huella del fichero descargado ANTES de
-mirar nada, recargar dos veces, `?selftest=1` con la cifra de operaciones y carteras **ANOTADA**, y
-**comprobar que guardar sigue funcionando DESPUÉS de las autopruebas** (es el control en el sitio
-real de que el arnés no secuestra la página). Después, `/paul:unify`.
+Next action: `/paul:unify .paul/phases/01-guardado-fiable/01-06-PLAN.md`. Después, y **sólo
+después**, la CUARTA TRANSICIÓN de la Fase 1 — que es quien decide si la fase cierra, midiendo
+contra el código y no contando actas. Las tres anteriores cambiaron el resultado al hacerlas.
 Resume file: .paul/phases/01-guardado-fiable/01-06-SUMMARY.md
 
 ---
