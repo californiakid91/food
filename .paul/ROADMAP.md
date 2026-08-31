@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 4 | In progress (4 ciclos cerrados; la 3ª transición devolvió otro hallazgo → 01-05) | - |
+| 1 | Guardado que no miente | 6 | In progress (4 cerrados; 01-05 en PLAN, 01-06 pendiente) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -87,9 +87,25 @@ brazos adversarios disjuntos, cada uno con una FRASE concreta que demoler. En es
 cuatro demolieron su frase y **cada uno encontró algo que ninguno de los otros vio**: el de
 documentos no vio un mutante, y el del oráculo no vio una cifra falsa.
 
-**Planes:** 01-01, 01-02, 01-03 y 01-04 cerrados; **01-05 abierto** por la tercera transición.
-Fichas abiertas por ella: **D-38**, **D-39**, **D-40**, **D-41**. Actas: `01-04-SUMMARY.md` y
-`01-TRANSICION-3.md`.
+**Planes:** 01-01, 01-02, 01-03 y 01-04 cerrados. La tercera transición abre **DOS** ciclos, y se
+partieron a propósito tras la revisión adversaria del primer borrador:
+
+- [ ] **01-05: La vara de medir** — que ningún instrumento pueda romperse y salir rotulado como un
+  hallazgo del código (D-39), que la puerta no pueda salir verde con el banco apagado ni por su
+  código de salida ni por el entorno (D-40), y que la variante automática esté vigilada en vez de
+  supuesta (D-41). **No toca `index.html`.** Va primero porque es la vara con la que se medirá el
+  01-06. PLAN escrito.
+- [ ] **01-06: El aviso que no miente** — cierra **D-38** ENTERA: las tres familias de mutantes
+  (color y duración del aviso local · el `aviso` de las ramas de rechazo · los tres mensajes de
+  consola) y **los DOS pintores que deciden**, `showSaveIndicator` y `setSyncUI`. Es el que
+  desbloquea el cierre de la fase, y el que exige verificación en navegador (§7 bis).
+
+El borrador que juntaba ambas cosas cubría seis de los nueve mutantes y llamaba a eso «cerrar la
+clase». La revisión adversaria lo demolió, y además destapó que exigir «rc≠0 con `VERIFY_INNER=1`»
+tal cual **mataba el banco de sabotaje**, porque el banco ejecuta la puerta con esa misma variable.
+Los dos hallazgos se verificaron con comando propio antes de aceptarlos.
+
+Actas: `01-04-SUMMARY.md` y `01-TRANSICION-3.md`.
 
 ### Phase 2: Backup y restauración
 

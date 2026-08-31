@@ -10,6 +10,9 @@
 (cuatro brazos adversarios disjuntos: caminos de pérdida, calidad del oráculo, cableado, y
 documentos contra evidencia). Abrió **D-38, D-39, D-40 y D-41**, marcó **D-15 y D-03 a
 re-medir**, y **NO cerró la fase**: acta `.paul/phases/01-guardado-fiable/01-TRANSICION-3.md`.
+La revisión adversaria del PLAN 01-05 (2026-08-31) amplió **D-38** con un segundo pintor que
+decide (`setSyncUI`) y con el reloj de la duración, y partió el trabajo en dos ciclos: **01-05**
+(instrumental) y **01-06** (la capa de aviso entera).
 Medición anterior: **2026-08-30**, ciclo **01-04** (cuatro brazos adversarios
 disjuntos —correctness, falsos verdes, calidad del oráculo y cableado— sobre el diff del ciclo).
 Cerró D-33, D-34 y D-31; abrió D-35, D-36 y D-37, y añadió `onScreenshotPicked` a D-09. Acta del
@@ -91,8 +94,19 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   sobre una copia aislada; el mutante representativo **re-verificado a mano** por el orquestador:
   `bash tools/verify.sh` → `rc=0`. Control positivo del arnés hecho: invertir `vaciariaElLibro`
   SÍ muere (rc=2), o sea que el estímulo llega y el oráculo muerde cuando puede.
-- **Estado:** ABIERTA · **es lo que abre el ciclo 01-05**. No se difiere: la meta de la Fase 1 dice
-  «en silencio», y un fallo pintado en verde ES el silencio.
+- **Segundo pintor que DECIDE, destapado por la revisión adversaria del PLAN 01-05 (2026-08-31):**
+  `setSyncUI` lleva dentro toda la cascada de estados con sus colores. Mutar su rama de error para
+  pintar el verde `#27ae60` es literalmente «un fallo de sincronización pintado en verde» —el daño
+  que da nombre al ciclo— y **hoy no lo mide nada**: la matriz comprueba el `aviso` que DEVUELVE el
+  juez, no lo que el pintor HACE con él, y `cloudwrites.py` sólo prohíbe el literal
+  `setSyncUI('ok')`. El arreglo tiene que cortar por el mismo sitio en los DOS pintores.
+- **La duración no vive en el elemento:** vive en el `setTimeout` del aviso. Un espía que registre
+  lo escrito en el elemento **no puede leerla**, así que ese mutante exige un reloj falso (§5.12),
+  no un espía de pantalla.
+- **Estado:** ABIERTA · la ataca **ENTERA el ciclo 01-06**. El borrador del 01-05 sólo cubría seis
+  de los nueve mutantes —se dejaba fuera la familia de los tres avisos de consola— y declaraba «la
+  clase cerrada»: cerrar seis y llamarlo clase habría sido §5.10 con acta. No se difiere: la meta
+  de la Fase 1 dice «en silencio», y un fallo pintado en verde ES el silencio.
 - **Qué la reabre:** que aparezca cualquier aviso al operador sin mutante propio que lo mate.
 
 ### D-39 · Los trinquetes revientan con `rc=1` y traceback en vez de fallar CERRADO

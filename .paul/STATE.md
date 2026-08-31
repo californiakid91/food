@@ -12,7 +12,8 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — **ABIERTA; su TERCERA transición NO la cerró**
 Planes: 01-01, 01-02, 01-03 y **01-04** CERRADOS (el último desplegado y visto en el navegador,
-`e2e8f86`). **01-05 ABIERTO** por la tercera transición.
+`e2e8f86`). **01-05: PLAN escrito y ATACADO**, corregido y pendiente de aprobación. **01-06 pendiente de
+planificar** (cierra D-38 entera).
 Status: los TRES objetivos del ALCANCE están en PASS medidos hoy contra el código. La **META no**:
 dice «en silencio», y el aparato de medición **no cubre la capa de aviso**. Pintar en VERDE un
 guardado que ha fallado deja la puerta entera en `rc=0` y «VERDE — todo ejercido y en verde»;
@@ -42,7 +43,7 @@ Progress:
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [01-05 ABIERTO — sin PLAN todavía]
+  ✓        ○        ○     [01-05 escrito; en revisión adversaria antes de aprobar]
 ```
 
 Ciclos 01-01, 01-02, 01-03 y 01-04: cerrados, cada uno con su acta, y el último desplegado. La
@@ -213,17 +214,21 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-31
-Stopped at: **TERCERA transición de la Fase 1 hecha y escrita.** Medida contra el código con la
-puerta verde y el árbol en exclusiva, con cuatro brazos adversarios disjuntos. Veredicto: **la
-fase NO cierra**. Correcciones documentales ya aplicadas en el mismo commit (cifra 15→14 con
-errata al pie del acta del 01-04, `PROJECT.md` al día con el despliegue, la tabla del `ROADMAP`
-que se contradecía a sí misma).
-Next action: **`/paul:plan` del ciclo 01-05** — «el aviso que no miente». Objetivo: que la capa de
-AVISO deje de ser el punto ciego del aparato de medición (D-38, cerrando la CLASE y no los nueve
-casos), y que los instrumentos no puedan romperse y salir clasificados como hallazgo de código
-(D-39, D-40, D-41). **Fuera de alcance:** el truncamiento por sync (D-01/D-30, Fase 3) y el
-resellado de `funciones_vistas` (D-26). El PLAN lo escribe Opus y lo ataca Fable antes de ejecutar.
-Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION-3.md
+Stopped at: **PLAN 01-05 escrito, atacado y REESCRITO.** La revisión adversaria demolió tres
+afirmaciones del borrador, las tres verificadas después con comando propio: (1) exigir «rc≠0 con
+`VERIFY_INNER=1`» **mataba el banco de sabotaje**, porque `sabotage.py::puerta()` ejecuta la puerta
+con esa misma variable y su control de vacuidad exige que esa corrida sea verde; (2) el plan
+prometía cerrar la CLASE del aviso y sólo atacaba **seis de los nueve** mutantes —faltaba la
+familia de los tres avisos de consola— y además dejaba fuera un **segundo pintor que decide**
+(`setSyncUI`), donde pintar de verde un error de sincronía es el daño que da nombre al ciclo;
+(3) la duración del aviso **no vive en el elemento** sino en su temporizador, así que el espía
+propuesto no podía leerla (§5.12: hace falta reloj falso).
+El trabajo se partió en dos ciclos por decisión del operador: **01-05** = la vara de medir
+(instrumental, no toca `index.html`), **01-06** = la capa de aviso ENTERA. Cerrar seis mutantes y
+llamarlo «clase cerrada» habría sido §5.10 con acta.
+Next action: `/paul:apply .paul/phases/01-guardado-fiable/01-05-PLAN.md`. El plan ya está atacado y
+corregido; los tres hallazgos de la revisión están incorporados como AC o como scope-limit nominal.
+Resume file: .paul/phases/01-guardado-fiable/01-05-PLAN.md
 
 ---
 *STATE.md — Updated after every significant action*
