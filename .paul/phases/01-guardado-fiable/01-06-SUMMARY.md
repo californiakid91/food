@@ -162,3 +162,34 @@ hallazgos de los brazos adversarios**, no del plan.
 de las escrituras; **no** resuelve `var(--green)` a un color real, no aplica CSS, no tiene
 disposición ni service worker. Un pintor puede quedar verde fuera del navegador y no verse en
 pantalla. Por eso el ciclo **no cierra sin la verificación en el navegador** (§7 bis).
+
+---
+
+## Cierre del loop (UNIFY, 2026-08-31)
+
+El acta de arriba se escribió al terminar el APPLY, cuando el punto ciego declarado —la fidelidad
+del simulador— seguía sin resolver. **Ya está resuelto**: el ciclo se abrió en la app desplegada y
+se miró.
+
+- **Navegador:** `685b44b` desplegado en Pages, confirmado por huella del fichero descargado
+  (`66e6dd20e9ec76163a332a06f5ef2598`, idéntica a la local; los dos primeros intentos servían aún
+  la anterior). Cuatro puntos en PASS, incluido **que guardar sigue funcionando después de las
+  autopruebas**, que es el control de R-2 en el sitio real. Acta:
+  `01-06-VERIFICACION-NAVEGADOR.md`.
+- **No reportado, y por eso no marcado PASS:** el estado del indicador de sincronización tras las
+  pruebas. No se hereda de que el resto fuera bien.
+- **Puerta re-corrida FRESCA en el UNIFY**, sobre el árbol ya commiteado
+  (`2b3d9973de899e7f014e0e9d1e1050b451343d86`): `bash tools/verify.sh` → **rc=0**, «VERDE — todo
+  ejercido y en verde», los **diez** pasos. Árbol idéntico antes y después, `git status` limpio.
+
+**Reconciliación PLAN vs. real:** los diez AC en PASS, con dos desviaciones anotadas arriba (el
+ámbito del censo, más ancho que el del plan; y el oráculo de los 34 avisos del censo, que es la
+foto sellada y no un espía por aviso). Ninguna deuda diferida en silencio: los diez hallazgos de
+los brazos se arreglaron dentro del ciclo, y la única ceguera nueva —**D-44**— tiene ficha propia
+en `.paul/DEUDAS.md` con lo que la reabre.
+
+**Lo que este cierre NO autoriza:** cerrar la FASE 1. El disparador de cierre de fase es medir los
+objetivos contra el código, no que haya seis actas para seis planes (§7). Las tres transiciones
+anteriores cambiaron el resultado al hacerlas.
+
+*Loop cerrado: PLAN ✓ → APPLY ✓ → UNIFY ✓*

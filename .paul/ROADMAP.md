@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 6 | In progress (**6 de 6 ciclos cerrados**; D-38 cerrada. Falta el NAVEGADOR del 01-06 y la CUARTA transición, que es quien decide si la fase cierra) | - |
+| 1 | Guardado que no miente | 6 | In progress (**6 de 6 ciclos cerrados con su loop completo**; D-38 cerrada y el 01-06 visto en el navegador. Falta la CUARTA transición, que es quien decide si la fase cierra) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -120,14 +120,17 @@ partieron a propósito tras la revisión adversaria del primer borrador:
   Los diez arreglados dentro del ciclo. Puerta VERDE por sus dos variantes con salida idéntica;
   banco `rc=0` con **74 controles mordiendo** (eran 52) más 10 guardas.
   Acta: `01-06-SUMMARY.md`.
-  **PENDIENTE: la verificación en navegador (§7 bis)**, que es punto de control bloqueante.
+  **Verificación en navegador HECHA** el 2026-08-31 sobre `685b44b` desplegado: cuatro puntos en
+  PASS, incluido que **guardar sigue funcionando después de las autopruebas**; 90 operaciones y 5
+  carteras idénticas antes y después. Sin reportar: el estado del indicador de sincronización.
+  Acta: `01-06-VERIFICACION-NAVEGADOR.md`. **LOOP CERRADO** (PLAN ✓ APPLY ✓ UNIFY ✓).
 
-Con el 01-06 cerrado, **D-38 ya no impide nada**. Lo que queda antes de intentar la CUARTA
-transición es **abrir la app en el navegador** (§7 bis): el punto ciego declarado de este ciclo es
-justo la fidelidad del simulador —no resuelve `var(--green)` a un color, no aplica CSS—, así que un
-pintor puede quedar verde en node y no verse en pantalla. Una sonda verde nunca supera a un intento
-real. Y **el cierre de un CICLO no autoriza el cierre de una FASE** (§7): quien decide es la
-medición contra el código, no el conteo de actas.
+Con el 01-06 cerrado y visto en el navegador, **D-38 ya no impide nada** y no queda ningún punto de
+control bloqueante antes de la CUARTA transición. El punto ciego declarado del ciclo —la fidelidad
+del simulador, que no resuelve `var(--green)` a un color ni aplica CSS— se cubrió con el intento
+real, que es lo único que supera a una sonda verde. Y **el cierre de un CICLO no autoriza el cierre
+de una FASE** (§7): quien decide es la medición contra el código, no el conteo de actas. Las tres
+transiciones anteriores cambiaron el resultado al hacerlas.
 
 El borrador que juntaba ambas cosas cubría seis de los nueve mutantes y llamaba a eso «cerrar la
 clase». La revisión adversaria lo demolió, y además destapó que exigir «rc≠0 con `VERIFY_INNER=1`»

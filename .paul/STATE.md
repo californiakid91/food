@@ -12,8 +12,9 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. Su tercera transición no la cerró, y la
 cuarta **aún no se ha hecho**.
-Planes: 01-01 a 01-06 **CERRADOS**. Falta la **verificación en el navegador** del 01-06 (§7 bis),
-que el propio plan pone como punto de control bloqueante, y después la CUARTA transición.
+Planes: 01-01 a 01-06 **CERRADOS**, el 01-06 con su loop completo (PLAN ✓ APPLY ✓ UNIFY ✓) y su
+verificación en el navegador hecha. Falta la CUARTA transición, que es quien decide si la fase
+cierra.
 Status: los TRES objetivos del ALCANCE siguen en PASS. La META —«sin que se entere nadie»— ya
 tiene oráculo: **D-38 CERRADA** por el ciclo 01-06. Abiertas D-42, D-43 y la nueva **D-44**
 (ceguera declarada del censo de avisos); D-15 y D-03 siguen marcadas A RE-MEDIR.
@@ -53,18 +54,19 @@ Actividad anterior: 2026-08-31 — despliegue y verificación en el navegador de
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [██████████] 100% de los ciclos (6 de 6 cerrados). La FASE sigue abierta: falta el
-  navegador (§7 bis) y la CUARTA transición, que es quien decide si cierra
+- Phase: [██████████] 100% de los ciclos (6 de 6 cerrados, loops completos y navegador hecho).
+  La FASE sigue abierta: falta la CUARTA transición, que es quien decide si cierra
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ○     [01-06 APPLY hecho y revisado por tres brazos; falta navegador y UNIFY]
+  ✓        ✓        ✓     [01-06 CERRADO el 2026-08-31: navegador hecho, acta cerrada, puerta
+                            re-corrida fresca en el UNIFY. Siguiente: CUARTA TRANSICIÓN de la fase]
 ```
 
-Ciclos 01-01 a 01-05: cerrados, cada uno con su acta. La
+Ciclos 01-01 a 01-06: cerrados, cada uno con su acta. La
 fase NO está cerrada. Su TERCERA transición (2026-08-31) midió la meta contra el código y **volvió
 a cambiar el resultado, por tercera vez consecutiva**: la primera abrió el 01-03, la segunda
 destapó D-33 y abrió el 01-04, y ésta abre el 01-05. `PLAN == SUMMARY` habría cerrado la fase las
@@ -282,7 +284,9 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-31
-Stopped at: **APPLY del ciclo 01-06 terminado, revisado y VERIFICADO EN EL NAVEGADOR.** Puerta
+Stopped at: **CICLO 01-06 CERRADO — loop completo.** Verificado en el navegador y UNIFY hecho, con
+la puerta re-corrida FRESCA sobre el árbol commiteado
+(`2b3d9973de899e7f014e0e9d1e1050b451343d86`): `rc=0`, diez pasos, `git status` limpio. Puerta
 VERDE por sus dos variantes con salida idéntica (`rc=0`, diez pasos); banco `rc=0` con **74
 controles mordiendo** (eran 52) más 10 guardas, árbol idéntico antes y después. Desplegado
 (`685b44b`) y comprobado en la app real: 90 operaciones y 5 carteras intactas, y **guardar sigue
@@ -293,8 +297,7 @@ Tres brazos adversarios disjuntos sobre el diff encontraron diez cosas, y ningun
 Sin ellos se habría cerrado D-38 dejando vivo su mutante titular —el fallo de guardado pintado en
 VERDE—, con acta y todo.
 
-Next action: `/paul:unify .paul/phases/01-guardado-fiable/01-06-PLAN.md`. Después, y **sólo
-después**, la CUARTA TRANSICIÓN de la Fase 1 — que es quien decide si la fase cierra, midiendo
+Next action: la **CUARTA TRANSICIÓN de la Fase 1** — que es quien decide si la fase cierra, midiendo
 contra el código y no contando actas. Las tres anteriores cambiaron el resultado al hacerlas.
 Resume file: .paul/phases/01-guardado-fiable/01-06-SUMMARY.md
 
