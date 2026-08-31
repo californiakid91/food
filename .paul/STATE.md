@@ -13,8 +13,9 @@ Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — **ABIERTA; su TERCERA transición NO la cerró**
 Planes: 01-01, 01-02, 01-03, **01-04** y **01-05** CERRADOS. El 01-04 desplegado y visto en el
 navegador (`e2e8f86`); el **01-05** (`4e81e6c`) es instrumental y **no toca `index.html`**, por lo
-que no necesita navegador. **01-06 pendiente de planificar**: cierra D-38 ENTERA y es lo único que
-queda para poder intentar la cuarta transición.
+que no necesita navegador. **01-06 PLANIFICADO** (`01-06-PLAN.md`, escrito, atacado por dos brazos
+disjuntos y reescrito): cierra D-38 ENTERA y es lo único que queda para poder intentar la cuarta
+transición. Pendiente de aprobación y APPLY.
 Status: los TRES objetivos del ALCANCE siguen en PASS. La **META no**: dice «en silencio», y el
 aparato de medición **no cubre la capa de aviso** — pintar en VERDE un guardado que ha fallado deja
 la puerta entera en `rc=0`, y nueve mutantes de esa capa sobreviven (**D-38**). Los otros tres
@@ -22,7 +23,28 @@ huecos del aparato de medición **ya no están**: el 01-05 cerró **D-39** (los 
 CERRADO), **D-40** (la puerta no puede salir verde con el banco apagado, ni por rc ni por entorno)
 y **D-41** (el enganche `pre-push`, vigilado). Abiertas D-38 (bloquea la fase), D-42 y D-43;
 D-15 y D-03 marcadas A RE-MEDIR.
-Last activity: 2026-08-31 — **UNIFY del ciclo 01-05**, la vara de medir (`4e81e6c`). Los siete AC
+Last activity: 2026-08-31 — **PLAN del ciclo 01-06** escrito, atacado y REESCRITO. El enfoque no lo
+decidió un solo modelo: era diseño abierto (§2) con precedentes propios del repo tirando en
+direcciones opuestas, así que se resolvió con **dialéctica adversaria de dos posturas, dos rondas**
+→ ejecutar los pintores REALES sobre un DOM observable con reloj falso, SIN extraer funciones puras
+(la mitad «decisión» ya existe y está medida desde el 01-04; lo que nunca ha ejecutado ningún test
+es el pintor). Sonda previa: los pintores se ejecutan fuera del navegador y su efecto se lee,
+duración incluida — árbol NO mutado.
+Después, **dos brazos adversarios disjuntos demolieron el borrador y cada uno vio algo que el otro
+no**. Los dos hallazgos decisivos, **re-verificados a mano sobre copia aislada** (árbol idéntico
+antes y después, `5decd8e9…`):
+**R-1** — el borrador dejaba viva UNA DE LAS TRES FAMILIAS que decía cerrar: la matriz de 84 filas
+afirma `clave` y `subir` pero **nunca `aviso`**, así que un rechazo por vaciado etiquetado como
+«todo bien» —un fallo pintado en VERDE— sale hoy `rc=0` con «✅ Autopruebas OK». Era «cerrar seis de
+nueve y llamarlo la clase», el mismo movimiento ya demolido en el borrador del 01-05.
+**R-2** — el borrador no exigía `try/finally` alrededor del reloj falso: un aserto que LANZARA
+habría dejado `setTimeout` sustituido para el resto de la vida de la página, capturando el
+`setTimeout(guardarTodo, 600)` de `schedSave`; o sea, **el ciclo que viene a impedir el borrado
+silencioso habría dejado de guardar los datos del operador, en silencio**.
+Incorporados los 11 hallazgos. También se **retira la cifra «nueve mutantes»**: no tiene artefacto
+que la respalde (nunca se enumeraron), y un criterio de éxito que la cite no se puede marcar PASS.
+Plan: `01-06-PLAN.md`.
+Actividad anterior: 2026-08-31 — **UNIFY del ciclo 01-05**, la vara de medir (`4e81e6c`). Los siete AC
 en PASS, cada uno **re-medido en esta sesión** y no heredado del APPLY: rc y mensajes literales
 transcritos en el acta. Puerta VERDE fresca por **sus dos variantes, y con salida idéntica**
 (`bash tools/verify.sh` → rc=0; y con `VERIFY_INNER=1` **exportado**, el enganche `pre-push` ejerció
@@ -51,7 +73,7 @@ Progress:
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ✓     [01-05 cerrado — listo para planificar el 01-06]
+  ✓        ○        ○     [01-06 PLANIFICADO y revisado; pendiente de aprobación]
 ```
 
 Ciclos 01-01 a 01-05: cerrados, cada uno con su acta. La
@@ -127,6 +149,12 @@ tres veces.
 | Toda foto sellada corrupta imprime su REMEDIO | 01-05 | Una foto ilegible bloqueaba también el resellado: el operador quedaba sin salida. Un rc=2 sin salida es un callejón |
 | `comparar_o_roto` se deja sin oráculo a propósito y se ficha como D-42 | 01-05 | Quitarlo devolvería el rc=1 con traceback en cuanto alguien añada una clave sin validar, que es justo D-39. Red declarada, deuda escrita |
 | `index.html` intacto y cero fotos reselladas son EVIDENCIA, no ausencia de trabajo | 01-05 | Son la prueba de que el ciclo cambió cómo FALLAN los instrumentos, no qué MIDEN. Si una foto hubiera necesitado resellado, sería deriva (rc=3) |
+| El enfoque del 01-06 lo decide una DIALÉCTICA, no yo solo | 01-06 PLAN | Diseño abierto con dos precedentes propios del repo en contra (01-04 dice «quien decide no hace E/S» Y dice «extraer para poder EJECUTARLO en node»). Dos posturas, dos rondas. Gana ejecutar el pintor real: la mitad «decisión» ya existe y está medida; lo que nunca ha ejecutado ningún test es el pintor |
+| El arnés observable devuelve `null` para todo id que no exista en `index.html` | 01-06 PLAN | Un DOM de mentira permisivo fabrica una clase de falsos verdes que el navegador no tiene: una errata en un identificador pasaría verde fuera del navegador y no pintaría nada en pantalla (§5.3). El conjunto se deriva del fichero, no se enumera |
+| El `aviso` del juez de subida entra en la matriz: la familia que el borrador dejaba viva | 01-06 PLAN | Re-verificado a mano: hoy un rechazo por vaciado etiquetado «todo bien» sale rc=0 y «✅ Autopruebas OK». Cerrar los dos pintores y llamarlo «la clase» habría sido §5.10 con acta, y ya pasó en el borrador del 01-05 |
+| El `try/finally` del reloj falso es BLOQUEANTE, no buena práctica | 01-06 PLAN | Sin él, un aserto que lance deja `setTimeout` sustituido para toda la vida de la página y el temporizador que guarda queda capturado: el ciclo contra el borrado silencioso habría dejado de guardar en silencio. Lleva mutante propio, o el control nunca se habrá visto rojo |
+| La red se cierra por RECEPTOR, no por una lista de canales | 01-06 PLAN | El borrador enumeraba «los dos pintores» y heredaba un ámbito de consola sellado a mano, que deja fuera HOY el arranque y las ventanas emergentes de sesión. Un guardián de deriva caza a quien QUITE una entrada, pero un conjunto incompleto DE ORIGEN le es invisible (§5.15) |
+| Se retira la cifra «nueve mutantes» de todo criterio de éxito | 01-06 PLAN | Nunca se enumeraron: el brazo B los reportó y sólo se re-verificó el representativo. Un criterio que cita una cifra sin artefacto no se puede marcar PASS con evidencia. Lo contrastable es el censo derivado |
 | Los hallazgos de los brazos se re-verifican a mano antes de aceptarlos | Fase 1 transición 3 | Un brazo puede inventar agujeros (§5.4). Los cuatro decisivos se reprodujeron con comando propio sobre copias aisladas; el resto se marca explícitamente como no re-verificado |
 
 ### Deferred Issues
@@ -248,10 +276,11 @@ AC y está escrita en el libro en este mismo commit.
 (`a2ed63a9…`): Pages sirve exactamente el código verificado en el navegador. Lo pendiente de
 empujar son actas y herramientas.
 
-Next action: `/paul:plan 01-06` — la capa de aviso ENTERA (D-38). Es lo único que queda para poder
-intentar la CUARTA transición de la Fase 1. Recordar: el 01-06 **sí** exige verificación en el
-navegador (§7 bis), porque cambia lo que el operador ve cuando algo falla.
-Resume file: .paul/phases/01-guardado-fiable/01-05-SUMMARY.md
+Next action: `/paul:apply .paul/phases/01-guardado-fiable/01-06-PLAN.md` — tras aprobar el plan.
+Recordar: el 01-06 **sí** exige verificación en el navegador (§7 bis), y el checkpoint incluye
+comprobar que **guardar sigue funcionando DESPUÉS de las autopruebas** (es el control de R-2 en el
+sitio real).
+Resume file: .paul/phases/01-guardado-fiable/01-06-PLAN.md
 
 ---
 *STATE.md — Updated after every significant action*

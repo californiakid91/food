@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 6 | In progress (5 cerrados; 01-06 pendiente, cierra D-38 y desbloquea la fase) | - |
+| 1 | Guardado que no miente | 6 | In progress (5 cerrados; **01-06 planificado y revisado**, pendiente de APPLY; cierra D-38 y desbloquea la fase) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -98,10 +98,17 @@ partieron a propósito tras la revisión adversaria del primer borrador:
   instrumentos siguen midiendo lo mismo. Abre **D-42** y **D-43**. Re-derivadas en fresco: 9 pasos
   en la puerta, 52 mordidas del banco, 61 controles verdes, **11 de este ciclo**.
   Acta: `01-05-SUMMARY.md`.
-- [ ] **01-06: El aviso que no miente** — cierra **D-38** ENTERA: las tres familias de mutantes
-  (color y duración del aviso local · el `aviso` de las ramas de rechazo · los tres mensajes de
-  consola) y **los DOS pintores que deciden**, `showSaveIndicator` y `setSyncUI`. Es el que
-  desbloquea el cierre de la fase, y el que exige verificación en navegador (§7 bis).
+- [ ] **01-06: El aviso que no miente** — **PLANIFICADO 2026-08-31** (`01-06-PLAN.md`). Cierra
+  **D-38** ENTERA: los dos pintores ejecutados de verdad fuera del navegador (color, texto,
+  visibilidad y duración con reloj falso), el campo `aviso` del juez de subida en todas sus ramas
+  de rechazo, los avisos de consola por mensaje literal, y una red **por receptor** cableada a la
+  puerta para que un aviso nuevo no nazca sin oráculo.
+  El enfoque se decidió por **dialéctica adversaria** (dos posturas, dos rondas) y el borrador fue
+  **demolido por dos brazos disjuntos**: dejaba viva una de las tres familias —un rechazo de subida
+  etiquetado «todo bien» sale HOY `rc=0` con «✅ Autopruebas OK», re-verificado a mano— y su reloj
+  falso sin `try/finally` podía dejar de guardar los datos del operador en silencio. Once hallazgos
+  incorporados; **retirada la cifra «nueve mutantes»** por no tener artefacto.
+  Exige verificación en navegador (§7 bis).
 
 Con el 01-05 cerrado, **lo único que impide cerrar la Fase 1 es D-38**: la capa de aviso sin
 oráculo. La cuarta transición sólo puede intentarse después del 01-06.
