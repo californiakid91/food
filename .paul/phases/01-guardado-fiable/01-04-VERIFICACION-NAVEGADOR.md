@@ -89,13 +89,22 @@ Repetir el paso 1. Tiene que dar el mismo número que al principio.
 
 | Punto | Resultado | Evidencia |
 |---|---|---|
-| 0 · el navegador tiene el código nuevo | PENDIENTE | |
-| 2 · verde en uso normal | PENDIENTE | |
-| 3 · «✅ Autopruebas OK» | PENDIENTE | |
-| 3 · `?selftest=1` deja los datos intactos | PENDIENTE | |
-| 4 · naranja «Cambios sin subir» | PENDIENTE | |
-| 5 · **ROJO «No se pudo sincronizar»** | PENDIENTE | |
-| 6 · datos intactos al final | PENDIENTE | |
+| 0 · el navegador tiene el código nuevo | **PASS** | `typeof decidirSubida === 'function'` → `true` en la consola del operador |
+| 2 · verde en uso normal | **PASS** | visto en pantalla por el operador |
+| 3 · «✅ Autopruebas OK» | **PASS** | leído en la consola |
+| 3 · `?selftest=1` deja los datos intactos | **PASS** | operaciones contadas antes y después por el operador, sin cambio |
+| 4 · naranja «Cambios sin subir» | **PASS** | provocado con el cerrojo de mentira; punto naranja, `aviso: 'pendiente'` |
+| 5 · **ROJO «No se pudo sincronizar»** | **PASS** | provocado con una escritura que rechaza; punto rojo, `aviso: 'error'`. **Es la primera vez que este estado se ve en un navegador real** |
+| 6 · datos intactos al final | **PENDIENTE** | recuento final no comunicado |
 
 > Se rellena con lo que el operador VE, no con lo que se espera que pase. Un punto sin
 > evidencia se queda en PENDIENTE, no pasa a PASS.
+
+**Lo que este documento NO demuestra.** Las cifras exactas del recuento no quedaron anotadas en
+esta pasada: el operador confirmó que no cambiaban, pero las dos pasadas anteriores sí dejaron
+el número (90 operaciones, 4 carteras). Una confirmación sin cifra es más débil que una con
+cifra y así se dice, en vez de copiar el 90 de una pasada anterior como si se hubiera medido hoy.
+
+**D-18 sigue abierta.** El rojo comprobado aquí es el de la SUBIDA fallida. El aviso rojo del
+GUARDADO LOCAL fallido —el que exige agotar el almacenamiento del navegador— sigue sin
+comprobarse desde la Fase 0. Son dos avisos distintos y este ciclo sólo cierra uno.

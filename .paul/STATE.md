@@ -13,24 +13,32 @@ Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — **ABIERTA; pendiente su TERCERA transición**
 Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 CERRADO (`77f8cef` +
 `56795eb` + acta); 01-03 CERRADO (`96c7a3e`, desplegado y verificado en el navegador);
-**01-04 CERRADO** (`21e1edb` + acta `01-04-SUMMARY.md`) — **sin desplegar**
+**01-04 CERRADO** (`21e1edb` + acta `01-04-SUMMARY.md`) — **desplegado y visto en el navegador** (`e2e8f86`)
 Status: el ciclo 01-04 cerró el defecto que paró la fase. Los siete criterios de aceptación en
 PASS con su artefacto, re-medidos en UNIFY con el árbol en exclusiva. Hay **exactamente una**
 escritura a Firestore en `index.html`, dentro de `subirALaNube`, decidida por `decidirSubida` —
 pura, ejecutable en node, que falla CERRADO de forma simétrica para operaciones y activos. Cero
 llamadas literales `setSyncUI('ok')`. D-33, D-34 y D-31 cerradas; D-35, D-36 y D-37 abiertas.
-Last activity: 2026-08-31 — **UNIFY del ciclo 01-04**. Puerta VERDE por sus DOS variantes
+Last activity: 2026-08-31 — **DESPLIEGUE y verificación en el navegador del 01-04**. Empujado
+`9ca21ee..7b6115a` con la puerta verde por su variante automática (`pre-push`, `rc=0`, ocho
+pasos). Confirmado por huella que Pages sirve la versión nueva
+(`4ff3b0ba79afa7ca1d479ea1525ad51d`, idéntica a la local; los dos primeros intentos devolvieron
+todavía la anterior). El operador lo miró en la app real: verde en uso normal, «✅ Autopruebas OK»
+sin tocar datos, y **los estados NARANJA y ROJO vistos por primera vez en un navegador**,
+provocados con dependencias de mentira que no escriben en la nube. Acta:
+`01-04-VERIFICACION-NAVEGADOR.md`.
+Actividad anterior: 2026-08-31 — **UNIFY del ciclo 01-04**. Puerta VERDE por sus DOS variantes
 (manual `rc=0` y enganche `pre-push` `rc=0`, salidas idénticas byte a byte salvo la línea de
 anuncio del propio enganche), árbol en exclusiva (`HEAD^{tree}` =
 `5870b9a53d56939119b647e9b64425e550ee7fb6`, idéntico antes y después de medir). Ocho pasos en la
 puerta, dos nuevos de este ciclo. **44 sabotajes mordiendo, 15 de este ciclo**, con el control de
 vacuidad vivo. Cifras re-derivadas en este UNIFY, no copiadas del APPLY.
-Actividad anterior: 2026-08-30 — APPLY del ciclo 01-04; los cuatro brazos adversarios devolvieron
+Y antes: 2026-08-30 — APPLY del ciclo 01-04; los cuatro brazos adversarios devolvieron
 veredicto y tres de ellos demolieron su frase con mutantes que sobrevivían a la puerta entera.
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [█████████░] 90% (4 ciclos cerrados; falta la tercera transición y ver el ciclo en el navegador)
+- Phase: [█████████░] 95% (4 ciclos cerrados y el último ya visto en el navegador; falta la TERCERA transición)
 
 ## Loop Position
 
@@ -114,7 +122,7 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 | ~~El cerrojo del libro ilegible se levanta antes de confirmar la reparación~~ | **RESUELTO** en el ciclo 01-03 (`96c7a3e`) | Arreglado, con autoprueba del cruce y diez controles positivos. Acta: `01-03-SUMMARY.md` |
 | ~~La FASE 1 no se ha medido contra el código después del 01-03~~ | **RESUELTO**: medida el 2026-08-30 sobre `69f728e..HEAD` | Acta: `01-TRANSICION-2.md`. La medición cambió el resultado: destapó D-33 |
 | ~~**D-33** · una tercera escritura a la nube esquiva la guarda de no-vaciado~~ | **RESUELTO** en el ciclo 01-04 (`21e1edb`) | Cerrada por la CLASE: una sola escritura, dos redes disjuntas cableadas a la puerta, control positivo en el banco. Acta: `01-04-SUMMARY.md` |
-| **El ciclo 01-04 no se ha visto en un navegador** | Añade un estado visual nuevo (punto ROJO «No se pudo sincronizar») y está SIN DESPLEGAR: la puerta no prueba la interfaz | Empujar a `main`, confirmar por huella que Pages sirve la versión nueva, recargar dos veces y mirarlo (§7 bis). Es requisito para la tercera transición |
+| ~~**El ciclo 01-04 no se ha visto en un navegador**~~ | **RESUELTO** el 2026-08-31: desplegado (`9ca21ee..e2e8f86`) y mirado en la app real | Acta: `01-04-VERIFICACION-NAVEGADOR.md`. Seis de siete puntos en PASS, incluido el ROJO nuevo. Queda el recuento final sin cifra |
 | **La FASE 1 no se ha medido contra el código después del 01-04** | Sin esa medición no se puede cerrar la fase; las dos veces anteriores medir CAMBIÓ el resultado | Tercera transición de fase sobre el diff completo, con brazos adversarios disjuntos |
 | G7 (radio de impacto) no ve `index.html` | La transición de fase no tiene instrumento propio; hoy se hace a mano | D-22. Se cierra cuando el grafo indexe el `<script>`, o cuando el sustituto sea un script del repo cableado a la puerta |
 
@@ -148,6 +156,26 @@ Misma disciplina: confirmado antes de mirar nada que Pages servía la versión n
 | `?selftest=1` deja los datos intactos | **PASS** | **90 operaciones y 4 carteras**, leídas de `balance-ops` y `balance-meta-v2` antes y después. Las mismas que en la pasada anterior |
 | El aviso sale en ROJO cuando el guardado falla | **NO COMPROBADO** | sigue siendo **D-18**; el 01-03 no lo tocó |
 
+### Tercera pasada — ciclo 01-04, `e2e8f86`, 2026-08-31
+
+Misma disciplina que las dos anteriores: confirmado ANTES de mirar nada que Pages servía la
+versión nueva (huella `4ff3b0ba79afa7ca1d479ea1525ad51d`, idéntica a la local; los dos primeros
+intentos devolvieron todavía la anterior, `661acd6b…`).
+
+| Punto | Resultado | Evidencia |
+|---|---|---|
+| El navegador tiene el código nuevo | **PASS** | `typeof decidirSubida === 'function'` en consola |
+| Verde en uso normal | **PASS** | visto en pantalla por el operador |
+| `?selftest=1` imprime «✅ Autopruebas OK» | **PASS** | leído en la consola |
+| `?selftest=1` deja los datos intactos | **PASS** | contado por el operador antes y después; **sin cifra anotada** esta vez |
+| NARANJA «Cambios sin subir» | **PASS** | provocado con un cerrojo de mentira; `aviso: 'pendiente'` |
+| **ROJO «No se pudo sincronizar»** | **PASS** | provocado con una escritura que rechaza; `aviso: 'error'`. **Primera vez que este estado se ve en un navegador** |
+| El aviso rojo del GUARDADO LOCAL fallido | **NO COMPROBADO** | sigue siendo **D-18**: es otro aviso, y exige agotar el almacenamiento del navegador |
+
+Los dos estados de fallo se provocaron inyectando dependencias falsas, no rompiendo nada real:
+**ninguna de las dos pruebas escribe en la nube**. Detalle y comandos exactos en
+`01-04-VERIFICACION-NAVEGADOR.md`, para que la próxima pasada no tenga que redescubrirlos.
+
 ## Boundaries (Active)
 
 Del PLAN 01-04 (ya ejecutado; se mantienen como invariantes vivos):
@@ -178,18 +206,14 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-31
-Stopped at: **UNIFY del ciclo 01-04 cerrado.** Acta escrita
-(`01-04-SUMMARY.md`), estado actualizado en los cuatro sitios donde vive (`STATE.md`,
-`ROADMAP.md`, `PROJECT.md`, `paul.json`) y libro de deudas al día. Puerta VERDE por sus dos
-variantes, árbol en exclusiva, cifras re-derivadas en el propio UNIFY.
-Next action: dos cosas, **en este orden**, y ninguna es «seguir con el siguiente ciclo»:
-  1. **Desplegar y MIRARLO** — empujar a `main`, confirmar por huella que Pages sirve la versión
-     nueva, recargar dos veces y comprobar el indicador de sincronía, incluido el estado ROJO
-     nuevo. La puerta ejerce funciones puras en node: no prueba la interfaz (§7 bis).
-  2. **TERCERA transición de la Fase 1** — medir la meta de la fase contra el código sobre el diff
-     completo, con brazos adversarios disjuntos. Las dos veces anteriores, medir cambió el
-     resultado. Sólo después se puede decidir si la fase cierra.
-Resume file: .paul/phases/01-guardado-fiable/01-04-SUMMARY.md
+Stopped at: **01-04 desplegado y VISTO en el navegador.** El ciclo estaba cerrado con su acta;
+ahora además está en producción y sus tres estados visuales se han visto en la app real. Con esto
+cae el último requisito previo a la transición.
+Next action: **TERCERA transición de la Fase 1** — medir la meta de la fase contra el código
+sobre el diff completo, con brazos adversarios disjuntos y una frase concreta que demoler cada
+uno. Las dos veces anteriores, medir CAMBIÓ el resultado (la segunda destapó D-33). Sólo después
+se puede decidir si la Fase 1 cierra. No arrancar un ciclo 01-05 antes de medir.
+Resume file: .paul/phases/01-guardado-fiable/01-04-VERIFICACION-NAVEGADOR.md
 
 ---
 *STATE.md — Updated after every significant action*

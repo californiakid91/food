@@ -125,6 +125,11 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Estado:** abierto y acotado. Riesgo bajo —es un operador ternario de una línea— pero el
   eslabón no está ejercido y no se blanquea como comprobado. Hereda del ciclo 01-01, donde el
   aviso rojo se construyó y nunca se vio en pantalla.
+- **NO la cierra la verificación del 2026-08-31.** Ese día se vio en el navegador el punto ROJO
+  «No se pudo sincronizar», y es **otro indicador**: ése es `setSyncUI`, el de la SUBIDA a la nube,
+  y se provoca inyectando una escritura que rechaza (receta en `01-04-VERIFICACION-NAVEGADOR.md`).
+  D-18 habla del cuerpo de `showSaveIndicator`, el aviso del GUARDADO LOCAL. Confundirlos cerraría
+  la ficha con la categoría equivocada, que es peor que dejarla abierta (§5.10).
 - **Qué la reabre:** cualquier cambio en `showSaveIndicator` o en el tema de colores; y se cierra
   cuando exista una forma segura y repetible de provocar un fallo de guardado real.
 
