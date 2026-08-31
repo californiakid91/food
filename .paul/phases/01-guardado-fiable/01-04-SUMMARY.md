@@ -162,3 +162,14 @@ Fichas completas en `.paul/DEUDAS.md`, que es la lista viva.
 ---
 *Fase: 01-guardado-fiable · Plan: 04*
 *Cerrado: 2026-08-31*
+
+---
+
+## ERRATA — añadida el 2026-08-31 por la TERCERA transición de la Fase 1
+
+**«15 sabotajes de este ciclo» es falso: son 14.** El total (44 casos mordiendo) sí es correcto.
+Re-derivado: `git show 96c7a3e:tools/sabotage.py | grep -c '    Caso('` → **30**, hoy **44**, y
+sólo `21e1edb` tocó el fichero; ningún caso anterior desapareció. El método de re-conteo que este
+acta declara (`grep -c 'muerde:'`) sólo puede producir el 44 — **el 15 no se re-derivó de nada**.
+Un acta no se reescribe, así que la cifra queda arriba con esta errata al pie.
+Detalle: `01-TRANSICION-3.md`, hallazgo T3-6.

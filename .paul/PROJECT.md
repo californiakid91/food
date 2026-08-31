@@ -42,8 +42,9 @@ Llevar al día tus carteras con precios manuales y sacar de ahí una declaració
 
 **Fase 1 — Guardado que no miente.** Cuatro ciclos cerrados: 01-01 (arranque y guardado honestos),
 01-02 (sincronización que no destruye), 01-03 (el cerrojo del libro ilegible, `96c7a3e`) y **01-04**
-(una sola puerta de subida, `21e1edb`). Los tres primeros están desplegados y verificados en el
-navegador real; **el 01-04 no**.
+(una sola puerta de subida, `21e1edb`). **Los cuatro están desplegados y verificados en el
+navegador real**; el 01-04 el 2026-08-31 (`e2e8f86`), con sus estados naranja y rojo vistos por
+primera vez en la app.
 
 El 01-04 cerró el hallazgo que paró la fase en su segunda transición: había tres escrituras a
 Firestore y sólo dos pasaban por la guarda de no-vaciado. Ahora hay **una**, decidida por una
@@ -140,4 +141,4 @@ desplegar y añade un estado visual nuevo.
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-08-29*
+*Last updated: 2026-08-31*

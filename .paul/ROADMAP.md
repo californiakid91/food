@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 4 | In progress (3 ciclos cerrados; la 2ª transición devolvió otro hallazgo → 01-04) | - |
+| 1 | Guardado que no miente | 4 | In progress (4 ciclos cerrados; la 3ª transición devolvió otro hallazgo → 01-05) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -59,31 +59,37 @@ Phases: 1 of 7 complete (Fase 0)
 - [x] 01-04: Una sola puerta de subida — cerrado 2026-08-31 (`21e1edb`) — las tres escrituras a
   Firestore reducidas a UNA, decidida por una función pura que falla cerrado y de forma simétrica
   cuando no puede mirar la nube; cero verdes escritos a mano; dos instrumentos nuevos cableados a
-  la puerta (`cloudwrites.py`, `emptycatch.py`); 15 sabotajes nuevos mordiendo
+  la puerta (`cloudwrites.py`, `emptycatch.py`); 14 sabotajes nuevos mordiendo
 
-**La fase SIGUE abierta tras el ciclo 01-04 — pendiente su TERCERA transición.**
+**La fase SIGUE abierta tras su TERCERA transición (2026-08-31) — abre el ciclo 01-05.**
 
-El defecto que paró la fase (D-33) está cerrado y con control positivo: hay exactamente una
-escritura a la nube, dentro de `subirALaNube`, y dos redes disjuntas ponen la puerta roja si
-aparece otra. También se cerraron D-34 y D-31 (esta última por la CLASE: cero llamadas literales
-que pinten el indicador en verde).
+El defecto que paró la fase en la segunda transición (D-33) está cerrado y con control positivo, y
+el ciclo 01-04 está desplegado y visto en el navegador. Lo que impide cerrar la fase ahora es otra
+cosa, medida y no opinable:
 
-Lo que impide declarar la fase cerrada ahora mismo son dos cosas, ninguna opinable:
+**Los tres objetivos del ALCANCE están en PASS, pero la META no.** La meta dice «sin que el
+operador se entere», y el aparato de medición **no cubre la capa de aviso**: pintar en VERDE un
+guardado que ha fallado deja la puerta entera en `rc=0` y «VERDE — todo ejercido y en verde».
+Nueve mutantes de esa capa sobreviven. Un fallo que se pinta verde ES, para el operador, el
+borrado en silencio que esta fase existe para impedir. Ficharlo como deuda lo blanquearía como
+«fase hecha» (§5.10) — la misma decisión que se tomó en las dos transiciones anteriores.
 
-1. **El cierre de un ciclo nunca autoriza el de una fase** (`CLAUDE.md` §7). La meta se mide
-   contra el código en una transición aparte, y medir cambia el resultado: eso fue justo lo que
-   destapó D-33 la vez anterior.
-2. **Nada de este ciclo se ha visto en un navegador.** El commit está en local, sin desplegar, y
-   añade un estado visual nuevo (punto ROJO «No se pudo sincronizar»). La puerta ejerce funciones
-   puras en node sobre un DOM de mentira: no prueba la interfaz (§7 bis).
+Además: los dos trinquetes se rompen con `rc=1` y traceback en vez de fallar cerrado, y la puerta
+los rotula entonces como si el código hubiera engordado; `VERIFY_INNER=1` sale con `rc=0` sin
+correr el banco; y nada vigila que el enganche `pre-push` exista.
+
+**Es la TERCERA vez consecutiva que medir cambia el resultado.** `PLAN == SUMMARY` habría cerrado
+la fase las tres veces.
 
 **Aviso para quien repita la transición:** G7 (radio de impacto) sigue **DEGRADADO** —
-`code-review-graph` no ve el JS dentro de `index.html` (**D-22**). Se sustituye a mano por brazos
-adversarios disjuntos; en la transición anterior el brazo de seguridad no encontró nada y el de
-objetivos encontró el hallazgo que paró la fase. Un solo brazo la habría cerrado.
+`code-review-graph` no ve el JS dentro de `index.html` (**D-22**). Se sustituye a mano por cuatro
+brazos adversarios disjuntos, cada uno con una FRASE concreta que demoler. En esta transición los
+cuatro demolieron su frase y **cada uno encontró algo que ninguno de los otros vio**: el de
+documentos no vio un mutante, y el del oráculo no vio una cifra falsa.
 
-**Planes:** 01-01, 01-02, 01-03 y 01-04 cerrados. Fichas abiertas por el último ciclo: **D-35**,
-**D-36** y **D-37**. Acta: `01-04-SUMMARY.md`.
+**Planes:** 01-01, 01-02, 01-03 y 01-04 cerrados; **01-05 abierto** por la tercera transición.
+Fichas abiertas por ella: **D-38**, **D-39**, **D-40**, **D-41**. Actas: `01-04-SUMMARY.md` y
+`01-TRANSICION-3.md`.
 
 ### Phase 2: Backup y restauración
 
@@ -175,4 +181,4 @@ objetivos encontró el hallazgo que paró la fase. Un solo brazo la habría cerr
 
 ---
 *Roadmap created: 2026-08-29*
-*Last updated: 2026-08-30*
+*Last updated: 2026-08-31*

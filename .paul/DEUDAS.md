@@ -6,7 +6,11 @@
 >
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
-Última medición contra el código: **2026-08-30**, ciclo **01-04** (cuatro brazos adversarios
+Última medición contra el código: **2026-08-31**, **TERCERA transición de la Fase 1**
+(cuatro brazos adversarios disjuntos: caminos de pérdida, calidad del oráculo, cableado, y
+documentos contra evidencia). Abrió **D-38, D-39, D-40 y D-41**, marcó **D-15 y D-03 a
+re-medir**, y **NO cerró la fase**: acta `.paul/phases/01-guardado-fiable/01-TRANSICION-3.md`.
+Medición anterior: **2026-08-30**, ciclo **01-04** (cuatro brazos adversarios
 disjuntos —correctness, falsos verdes, calidad del oráculo y cableado— sobre el diff del ciclo).
 Cerró D-33, D-34 y D-31; abrió D-35, D-36 y D-37, y añadió `onScreenshotPicked` a D-09. Acta del
 ciclo: `.paul/phases/01-guardado-fiable/01-04-SUMMARY.md`. La medición anterior (SEGUNDA
@@ -18,8 +22,10 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 > de documentos del 2026-08-30 encontró que **casi todas** las de este fichero ya apuntaban mal.
 > Se cierra la CLASE en vez del caso (`CLAUDE.md` §5.15): **para localizar el código se usa el
 > NOMBRE de la función y `grep`, nunca el número de línea.** Las cifras derivadas de instrumentos
-> (tamaños de función, controles de sabotaje, hashes) sí son fiables: las vuelve a derivar un
-> script. Las copiadas a mano, no.
+> (tamaños de función, controles de sabotaje, hashes) sí son fiables **cuando un script las
+> vuelve a derivar**. Las copiadas a mano, no — y **`funciones_vistas` de `baseline-funcs.json`
+> es una de las copiadas a mano**: dice 186 y hoy se derivan 190 sobre un `index.html` que no ha
+> cambiado desde el sellado. Es munición de **D-26**, no una cifra fiable.
 
 ---
 
@@ -67,6 +73,68 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   que las claves de almacenamiento no llevan el identificador de la cuenta.
 - **Qué la reabre:** que se use la app con más de una cuenta, o que se comparta el dispositivo.
 
+### D-38 · La capa de AVISO no tiene oráculo: nueve mutantes sobreviven a la puerta entera
+- **Qué es:** el aparato de medición cubre el MECANISMO de las guardas pero no su AVISO. Sustituir
+  en `showSaveIndicator` el color condicional por un verde fijo —o sea, **pintar en VERDE un
+  guardado que ha fallado**— deja `tools/verify.sh` en `rc=0` y «VERDE — todo ejercido y en
+  verde», con el banco de sabotaje ejecutado y en OK. Otras ocho mutaciones de la misma capa
+  sobreviven igual: la duración del aviso de error, el `aviso` que devuelve `decidirSubida` en sus
+  ramas de rechazo, y tres mensajes de consola degradables a informativos. Es **§5.6**: el
+  mecanismo tiene control, su aviso no.
+- **Por qué es invisible hoy:** `tools/dom_stub.js` devuelve `null` en `getElementById`, así que el
+  CUERPO de `showSaveIndicator` es código muerto en node; las autopruebas lo sustituyen por un
+  espía, o sea que miden que los llamantes pasan `ok=false`, nunca qué hace la función con ese
+  `false`. La matriz de 84 filas comprueba `clave` y `subir`, **nunca `aviso`**. Y
+  `cloudwrites.py` prohíbe el literal `setSyncUI('ok')`, no un `estadoSync('ok')` alimentado por
+  el juez — D-31 cerró el caso literal, no esta clase.
+- **Cómo se midió:** TERCERA transición de la Fase 1 (2026-08-31), brazo adversario del oráculo
+  sobre una copia aislada; el mutante representativo **re-verificado a mano** por el orquestador:
+  `bash tools/verify.sh` → `rc=0`. Control positivo del arnés hecho: invertir `vaciariaElLibro`
+  SÍ muere (rc=2), o sea que el estímulo llega y el oráculo muerde cuando puede.
+- **Estado:** ABIERTA · **es lo que abre el ciclo 01-05**. No se difiere: la meta de la Fase 1 dice
+  «en silencio», y un fallo pintado en verde ES el silencio.
+- **Qué la reabre:** que aparezca cualquier aviso al operador sin mutante propio que lo mate.
+
+### D-39 · Los trinquetes revientan con `rc=1` y traceback en vez de fallar CERRADO
+- **Qué es:** `cargar_baseline()` de `tools/funcsize.py` valida que la clave `excede` exista, pero
+  no su TIPO. Con `"excede": null` (JSON válido y aceptado por su propio chequeo de forma),
+  `--check` muere con `TypeError: 'NoneType' object is not iterable` y **rc=1**. La puerta lo
+  rotula entonces «FALLO trinquete de tamaño de funciones → HALLAZGOS (rc=1)»: **un instrumento
+  roto sale clasificado como código que ha engordado**, y manda a mirar el sitio equivocado.
+  Mismo agujero de clase en `tools/emptycatch.py` (`tolerados` sin validar tipo, y `--update`
+  leyendo `['motivos']` sin validarlo).
+- **Cómo se midió:** TERCERA transición (2026-08-31), brazo de cableado; **re-verificado a mano**
+  por el orquestador sobre copia aislada: rc obtenido **1**, rc debido **2**.
+- **Estado:** ABIERTA · entra en el ciclo 01-05. Viola directamente `CLAUDE.md` §4.3: «un traceback
+  sin capturar también da rc≠0, así que un control que sólo mire el rc pasa con y sin el manejo de
+  errores».
+- **Qué la reabre:** cualquier instrumento nuevo que lea una foto sellada sin validar sus tipos.
+
+### D-40 · `VERIFY_INNER=1` deja la puerta en `rc=0` con el banco de sabotaje sin correr
+- **Qué es:** con esa variable puesta, `verify.sh` imprime «OMITIDO banco de sabotaje» y «VERDE,
+  PERO EL BANCO NO CORRIÓ», pero **sale con 0**. El enganche `pre-push` hereda el entorno y sólo
+  bloquea con rc≠0: esa variable exportada en un perfil, un wrapper o un CI deja pasar todos los
+  push con el banco apagado, indefinidamente. **El veredicto de una puerta es un exit code, no una
+  línea de texto que alguien tiene que leer** (§4.1).
+- **Cómo se midió:** TERCERA transición (2026-08-31); **re-verificado a mano**: `VERIFY_INNER=1
+  bash tools/verify.sh` sobre copia aislada → `rc=0`.
+- **Estado:** ABIERTA · entra en el ciclo 01-05. Arreglo natural: que esa variante salga con rc≠0,
+  o que el enganche limpie la variable del entorno antes de llamar a la puerta.
+- **Qué la reabre:** cualquier interruptor nuevo que reduzca lo que se ejerce sin cambiar el rc.
+
+### D-41 · Nada vigila que el enganche `pre-push` exista ni que esté al día
+- **Qué es:** la variante automática de la puerta es el enganche que instala
+  `tools/install-hooks.sh`. Hoy el instalado es byte a byte el del instalador, pero **ningún paso
+  de la puerta lo comprueba**. En una máquina nueva la variante automática sencillamente no
+  existe, y nada se pone rojo; si el instalador cambia, el instalado queda rancio en silencio. Es
+  la definición del propio proyecto de instrumento no cableado (§4.1), y el escenario exacto que
+  §4.2 manda vigilar: «verifica AMBAS variantes».
+- **Cómo se midió:** TERCERA transición (2026-08-31), brazo de cableado: comparó el enganche
+  instalado contra el heredoc del instalador (idénticos) y comprobó que ni `verify.sh` ni
+  `sabotage.py` lo miran.
+- **Estado:** ABIERTA · entra en el ciclo 01-05.
+- **Qué la reabre:** trabajar el proyecto en una máquina nueva sin correr el instalador.
+
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
 - **Qué es:** `applySyncPayload` sustituye `ops` entero por lo que venga de la nube, con
   last-write-wins por un único `savedAt` de documento. Importar operaciones en el móvil sin red y
@@ -90,6 +158,11 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué la reabre:** nada; está en cola.
 
 ### D-03 · El documento de Firestore crece hacia el límite de 1 MB
+
+> **⚠️ A RE-MEDIR (2026-08-31, tercera transición).** La mitad del daño que describe —«el fallo
+> de `set()` falla en silencio mientras el indicador sigue verde»— la cerró el ciclo 01-04, y se
+> vio el ROJO en el navegador el 2026-08-31. El núcleo (el documento hacia 1 MB, el tamaño del
+> paquete jamás medido) sigue abierto. Detalle: `01-TRANSICION-3.md`, hallazgo T3-7.
 - **Qué es:** `buildSyncPayload` mete todos los snapshots mensuales de todos los activos en UN
   documento. Firestore corta en 1 MB, y el fallo de `set()` sólo hace `console.error`
   (`index.html:2945`) mientras el indicador de sync sigue verde.
@@ -272,6 +345,12 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   consultar el cerrojo» se pone rojo: esta deuda se paga con interfaz, no aflojando el cerrojo.
 
 ### D-15 · La guarda de subida está comprobada por presencia, no por precedencia
+
+> **⚠️ A RE-MEDIR (2026-08-31, tercera transición).** Tres afirmaciones centrales de esta ficha
+> son falsas hoy: la guarda ya no vive en `schedulePush`, el doble de Firestore SÍ existe
+> (`arnesDeSubida`) y las autopruebas asíncronas también. Su propio disparador de reapertura se
+> cumplió en el 01-04 sin que nadie la revisara. **No se cierra a ciegas**: se re-mide y se
+> reescribe. Detalle: `01-TRANSICION-3.md`, hallazgo T3-7.
 - **Qué es:** la guarda que impide subir un libro vacío vive dentro de `schedulePush`, que es
   asíncrona, va detrás de un temporizador y habla con Firestore. Las autopruebas corren en node sin
   Firestore, así que lo único que comprueban de ese lado es que `schedulePush` **llama** al juez

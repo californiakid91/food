@@ -10,48 +10,46 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 Milestone: v0.1 Datos fiables (v0.1.0)
-Phase: 1 of 6 (Guardado que no miente) — **ABIERTA; pendiente su TERCERA transición**
-Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 CERRADO (`77f8cef` +
-`56795eb` + acta); 01-03 CERRADO (`96c7a3e`, desplegado y verificado en el navegador);
-**01-04 CERRADO** (`21e1edb` + acta `01-04-SUMMARY.md`) — **desplegado y visto en el navegador** (`e2e8f86`)
-Status: el ciclo 01-04 cerró el defecto que paró la fase. Los siete criterios de aceptación en
-PASS con su artefacto, re-medidos en UNIFY con el árbol en exclusiva. Hay **exactamente una**
-escritura a Firestore en `index.html`, dentro de `subirALaNube`, decidida por `decidirSubida` —
-pura, ejecutable en node, que falla CERRADO de forma simétrica para operaciones y activos. Cero
-llamadas literales `setSyncUI('ok')`. D-33, D-34 y D-31 cerradas; D-35, D-36 y D-37 abiertas.
-Last activity: 2026-08-31 — **DESPLIEGUE y verificación en el navegador del 01-04**. Empujado
-`9ca21ee..7b6115a` con la puerta verde por su variante automática (`pre-push`, `rc=0`, ocho
-pasos). Confirmado por huella que Pages sirve la versión nueva
-(`4ff3b0ba79afa7ca1d479ea1525ad51d`, idéntica a la local; los dos primeros intentos devolvieron
-todavía la anterior). El operador lo miró en la app real: verde en uso normal, «✅ Autopruebas OK»
-sin tocar datos, y **los estados NARANJA y ROJO vistos por primera vez en un navegador**,
-provocados con dependencias de mentira que no escriben en la nube. Acta:
-`01-04-VERIFICACION-NAVEGADOR.md`.
-Actividad anterior: 2026-08-31 — **UNIFY del ciclo 01-04**. Puerta VERDE por sus DOS variantes
-(manual `rc=0` y enganche `pre-push` `rc=0`, salidas idénticas byte a byte salvo la línea de
-anuncio del propio enganche), árbol en exclusiva (`HEAD^{tree}` =
-`5870b9a53d56939119b647e9b64425e550ee7fb6`, idéntico antes y después de medir). Ocho pasos en la
-puerta, dos nuevos de este ciclo. **44 sabotajes mordiendo, 15 de este ciclo**, con el control de
-vacuidad vivo. Cifras re-derivadas en este UNIFY, no copiadas del APPLY.
-Y antes: 2026-08-30 — APPLY del ciclo 01-04; los cuatro brazos adversarios devolvieron
-veredicto y tres de ellos demolieron su frase con mutantes que sobrevivían a la puerta entera.
+Phase: 1 of 6 (Guardado que no miente) — **ABIERTA; su TERCERA transición NO la cerró**
+Planes: 01-01, 01-02, 01-03 y **01-04** CERRADOS (el último desplegado y visto en el navegador,
+`e2e8f86`). **01-05 ABIERTO** por la tercera transición.
+Status: los TRES objetivos del ALCANCE están en PASS medidos hoy contra el código. La **META no**:
+dice «en silencio», y el aparato de medición **no cubre la capa de aviso**. Pintar en VERDE un
+guardado que ha fallado deja la puerta entera en `rc=0` y «VERDE — todo ejercido y en verde»;
+nueve mutantes de esa capa sobreviven. Además los dos trinquetes se rompen con `rc=1` y traceback
+en vez de fallar cerrado (y la puerta los rotula como si el código hubiera engordado),
+`VERIFY_INNER=1` sale con `rc=0` sin correr el banco, y nada vigila que el enganche `pre-push`
+exista. Abiertas D-38, D-39, D-40 y D-41; D-15 y D-03 marcadas A RE-MEDIR.
+Last activity: 2026-08-31 — **TERCERA TRANSICIÓN de la Fase 1**. Árbol en exclusiva
+(`HEAD^{tree}` = `dbd46d97beca95ea8252276a503df9350e0e1b29`, idéntico antes y después; huella de
+`index.html` `4ff3b0ba79afa7ca1d479ea1525ad51d`, la misma que sirve Pages). Puerta VERDE fresca
+(`rc=0`, ocho pasos) ANTES de medir. G7 sigue DEGRADADO (D-22) y se sustituyó por **cuatro brazos
+adversarios disjuntos**, cada uno con una FRASE concreta que demoler y prohibición nominal de
+mutar el árbol: **los cuatro la demolieron, y cada uno encontró algo que ninguno de los otros
+vio**. Los hallazgos decisivos fueron **re-verificados a mano** por el orquestador sobre copias
+aisladas. Acta: `01-TRANSICION-3.md`.
+Actividad anterior: 2026-08-31 — despliegue y verificación en el navegador del 01-04 (`e2e8f86`,
+`f9949e8`): verde en uso normal, «✅ Autopruebas OK» sin tocar datos, y los estados NARANJA y ROJO
+vistos por primera vez en un navegador.
+Y antes: 2026-08-31 — UNIFY del ciclo 01-04, puerta verde por sus dos variantes.
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [█████████░] 95% (4 ciclos cerrados y el último ya visto en el navegador; falta la TERCERA transición)
+- Phase: [███████░░░] 75% (4 ciclos cerrados y desplegados, pero la TERCERA transición NO cerró la fase: abre el 01-05)
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ✓     [01-04 CERRADO — listo para la TERCERA transición de la Fase 1]
+  ○        ○        ○     [01-05 ABIERTO — sin PLAN todavía]
 ```
 
-Ciclos 01-01, 01-02, 01-03 y 01-04: cerrados, cada uno con su acta. La fase NO está cerrada: el
-cierre de un ciclo nunca autoriza el de una fase (§7), y la meta se mide contra el código en una
-transición aparte. Las dos transiciones anteriores cambiaron el resultado al medir — la segunda
-destapó D-33, que es justo lo que acaba de arreglar este ciclo.
+Ciclos 01-01, 01-02, 01-03 y 01-04: cerrados, cada uno con su acta, y el último desplegado. La
+fase NO está cerrada. Su TERCERA transición (2026-08-31) midió la meta contra el código y **volvió
+a cambiar el resultado, por tercera vez consecutiva**: la primera abrió el 01-03, la segunda
+destapó D-33 y abrió el 01-04, y ésta abre el 01-05. `PLAN == SUMMARY` habría cerrado la fase las
+tres veces.
 
 ## Performance Metrics
 
@@ -109,6 +107,11 @@ destapó D-33, que es justo lo que acaba de arreglar este ciclo.
 | El trinquete se resella con semántica v2 a propósito (ámbito ampliado a `async function`) | 01-04 | Volver `runSelfTests` asíncrona la había sacado del trinquete SIN que nada se pusiera rojo. Cambiar la regla de medida es DERIVA (rc=3): el resellado es una decisión escrita, no un trámite |
 | Los tres hallazgos de la revisión adversaria se arreglan dentro del ciclo, no se difieren | 01-04 | Eran correctness y eran huecos del propio aparato de medición: un fixture que ataba el contenido de la nube a su nombre, un CABLE sin medir entre dos piezas ya medidas, y un `await` perdido que dejaba una suite sin ejercer con la puerta verde y sorda |
 | El interruptor `VERIFY_INNER` pasa a AVISAR, y se borra un `VERIFY_DEGRADED` fantasma | 01-04 | Un banco que se salta en silencio es un falso verde; y el `VERIFY_DEGRADED` sólo existía en un comentario que ninguna rama leía — §5.1 en estado puro |
+| La TERCERA transición tampoco cierra la FASE 1: abre el ciclo 01-05 | Fase 1 transición 3 | Los tres objetivos del alcance están en PASS, pero la META no: la meta dice «en silencio» y la capa de AVISO no tiene oráculo. Un guardado fallido pintado en verde pasa la puerta entera. Ficharlo como deuda lo blanquearía como «fase hecha» (§5.10) — misma decisión que en las dos transiciones anteriores |
+| Un fallo pintado en VERDE cuenta como borrado en silencio | Fase 1 transición 3 | Es la lectura literal de la meta. Si sólo se exigiera el MECANISMO, la fase cerraría con nueve mutantes vivos en la capa que el operador realmente mira |
+| El truncamiento por sync NO entra en el 01-05: es D-01 y es Fase 3 | Fase 1 transición 3 | El brazo de caminos de pérdida redescubrió que un dispositivo rezagado pisa una nube rica sin aviso. Es real y grave, pero ya está fichado y es la meta declarada de la Fase 3. La meta de la Fase 1 habla de guardado y ARRANQUE. Meterlo aquí sería mover la vara a mitad de partido |
+| El acta del 01-04 no se reescribe: se le pone ERRATA al pie | Fase 1 transición 3 | Un SUMMARY es un acta y se entierra (§8). La cifra falsa («15 sabotajes», son 14) queda donde estaba, con la corrección y su re-derivación debajo. Los documentos VIVOS (STATE, ROADMAP) sí se corrigen en su sitio |
+| Los hallazgos de los brazos se re-verifican a mano antes de aceptarlos | Fase 1 transición 3 | Un brazo puede inventar agujeros (§5.4). Los cuatro decisivos se reprodujeron con comando propio sobre copias aisladas; el resto se marca explícitamente como no re-verificado |
 
 ### Deferred Issues
 
@@ -123,7 +126,11 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 | ~~La FASE 1 no se ha medido contra el código después del 01-03~~ | **RESUELTO**: medida el 2026-08-30 sobre `69f728e..HEAD` | Acta: `01-TRANSICION-2.md`. La medición cambió el resultado: destapó D-33 |
 | ~~**D-33** · una tercera escritura a la nube esquiva la guarda de no-vaciado~~ | **RESUELTO** en el ciclo 01-04 (`21e1edb`) | Cerrada por la CLASE: una sola escritura, dos redes disjuntas cableadas a la puerta, control positivo en el banco. Acta: `01-04-SUMMARY.md` |
 | ~~**El ciclo 01-04 no se ha visto en un navegador**~~ | **RESUELTO** el 2026-08-31: desplegado (`9ca21ee..e2e8f86`) y mirado en la app real | Acta: `01-04-VERIFICACION-NAVEGADOR.md`. Seis de siete puntos en PASS, incluido el ROJO nuevo. Queda el recuento final sin cifra |
-| **La FASE 1 no se ha medido contra el código después del 01-04** | Sin esa medición no se puede cerrar la fase; las dos veces anteriores medir CAMBIÓ el resultado | Tercera transición de fase sobre el diff completo, con brazos adversarios disjuntos |
+| ~~**La FASE 1 no se ha medido contra el código después del 01-04**~~ | **RESUELTO** el 2026-08-31 | Acta: `01-TRANSICION-3.md`. Medir volvió a cambiar el resultado: la fase NO cierra |
+| **D-38 · la capa de AVISO no tiene oráculo** | Nueve mutantes sobreviven a la puerta entera; un guardado fallido pintado en VERDE sale «VERDE — todo ejercido y en verde». **Bloquea el cierre de la Fase 1** | Ciclo 01-05: dar oráculo al cuerpo de `showSaveIndicator` y al `aviso` de `decidirSubida`, cerrando la CLASE y no los nueve casos |
+| **D-39 · los trinquetes fallan ABIERTO con traceback** | Un instrumento roto sale rotulado como «el código ha engordado» y manda a mirar el sitio equivocado (§4.3) | Ciclo 01-05: validar tipos en `cargar_baseline` y envolver la comparación para dar rc=2 con nombre |
+| **D-40 · `VERIFY_INNER=1` deja la puerta en rc=0 sin banco** | El enganche hereda el entorno: esa variable exportada deja pasar todos los push con el banco apagado | Ciclo 01-05: rc≠0 en esa variante, o el enganche limpia la variable |
+| **D-41 · nada vigila el enganche `pre-push`** | En una máquina nueva la variante automática no existe y nada se pone rojo | Ciclo 01-05: un paso que compare el instalado con su instalador |
 | G7 (radio de impacto) no ve `index.html` | La transición de fase no tiene instrumento propio; hoy se hace a mano | D-22. Se cierra cuando el grafo indexe el `<script>`, o cuando el sustituto sea un script del repo cableado a la puerta |
 
 ## Verificación manual de la Fase 1 — app desplegada, 2026-08-30
@@ -206,14 +213,17 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-31
-Stopped at: **01-04 desplegado y VISTO en el navegador.** El ciclo estaba cerrado con su acta;
-ahora además está en producción y sus tres estados visuales se han visto en la app real. Con esto
-cae el último requisito previo a la transición.
-Next action: **TERCERA transición de la Fase 1** — medir la meta de la fase contra el código
-sobre el diff completo, con brazos adversarios disjuntos y una frase concreta que demoler cada
-uno. Las dos veces anteriores, medir CAMBIÓ el resultado (la segunda destapó D-33). Sólo después
-se puede decidir si la Fase 1 cierra. No arrancar un ciclo 01-05 antes de medir.
-Resume file: .paul/phases/01-guardado-fiable/01-04-VERIFICACION-NAVEGADOR.md
+Stopped at: **TERCERA transición de la Fase 1 hecha y escrita.** Medida contra el código con la
+puerta verde y el árbol en exclusiva, con cuatro brazos adversarios disjuntos. Veredicto: **la
+fase NO cierra**. Correcciones documentales ya aplicadas en el mismo commit (cifra 15→14 con
+errata al pie del acta del 01-04, `PROJECT.md` al día con el despliegue, la tabla del `ROADMAP`
+que se contradecía a sí misma).
+Next action: **`/paul:plan` del ciclo 01-05** — «el aviso que no miente». Objetivo: que la capa de
+AVISO deje de ser el punto ciego del aparato de medición (D-38, cerrando la CLASE y no los nueve
+casos), y que los instrumentos no puedan romperse y salir clasificados como hallazgo de código
+(D-39, D-40, D-41). **Fuera de alcance:** el truncamiento por sync (D-01/D-30, Fase 3) y el
+resellado de `funciones_vistas` (D-26). El PLAN lo escribe Opus y lo ataca Fable antes de ejecutar.
+Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION-3.md
 
 ---
 *STATE.md — Updated after every significant action*
