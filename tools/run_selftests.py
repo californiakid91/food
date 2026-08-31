@@ -8,6 +8,7 @@ node sobre un DOM minimo de mentira.
 Falla CERRADO: si no puede extraer, cargar o encontrar runSelfTests, sale con
 rc=2 (instrumento roto). Nunca "0 hallazgos" cuando no pudo medir.
 """
+import json
 import pathlib
 import re
 import subprocess
@@ -35,7 +36,25 @@ def main():
     if 'function runSelfTests' not in js:
         broken("runSelfTests() no esta en index.html")
 
+    # Identificadores del MARCADO, DERIVADOS del propio fichero (nunca una
+    # lista escrita aqui: una lista blanca solo protege de lo que ya conoce).
+    # El arnes observable del 01-06 los necesita para poder devolver `null` a
+    # todo id que no exista de verdad -- un DOM de mentira permisivo fabrica
+    # falsos verdes que el navegador no tiene. Falla CERRADO: cero ids es
+    # instrumento roto, jamas "0 hallazgos".
+    marcado = re.sub(r'<script(?![^>]*\bsrc=)[^>]*>.*?</script>', '', html,
+                     flags=re.DOTALL)
+    # `\bid=` casaba tambien `data-id=` (el guion es frontera de palabra) y se
+    # dejaba fuera `id='...'` con comilla simple. Sobre-derivar hace el DOM de
+    # mentira mas permisivo que un navegador; sub-derivar lo hace mas estricto.
+    # Las dos direcciones falsean, y esta lista es el ancla del fallo cerrado.
+    ids = sorted(set(re.findall(r'(?:^|[\s"\'])id\s*=\s*["\']([^"\']+)["\']',
+                                marcado)))
+    if not ids:
+        broken("no derive ningun id del marcado de index.html: el patron no casa")
+
     harness = (ROOT / 'tools' / 'dom_stub.js').read_text(encoding='utf-8')
+    harness += "\nglobalThis.__IDS_DEL_MARCADO = " + json.dumps(ids) + ";\n"
     # Datos REALES de mentira, sembrados por el arnés ANTES de cargar la app:
     # ?selftest=1 tambien corre en el navegador del usuario, con sus datos
     # delante, y ya se comio el libro de operaciones una vez -- silenciosamente,

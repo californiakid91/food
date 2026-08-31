@@ -10,70 +10,58 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 Milestone: v0.1 Datos fiables (v0.1.0)
-Phase: 1 of 6 (Guardado que no miente) — **ABIERTA; su TERCERA transición NO la cerró**
-Planes: 01-01, 01-02, 01-03, **01-04** y **01-05** CERRADOS. El 01-04 desplegado y visto en el
-navegador (`e2e8f86`); el **01-05** (`4e81e6c`) es instrumental y **no toca `index.html`**, por lo
-que no necesita navegador. **01-06 PLANIFICADO** (`01-06-PLAN.md`, escrito, atacado por dos brazos
-disjuntos y reescrito): cierra D-38 ENTERA y es lo único que queda para poder intentar la cuarta
-transición. Pendiente de aprobación y APPLY.
-Status: los TRES objetivos del ALCANCE siguen en PASS. La **META no**: dice «en silencio», y el
-aparato de medición **no cubre la capa de aviso** — pintar en VERDE un guardado que ha fallado deja
-la puerta entera en `rc=0`, y nueve mutantes de esa capa sobreviven (**D-38**). Los otros tres
-huecos del aparato de medición **ya no están**: el 01-05 cerró **D-39** (los trinquetes fallan
-CERRADO), **D-40** (la puerta no puede salir verde con el banco apagado, ni por rc ni por entorno)
-y **D-41** (el enganche `pre-push`, vigilado). Abiertas D-38 (bloquea la fase), D-42 y D-43;
-D-15 y D-03 marcadas A RE-MEDIR.
-Last activity: 2026-08-31 — **PLAN del ciclo 01-06** escrito, atacado y REESCRITO. El enfoque no lo
-decidió un solo modelo: era diseño abierto (§2) con precedentes propios del repo tirando en
-direcciones opuestas, así que se resolvió con **dialéctica adversaria de dos posturas, dos rondas**
-→ ejecutar los pintores REALES sobre un DOM observable con reloj falso, SIN extraer funciones puras
-(la mitad «decisión» ya existe y está medida desde el 01-04; lo que nunca ha ejecutado ningún test
-es el pintor). Sonda previa: los pintores se ejecutan fuera del navegador y su efecto se lee,
-duración incluida — árbol NO mutado.
-Después, **dos brazos adversarios disjuntos demolieron el borrador y cada uno vio algo que el otro
-no**. Los dos hallazgos decisivos, **re-verificados a mano sobre copia aislada** (árbol idéntico
-antes y después, `5decd8e9…`):
-**R-1** — el borrador dejaba viva UNA DE LAS TRES FAMILIAS que decía cerrar: la matriz de 84 filas
-afirma `clave` y `subir` pero **nunca `aviso`**, así que un rechazo por vaciado etiquetado como
-«todo bien» —un fallo pintado en VERDE— sale hoy `rc=0` con «✅ Autopruebas OK». Era «cerrar seis de
-nueve y llamarlo la clase», el mismo movimiento ya demolido en el borrador del 01-05.
-**R-2** — el borrador no exigía `try/finally` alrededor del reloj falso: un aserto que LANZARA
-habría dejado `setTimeout` sustituido para el resto de la vida de la página, capturando el
-`setTimeout(guardarTodo, 600)` de `schedSave`; o sea, **el ciclo que viene a impedir el borrado
-silencioso habría dejado de guardar los datos del operador, en silencio**.
-Incorporados los 11 hallazgos. También se **retira la cifra «nueve mutantes»**: no tiene artefacto
-que la respalde (nunca se enumeraron), y un criterio de éxito que la cite no se puede marcar PASS.
-Plan: `01-06-PLAN.md`.
-Actividad anterior: 2026-08-31 — **UNIFY del ciclo 01-05**, la vara de medir (`4e81e6c`). Los siete AC
-en PASS, cada uno **re-medido en esta sesión** y no heredado del APPLY: rc y mensajes literales
-transcritos en el acta. Puerta VERDE fresca por **sus dos variantes, y con salida idéntica**
-(`bash tools/verify.sh` → rc=0; y con `VERIFY_INNER=1` **exportado**, el enganche `pre-push` ejerció
-igualmente los nueve pasos, banco incluido). Banco rc=0, 61 controles verdes, **11 nuevos**, árbol
-idéntico antes y después (`39474868af25`). `index.html` intacto byte a byte y ninguna foto
-resellada. El UNIFY abrió **D-43** al leer los mutadores uno a uno. Acta: `01-05-SUMMARY.md`.
-Actividad anterior: 2026-08-31 — **TERCERA TRANSICIÓN de la Fase 1**. Árbol en exclusiva
-(`HEAD^{tree}` = `dbd46d97beca95ea8252276a503df9350e0e1b29`, idéntico antes y después; huella de
-`index.html` `4ff3b0ba79afa7ca1d479ea1525ad51d`, la misma que sirve Pages). Puerta VERDE fresca
-(`rc=0`, ocho pasos) ANTES de medir. G7 sigue DEGRADADO (D-22) y se sustituyó por **cuatro brazos
-adversarios disjuntos**, cada uno con una FRASE concreta que demoler y prohibición nominal de
-mutar el árbol: **los cuatro la demolieron, y cada uno encontró algo que ninguno de los otros
-vio**. Los hallazgos decisivos fueron **re-verificados a mano** por el orquestador sobre copias
-aisladas. Acta: `01-TRANSICION-3.md`.
-Actividad anterior: 2026-08-31 — despliegue y verificación en el navegador del 01-04 (`e2e8f86`,
-`f9949e8`): verde en uso normal, «✅ Autopruebas OK» sin tocar datos, y los estados NARANJA y ROJO
-vistos por primera vez en un navegador.
-Y antes: 2026-08-31 — UNIFY del ciclo 01-04, puerta verde por sus dos variantes.
+Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. Su tercera transición no la cerró, y la
+cuarta **aún no se ha hecho**.
+Planes: 01-01 a 01-06 **CERRADOS**. Falta la **verificación en el navegador** del 01-06 (§7 bis),
+que el propio plan pone como punto de control bloqueante, y después la CUARTA transición.
+Status: los TRES objetivos del ALCANCE siguen en PASS. La META —«sin que se entere nadie»— ya
+tiene oráculo: **D-38 CERRADA** por el ciclo 01-06. Abiertas D-42, D-43 y la nueva **D-44**
+(ceguera declarada del censo de avisos); D-15 y D-03 siguen marcadas A RE-MEDIR.
+Last activity: 2026-08-31 — **APPLY del ciclo 01-06**, la capa de aviso. Los pintores
+(`showSaveIndicator` y `setSyncUI`) **se ejecutan de verdad** por primera vez, sobre un DOM
+observable con reloj falso y una ventana que se retira en un `finally` idempotente; se lee su
+efecto: texto, color **por su valor**, visibilidad y duración. El campo `aviso` del juez de subida
+entra en las 84 filas de la matriz. Instrumento nuevo `tools/avisos.py`, cableado a la puerta, con
+dos redes disjuntas: por RECEPTOR y por CANAL (34 avisos sellados con su nivel y su prefijo
+literal, cada uno con su motivo).
+
+**Lo importante de este ciclo: se dio por hecho una vez y estaba mal.** La puerta salió verde, el
+banco verde con 68 controles y las dos variantes idénticas — y los **TRES brazos adversarios del
+diff lo demolieron**, cada uno viendo algo que los otros dos no. Diez hallazgos, todos atendidos
+dentro del ciclo, ninguno diferido. El peor, re-verificado a mano sobre copia aislada:
+
+> el aserto exigía que los colores de éxito y de fallo fueran **DISTINTOS**, nunca **CUÁLES**, así
+> que **intercambiarlos —el fallo de guardado pintado en VERDE— salía `rc=0` y «✅ Autopruebas
+> OK»**. El daño que da nombre a D-38, vivo dentro del ciclo escrito para matarlo (§5.8).
+
+Otros: el error de sync en naranja pasaba; un aviso de **2 ms** pasaba; el detector de cesión de
+control pasaba con el mecanismo **borrado** (§5.1); mi propia cabecera afirmaba una ficha de
+DEUDAS que no existía (§5.1 otra vez); **nueve avisos reales** del guardado por sync y del arranque
+escapaban al censo; el banco restauraba `verify.sh` en otro inodo y el intérprete seguía leyendo
+los bytes mutados mientras el hash decía «árbol limpio»; y el banco suponía `.git/hooks`, la misma
+suposición que el 01-05 ya había quitado de las otras dos herramientas (§5.16).
+Acta: `01-06-SUMMARY.md`.
+Actividad anterior: 2026-08-31 — **PLAN del ciclo 01-06**, escrito, atacado por dos brazos
+disjuntos y reescrito. El enfoque lo decidió una **dialéctica adversaria de dos posturas y dos
+rondas**, no un solo modelo: ejecutar los pintores REALES sobre un DOM observable con reloj falso,
+sin extraer funciones puras.
+Actividad anterior: 2026-08-31 — **UNIFY del ciclo 01-05**, la vara de medir (`4e81e6c`). Siete AC
+en PASS, re-medidos, puerta verde por sus dos variantes con salida idéntica. Abrió D-43.
+Actividad anterior: 2026-08-31 — **TERCERA TRANSICIÓN de la Fase 1**: cuatro brazos adversarios
+disjuntos, los cuatro demolieron su frase, y la fase NO se cerró. Acta: `01-TRANSICION-3.md`.
+Actividad anterior: 2026-08-31 — despliegue y verificación en el navegador del 01-04 (`e2e8f86`).
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [████████░░] 83% (5 de 6 ciclos cerrados; queda el 01-06, que cierra D-38 y desbloquea la fase)
+- Phase: [██████████] 100% de los ciclos (6 de 6 cerrados). La FASE sigue abierta: falta el
+  navegador (§7 bis) y la CUARTA transición, que es quien decide si cierra
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ○        ○     [01-06 PLANIFICADO y revisado; pendiente de aprobación]
+  ✓        ✓        ○     [01-06 APPLY hecho y revisado por tres brazos; falta navegador y UNIFY]
 ```
 
 Ciclos 01-01 a 01-05: cerrados, cada uno con su acta. La
@@ -85,7 +73,7 @@ tres veces.
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: —
 - Total execution time: —
 
@@ -94,7 +82,7 @@ tres veces.
 | Phase | Plans | Total Time | Avg/Plan |
 |-------|-------|------------|----------|
 | 00-hotfix-decimal | 1/1 | — | — |
-| 01-guardado-fiable | 5/6 | — | — |
+| 01-guardado-fiable | 6/6 | — | — |
 
 ## Accumulated Context
 
@@ -155,6 +143,11 @@ tres veces.
 | El `try/finally` del reloj falso es BLOQUEANTE, no buena práctica | 01-06 PLAN | Sin él, un aserto que lance deja `setTimeout` sustituido para toda la vida de la página y el temporizador que guarda queda capturado: el ciclo contra el borrado silencioso habría dejado de guardar en silencio. Lleva mutante propio, o el control nunca se habrá visto rojo |
 | La red se cierra por RECEPTOR, no por una lista de canales | 01-06 PLAN | El borrador enumeraba «los dos pintores» y heredaba un ámbito de consola sellado a mano, que deja fuera HOY el arranque y las ventanas emergentes de sesión. Un guardián de deriva caza a quien QUITE una entrada, pero un conjunto incompleto DE ORIGEN le es invisible (§5.15) |
 | Se retira la cifra «nueve mutantes» de todo criterio de éxito | 01-06 PLAN | Nunca se enumeraron: el brazo B los reportó y sólo se re-verificó el representativo. Un criterio que cita una cifra sin artefacto no se puede marcar PASS con evidencia. Lo contrastable es el censo derivado |
+| El ámbito del censo de avisos se mide ENTERO y se exime por NOMBRE | 01-06 | Se intentó acotar dos veces y las dos perdió avisos reales: con ocho raíces a mano escapaban nueve del camino de la fase; con raíces derivadas y cierre transitivo se perdió `guardarTodo`, que sólo se alcanza como ARGUMENTO de un temporizador. Un cierre transitivo sobre JS tiene más formas de escaparse de las que uno puede enumerar. El instrumento MIDE; quien EXIME es el criterio |
+| Un aviso que DESAPARECE es un HALLAZGO, no una mejora | 01-06 | Degradar un `console.error` del arranque a `console.log` salía rotulado «ha desaparecido» **con el comando de resellado debajo**: el instrumento dirigía la mano del operador a amnistiar el silencio (§4.4). Aquí la dirección buena no es «menos»: una boca que se cierra ES el daño de esta fase. Por eso NO compara por dominación, al revés que `funcsize` y `emptycatch` |
+| Los colores se afirman por su VALOR, no por «que sean distintos» | 01-06 | «Distintos» lo satisface INTERCAMBIARLOS, o sea pintar el fallo en verde: `rc=0` y «✅ Autopruebas OK». Mi oráculo heredó mi punto ciego dentro del ciclo escrito para cerrar ese agujero (§5.8) |
+| El censo entra más ancho que el alcance del plan, y se dice | 01-06 | El plan excluía los avisos que no son de guardado ni de arranque. Con ámbito plano sí entran, y se sellan con su motivo uno a uno. Recortar el ámbito para que cuadrara con el plan habría sido meterle juicio al instrumento, y un instrumento con juicio dentro se dobla |
+| Los diez hallazgos de los brazos se arreglan DENTRO del ciclo, ninguno se difiere | 01-06 | Seis eran huecos del propio aparato de medición y cuatro correctness en las herramientas. Pasar a UNIFY con uno sin atender lo habría blanqueado como «hecho» (§3.4) |
 | Los hallazgos de los brazos se re-verifican a mano antes de aceptarlos | Fase 1 transición 3 | Un brazo puede inventar agujeros (§5.4). Los cuatro decisivos se reprodujeron con comando propio sobre copias aisladas; el resto se marca explícitamente como no re-verificado |
 
 ### Deferred Issues
@@ -174,7 +167,9 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 | ~~**D-39 · los trinquetes fallan ABIERTO con traceback**~~ | **RESUELTA** en el ciclo 01-05 (`4e81e6c`) | `cargar_baseline()` valida el TIPO de cada clave en los dos instrumentos, incluidas las que sólo lee `--update`. rc=2 con nombre, clave y remedio. Dos sabotajes propios |
 | ~~**D-40 · `VERIFY_INNER=1` deja la puerta en rc=0 sin banco**~~ | **RESUELTA** en el ciclo 01-05 (`4e81e6c`) | Dos capas: la variante interior devuelve **rc=4** (verde sólo para el banco, y dicho en la cabecera), y el enganche **limpia** la variable. Verificado con la variable exportada: el push ejerció los nueve pasos |
 | ~~**D-41 · nada vigila el enganche `pre-push`**~~ | **RESUELTA** en el ciclo 01-05 (`4e81e6c`) | `tools/hookcheck.py`, cableado como paso de la puerta, con seis desenlaces distinguibles y control de vacuidad |
-| **D-38 · la capa de AVISO no tiene oráculo** | Nueve mutantes sobreviven a la puerta entera; un guardado fallido pintado en VERDE sale «VERDE — todo ejercido y en verde». **Bloquea el cierre de la Fase 1** | Ciclo **01-06**: las tres familias de mutantes **y los DOS pintores que deciden** (`showSaveIndicator` y `setSyncUI`), con reloj falso para la duración. La CLASE entera, no seis de nueve |
+| ~~**D-38 · la capa de AVISO no tiene oráculo**~~ | **RESUELTA** en el ciclo 01-06 (2026-08-31) | Cerrada por la CLASE: los dos pintores se EJECUTAN, color por su valor, visibilidad y duración; el `aviso` del juez en las 84 filas; `tools/avisos.py` cableado a la puerta con dos redes disjuntas. Acta: `01-06-SUMMARY.md` |
+| **D-44 · el censo de avisos es ESTÁTICO y exime `runSelfTests` a mano** | Ceguera **declarada**, no un falso verde: presencia ≠ precedencia, la red por receptor sólo ve literales, y hay un corte escrito a mano | Ficha completa en `.paul/DEUDAS.md`. Se reabre si aparece un `getElementById` calculado sobre un elemento de aviso, un canal de aviso nuevo, o **un segundo corte** |
+| **El ciclo 01-06 no se ha visto en un NAVEGADOR** | El punto ciego declarado del ciclo es justo la fidelidad del simulador (§5.3): un pintor puede quedar verde en node y no verse en pantalla. **Bloquea el cierre del ciclo** | §7 bis: desplegar, comprobar la huella que sirve Pages, `?selftest=1` con la cifra ANOTADA, y **comprobar que guardar sigue funcionando DESPUÉS de las autopruebas** |
 | **D-39 · los trinquetes fallan ABIERTO con traceback** | Un instrumento roto sale rotulado como «el código ha engordado» y manda a mirar el sitio equivocado (§4.3) | Ciclo 01-05: validar tipos en `cargar_baseline` y envolver la comparación para dar rc=2 con nombre |
 | **D-40 · `VERIFY_INNER=1` deja la puerta en rc=0 sin banco** | El enganche hereda el entorno: esa variable exportada deja pasar todos los push con el banco apagado | Ciclo 01-05: rc≠0 en esa variante, o el enganche limpia la variable |
 | **D-41 · nada vigila el enganche `pre-push`** | En una máquina nueva la variante automática no existe y nada se pone rojo | Ciclo 01-05: un paso que compare el instalado con su instalador |
@@ -260,27 +255,21 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-08-31
-Stopped at: **UNIFY del ciclo 01-05 cerrado.** Los siete AC en PASS, **re-medidos en esta sesión**
-con el árbol limpio (`1bd8d35b…`), no heredados del APPLY: los rc y los mensajes literales están
-transcritos en el acta. Lo que más importa de este ciclo: la puerta con la que se va a medir el
-01-06 ya no puede salir verde sin ejercerse, ni confundir un instrumento roto con un hallazgo del
-código, ni suponer que la variante automática existe.
+Stopped at: **APPLY del ciclo 01-06 terminado y revisado.** Puerta VERDE fresca por sus **dos
+variantes con salida idéntica** (`rc=0`, diez pasos); banco `rc=0` con **74 controles mordiendo**
+(eran 52) más 10 guardas, vacuidad verde y árbol idéntico antes y después
+(`36d1bbd41a657cfcde4ecbcc788c7b6eaef60f87`).
 
-Este UNIFY **cambió algo al medir**, como los tres anteriores: leyendo los seis mutadores nuevos
-uno a uno contra el texto del AC-7 apareció **D-43** — un mutador sustituye texto sin afirmar que
-su ancla sea única. No es un falso verde (falla ruidosamente), pero es una desviación nominal del
-AC y está escrita en el libro en este mismo commit.
+Lo que hay que recordar de este ciclo: **la puerta ya estaba verde cuando el ciclo estaba mal**.
+Tres brazos adversarios disjuntos sobre el diff encontraron diez cosas, y ninguno vio lo del otro.
+Sin ellos se habría cerrado D-38 dejando vivo su mutante titular.
 
-**Sin desplegar, y comprobado que no importa:** el local va 5 commits por delante de `origin/main`
-(en `7b6115a`), pero el `index.html` de HEAD es **el mismo blob** que el de `origin/main`
-(`a2ed63a9…`): Pages sirve exactamente el código verificado en el navegador. Lo pendiente de
-empujar son actas y herramientas.
-
-Next action: `/paul:apply .paul/phases/01-guardado-fiable/01-06-PLAN.md` — tras aprobar el plan.
-Recordar: el 01-06 **sí** exige verificación en el navegador (§7 bis), y el checkpoint incluye
-comprobar que **guardar sigue funcionando DESPUÉS de las autopruebas** (es el control de R-2 en el
-sitio real).
-Resume file: .paul/phases/01-guardado-fiable/01-06-PLAN.md
+Next action: **verificación en el navegador (§7 bis)** — es el punto de control bloqueante del
+plan 01-06. Empujar a `main`, esperar a Pages, comprobar la huella del fichero descargado ANTES de
+mirar nada, recargar dos veces, `?selftest=1` con la cifra de operaciones y carteras **ANOTADA**, y
+**comprobar que guardar sigue funcionando DESPUÉS de las autopruebas** (es el control en el sitio
+real de que el arnés no secuestra la página). Después, `/paul:unify`.
+Resume file: .paul/phases/01-guardado-fiable/01-06-SUMMARY.md
 
 ---
 *STATE.md — Updated after every significant action*

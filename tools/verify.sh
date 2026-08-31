@@ -78,6 +78,14 @@ paso "puerta unica de escritura a la nube" python3 tools/cloudwrites.py
 # 6. Censo de catch vacios contra la foto sellada.
 paso "censo de catch vacios" python3 tools/emptycatch.py --check
 
+# 6b. La capa de AVISO: lo que el operador MIRA cuando algo falla.
+#     Dos redes disjuntas: por RECEPTOR (nadie toca los elementos del aviso
+#     fuera de los pintores) y por CANAL (censo de avisos con su nivel y su
+#     prefijo literal, contra foto sellada). Hasta el 01-06 esta capa no tenia
+#     oraculo ninguno: un guardado fallido pintado en VERDE pasaba la puerta
+#     entera (D-38). Va FUERA de cualquier interruptor de degradado.
+paso "capa de aviso (censo y receptores)" python3 tools/avisos.py --check
+
 # 7. El banco de sabotaje: demuestra que lo de arriba MUERDE.
 #    Se salta cuando la puerta corre DENTRO del propio banco (VERIFY_INNER=1),
 #    que es la unica forma de que no se llame a si misma en bucle.

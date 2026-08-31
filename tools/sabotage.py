@@ -37,11 +37,35 @@ BASELINE = ROOT / '.paul' / 'baseline-funcs.json'
 CLOUDWRITES = ROOT / 'tools' / 'cloudwrites.py'
 EMPTYCATCH = ROOT / 'tools' / 'emptycatch.py'
 CATCHES = ROOT / '.paul' / 'baseline-catches.json'
+AVISOS = ROOT / 'tools' / 'avisos.py'
+BASELINE_AVISOS = ROOT / '.paul' / 'baseline-avisos.json'
+RUNSELFTESTS = ROOT / 'tools' / 'run_selftests.py'
 VERIFY = ROOT / 'tools' / 'verify.sh'
 SABOTAGE = ROOT / 'tools' / 'sabotage.py'
 INSTALLHOOKS = ROOT / 'tools' / 'install-hooks.sh'
 HOOKCHECK = ROOT / 'tools' / 'hookcheck.py'
-PREPUSH = ROOT / '.git' / 'hooks' / 'pre-push'
+
+
+def _dir_de_hooks():
+    """Donde git guarda los enganches DE VERDAD.
+
+    Suponer `.git/hooks` es la misma suposicion que el 01-05 quito de
+    `install-hooks.sh` y de `hookcheck.py`: con `core.hooksPath` puesto, o en un
+    `git worktree`, el enganche vive en otro sitio y esto vigilaba un fichero
+    que nadie instala. Dos predicados sobre el mismo objeto tienen que ser el
+    MISMO predicado (CLAUDE.md 5.16).
+    """
+    try:
+        r = subprocess.run(['git', 'rev-parse', '--git-path', 'hooks'],
+                           capture_output=True, text=True, check=False, cwd=ROOT)
+        if r.returncode == 0 and r.stdout.strip():
+            return (ROOT / r.stdout.strip()).resolve()
+    except OSError:
+        pass
+    return ROOT / '.git' / 'hooks'
+
+
+PREPUSH = _dir_de_hooks() / 'pre-push'
 
 # Verde de la puerta corrida DESDE DENTRO del banco. Desde el ciclo 01-05 esa
 # variante devuelve 4 y no 0: un 0 ahi era una puerta verde con el banco
@@ -54,7 +78,8 @@ VERDE_INTERIOR = 4
 # y NO incluian ni la puerta, ni el banco, ni el enganche: el "arbol identico"
 # de un sabotaje que los mutara no probaba nada sobre ellos.
 TOCABLES = [INDEX, FUNCSIZE, BASELINE, CLOUDWRITES, EMPTYCATCH, CATCHES,
-            VERIFY, SABOTAGE, INSTALLHOOKS, HOOKCHECK, PREPUSH]
+            VERIFY, SABOTAGE, INSTALLHOOKS, HOOKCHECK, PREPUSH,
+            AVISOS, BASELINE_AVISOS, RUNSELFTESTS]
 
 
 def hash_arbol():
@@ -367,6 +392,123 @@ CASOS = [
     Caso("deriva: se afloja la vara de medir", FUNCSIZE,
          "'umbral_lineas': 60,", "'umbral_lineas': 500,",
          3, "DERIVA"),
+    # ── Controles del ciclo 01-06: la capa de AVISO (D-38). ────────────────
+    # Hasta este ciclo NINGUNO de estos mutantes moria: la puerta entera salia
+    # rc=0 con un fallo de guardado pintado en VERDE.
+    #
+    # A. Los dos PINTORES, ejecutados de verdad sobre un DOM observable.
+    Caso("el pintor del guardado usa el mismo color para el fallo", INDEX,
+         "el.style.color = ok ? 'var(--green)' : 'var(--red)';",
+         "el.style.color = 'var(--green)';",
+         1, "AC-1 los colores de fallo y de \u00e9xito son DISTINTOS"),
+    Caso("el aviso se pinta INVISIBLE", INDEX,
+         "  el.style.opacity = '1';", "  el.style.opacity = '0';",
+         1, "AC-1 el aviso de fallo queda VISIBLE"),
+    Caso("el fallo dura lo mismo que el exito", INDEX,
+         "ok ? 1800 : 5000);", "1800);",
+         1, "AC-2 las dos duraciones difieren"),
+    # El CRUCE (5.5): sin cancelar el anterior, el apagado del "Guardado OK"
+    # borraria a los 1,8 s el aviso de error que acaba de sustituirlo.
+    Caso("el pintor deja de cancelar el temporizador anterior", INDEX,
+         "  clearTimeout(indicadorTimer);\n  indicadorTimer =", "  indicadorTimer =",
+         1, "AC-2 la segunda pintura cancel\u00f3 el temporizador ANTERIOR"),
+    # El MUTANTE VECINO que destapo la revision adversaria: cancelar OTRA
+    # variable satisface "cancelo algo". Por eso el aserto exige el id EXACTO.
+    Caso("el pintor cancela OTRO temporizador, no el suyo", INDEX,
+         "  clearTimeout(indicadorTimer);\n  indicadorTimer =",
+         "  clearTimeout(saveTimer);\n  indicadorTimer =",
+         1, "AC-2 la segunda pintura cancel\u00f3 el temporizador ANTERIOR"),
+    Caso("la rama de ERROR del indicador de sync se pinta en verde", INDEX,
+         "    dot.style.background = '#e74c3c';\n    dot.title = 'No se pudo sincronizar';",
+         "    dot.style.background = '#27ae60';\n    dot.title = 'Sincronizado';",
+         1, "AC-3 exactamente UNO pinta el verde de sincronizado"),
+    # B. La familia que el borrador del plan dejaba viva (R-1): el AVISO del
+    #    juez. Reproducido antes del ciclo: salia rc=0 y "Autopruebas OK".
+    Caso("un rechazo por vaciado se etiqueta como TODO BIEN", INDEX,
+         "    return { subir: false, aviso: 'pendiente', clave: 'vaciaria',",
+         "    return { subir: false, aviso: 'ok', clave: 'vaciaria',",
+         1, "AC-4 matriz"),
+    # C. La red por CANAL y la red por RECEPTOR de tools/avisos.py.
+    Caso("un aviso de consola se degrada a informativo", INDEX,
+         "  else console.error('No se sincroniza: el guardado local fall\u00f3.');",
+         "  else console.warn('No se sincroniza: el guardado local fall\u00f3.');",
+         1, "la capa de aviso ha cambiado sin que la foto lo sepa"),
+    Caso("aparece un aviso NUEVO sin sellar", INDEX,
+         "function schedSave(mensajeExito) {",
+         "function schedSave(mensajeExito) {\n  console.warn('aviso nuevo sin sellar');",
+         1, "aviso NUEVO o CAMBIADO"),
+    Caso("alguien pinta el aviso desde FUERA de los pintores", INDEX,
+         "function schedSave(mensajeExito) {",
+         "function schedSave(mensajeExito) {\n  const x = document.getElementById"
+         "('save-indicator'); if (x) x.style.color = 'var(--green)';",
+         1, "fuera de los pintores"),
+    Caso("deriva: cambia el ambito del censo de avisos", AVISOS,
+         "'cortes': ['runSelfTests'],", "'cortes': [],",
+         3, "DERIVA"),
+    Caso("la foto de avisos tiene 'motivos' del tipo equivocado", BASELINE_AVISOS,
+         '"motivos": {', '"motivos": null,\n  "_sabotaje": {',
+         2, "la clave 'motivos' es NoneType"),
+    # D. Mutantes de ARNES. Estos NO miden producto: miden el instrumento con el
+    #    que se mide el producto, y son el control positivo de los asertos del
+    #    AC-0 y del AC-6, que no tienen trozo de producto que revertir.
+    Caso("ARNES: la ventana de pintura pierde su finally", INDEX,
+         "  try { return fn(v); } finally { v.cerrar(); }",
+         "  const r = fn(v); v.cerrar(); return r;",
+         1, "AC-0 y aun as\u00ed restaur\u00f3 getElementById"),
+    Caso("ARNES: el reloj falso deja de dar identificadores unicos", INDEX,
+         "sig++; v.programaciones.push({ id: sig, fn: fn, ms: ms }); return sig;",
+         "v.programaciones.push({ id: sig, fn: fn, ms: ms }); return sig;",
+         1, "AC-2 con identificadores distintos"),
+    # Ancla ESTABLE a proposito: no la expresion regular (que ya cambio una vez
+    # y dejo tres mutadores mudos), sino la linea del fallo cerrado.
+    Caso("ARNES: el derivador de identificadores no encuentra ninguno", RUNSELFTESTS,
+         "    if not ids:\n", "    ids = []\n    if not ids:\n",
+         2, "no derive ningun id del marcado"),
+    # R-3: vigilar solo el conjunto VACIO no basta. El pintor hace
+    # `if (!el) return`, asi que un conjunto INCOMPLETO de origen lo dejaria
+    # irse de vacio y en verde (5.15).
+    Caso("ARNES: al derivador le falta JUSTO el identificador del aviso", RUNSELFTESTS,
+         "    if not ids:\n",
+         "    ids = [i for i in ids if i != 'save-indicator']\n    if not ids:\n",
+         2, "no tiene identificadores que los pintores usan de verdad: save-indicator"),
+    # ── Lo que destaparon los TRES brazos adversarios del 01-06. ───────────
+    # Cada uno de estos salia rc=0 y "Autopruebas OK" con el ciclo ya escrito,
+    # re-verificado a mano sobre copia aislada antes de aceptarlo.
+    #
+    # El peor: los colores INTERCAMBIADOS. El aserto pedia que fueran DISTINTOS
+    # y nunca CUALES, asi que pintar el fallo en VERDE lo satisfacia -- que es
+    # literalmente el dano que da nombre a D-38. Mi oraculo heredo mi punto
+    # ciego (5.8), en el ciclo que existe para cerrar ese agujero.
+    Caso("los colores del pintor del guardado, INTERCAMBIADOS", INDEX,
+         "el.style.color = ok ? 'var(--green)' : 'var(--red)';",
+         "el.style.color = ok ? 'var(--red)' : 'var(--green)';",
+         1, "AC-1 el fallo se pinta con el color de PELIGRO"),
+    Caso("el ERROR de sincronizacion pintado NARANJA en vez de rojo", INDEX,
+         "    dot.style.background = '#e74c3c';\n    dot.title = 'No se pudo sincronizar';",
+         "    dot.style.background = '#e67e22';\n    dot.title = 'No se pudo sincronizar';",
+         1, "AC-3 el estado error pinta SU color"),
+    Caso("el aviso dura 2 milisegundos: invisible para el operador", INDEX,
+         "ok ? 1800 : 5000);", "ok ? 1 : 2);",
+         1, "AC-2 el aviso de \u00e9xito dura lo bastante para leerse"),
+    # 5.1 con uniforme: el comentario lo llamaba "MECANISMO explicito" y el
+    # aserto pasaba con el mecanismo BORRADO, porque `cedido` ya era false.
+    Caso("ARNES: se borra el mecanismo que detecta la cesion de control", INDEX,
+         "  Promise.resolve().then(() => { v.cedido = true; });\n", "",
+         1, "AC-0 y el detector REACCIONA cuando s\u00ed se cede el control"),
+    # El ambito del censo escapaba por las dependencias INYECTADAS y por el
+    # codigo suelto del arranque: nueve avisos reales del camino de la fase
+    # quedaban fuera y un aviso sembrado ahi salia verde.
+    Caso("aviso NUEVO sembrado en el guardado por sincronizacion", INDEX,
+         "  } else if (!saveOpsAll(entrante)) {",
+         "  } else if (console.warn('aviso sembrado en sync'), !saveOpsAll(entrante)) {",
+         1, "aviso NUEVO o CAMBIADO"),
+    # Degradar a un canal NO censado (`console.log`) hace DESAPARECER el aviso.
+    # Antes salia rotulado como mejora y con el comando de resellado debajo:
+    # el instrumento dirigia la mano del operador a amnistiar el silencio.
+    Caso("aviso del ARRANQUE degradado a un canal no censado", INDEX,
+         "      console.error('Operaciones antiguas ilegibles en la cartera '",
+         "      console.log('Operaciones antiguas ilegibles en la cartera '",
+         1, "han DESAPARECIDO avisos que la foto sellaba"),
     Caso("no se puede medir: index.html vacio", INDEX,
          None, "",
          2, "INSTRUMENTO ROTO"),
@@ -450,6 +592,15 @@ def main():
     else:
         print("  OK    --check no escribe en la foto sellada (funcsize)")
 
+    antes = hashlib.sha256(BASELINE_AVISOS.read_bytes()).hexdigest()
+    subprocess.run([sys.executable, str(AVISOS), '--check'],
+                   capture_output=True, text=True, check=False, cwd=ROOT)
+    if hashlib.sha256(BASELINE_AVISOS.read_bytes()).hexdigest() != antes:
+        print("  NO MUERDE: avisos --check ha ESCRITO en su foto sellada")
+        fallos.append("avisos --check escribe")
+    else:
+        print("  OK    --check no escribe en la foto sellada (avisos)")
+
     antes = hashlib.sha256(CATCHES.read_bytes()).hexdigest()
     subprocess.run([sys.executable, str(EMPTYCATCH), '--check'],
                    capture_output=True, text=True, check=False, cwd=ROOT)
@@ -507,10 +658,19 @@ def main():
         # que no ejecute el `finally`; NO se tapa con un comentario que prometa
         # un freno: quien lo caza es el control de vacuidad de la proxima
         # corrida, que ve la puerta interior en 0 y lo dice con esas palabras.
-        tmp = VERIFY.with_name(VERIFY.name + '.restaurando')
-        tmp.write_bytes(original)
-        os.chmod(tmp, modo_original)
-        os.replace(tmp, VERIFY)
+        # Restauracion EN EL MISMO INODO, no por `os.replace`. El bash padre
+        # que esta ejecutando este mismo fichero conserva un descriptor abierto
+        # sobre el inodo ORIGINAL: un renombrado le deja leyendo los bytes
+        # MUTADOS el resto de la corrida, y `hash_arbol()` --que lee por RUTA--
+        # informaria del arbol como limpio. La mutacion es de la misma longitud
+        # (lo afirma `sustituir_unico_mismo_largo`), asi que devolver los bytes
+        # originales tampoco mueve nada de lo que el padre aun no ha leido.
+        with open(VERIFY, 'r+b') as f:
+            f.write(original)
+            f.truncate(len(original))
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(VERIFY, modo_original)
 
     # (b) Los tres desenlaces de hookcheck, SOBRE COPIAS. No se mutila el
     #     enganche instalado: cuando la puerta corre desde el pre-push, borrarlo

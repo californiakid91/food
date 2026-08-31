@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 6 | In progress (5 cerrados; **01-06 planificado y revisado**, pendiente de APPLY; cierra D-38 y desbloquea la fase) | - |
+| 1 | Guardado que no miente | 6 | In progress (**6 de 6 ciclos cerrados**; D-38 cerrada. Falta el NAVEGADOR del 01-06 y la CUARTA transición, que es quien decide si la fase cierra) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -98,7 +98,7 @@ partieron a propósito tras la revisión adversaria del primer borrador:
   instrumentos siguen midiendo lo mismo. Abre **D-42** y **D-43**. Re-derivadas en fresco: 9 pasos
   en la puerta, 52 mordidas del banco, 61 controles verdes, **11 de este ciclo**.
   Acta: `01-05-SUMMARY.md`.
-- [ ] **01-06: El aviso que no miente** — **PLANIFICADO 2026-08-31** (`01-06-PLAN.md`). Cierra
+- [x] **01-06: El aviso que no miente** — **APPLY hecho y revisado 2026-08-31**. Cierra
   **D-38** ENTERA: los dos pintores ejecutados de verdad fuera del navegador (color, texto,
   visibilidad y duración con reloj falso), el campo `aviso` del juez de subida en todas sus ramas
   de rechazo, los avisos de consola por mensaje literal, y una red **por receptor** cableada a la
@@ -108,10 +108,26 @@ partieron a propósito tras la revisión adversaria del primer borrador:
   etiquetado «todo bien» sale HOY `rc=0` con «✅ Autopruebas OK», re-verificado a mano— y su reloj
   falso sin `try/finally` podía dejar de guardar los datos del operador en silencio. Once hallazgos
   incorporados; **retirada la cifra «nueve mutantes»** por no tener artefacto.
-  Exige verificación en navegador (§7 bis).
 
-Con el 01-05 cerrado, **lo único que impide cerrar la Fase 1 es D-38**: la capa de aviso sin
-oráculo. La cuarta transición sólo puede intentarse después del 01-06.
+  **Y entonces el ciclo, ya escrito y con la puerta VERDE, fue demolido otra vez por TRES brazos
+  adversarios disjuntos sobre el diff: diez hallazgos más, ninguno visto por más de un brazo.** El
+  peor: los asertos exigían que los colores de éxito y de fallo fueran DISTINTOS, nunca CUÁLES, así
+  que **intercambiarlos —el fallo de guardado pintado en VERDE— salía `rc=0` y «✅ Autopruebas
+  OK»**: el daño titular de D-38, vivo dentro del ciclo escrito para matarlo (§5.8). También: el
+  error de sync en naranja pasaba, un aviso de 2 ms pasaba, el detector de cesión de control pasaba
+  con el mecanismo borrado, nueve avisos reales del guardado por sync y del arranque escapaban al
+  censo, y el banco restauraba la puerta en otro inodo mientras el hash decía «árbol limpio».
+  Los diez arreglados dentro del ciclo. Puerta VERDE por sus dos variantes con salida idéntica;
+  banco `rc=0` con **74 controles mordiendo** (eran 52) más 10 guardas.
+  Acta: `01-06-SUMMARY.md`.
+  **PENDIENTE: la verificación en navegador (§7 bis)**, que es punto de control bloqueante.
+
+Con el 01-06 cerrado, **D-38 ya no impide nada**. Lo que queda antes de intentar la CUARTA
+transición es **abrir la app en el navegador** (§7 bis): el punto ciego declarado de este ciclo es
+justo la fidelidad del simulador —no resuelve `var(--green)` a un color, no aplica CSS—, así que un
+pintor puede quedar verde en node y no verse en pantalla. Una sonda verde nunca supera a un intento
+real. Y **el cierre de un CICLO no autoriza el cierre de una FASE** (§7): quien decide es la
+medición contra el código, no el conteo de actas.
 
 El borrador que juntaba ambas cosas cubría seis de los nueve mutantes y llamaba a eso «cerrar la
 clase». La revisión adversaria lo demolió, y además destapó que exigir «rc≠0 con `VERIFY_INNER=1`»

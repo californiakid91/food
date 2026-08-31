@@ -6,7 +6,13 @@
 >
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
-Último ciclo cerrado: **01-05** (2026-08-31), la vara de medir. Cerró **D-39, D-40 y D-41**,
+Último ciclo cerrado: **01-06** (2026-08-31), la capa de aviso. **Cerró D-38** por la clase y
+abrió **D-44**. Los TRES brazos adversarios del diff demolieron el ciclo ya escrito, cada uno
+viendo algo que los otros dos no: diez hallazgos, el peor de ellos **un fallo de guardado pintado
+en VERDE que salía `rc=0`** dentro del ciclo escrito para impedirlo.
+Acta: `.paul/phases/01-guardado-fiable/01-06-SUMMARY.md`.
+
+Ciclo anterior: **01-05** (2026-08-31), la vara de medir. Cerró **D-39, D-40 y D-41**,
 abrió **D-42** (y **D-43** al cerrarlo) y re-midió **D-26** (186 sellado vs **190** derivadas: se ha vuelto a desfasar y la
 puerta sigue verde). La revisión adversaria del diff destapó **dos falsos verdes del propio
 arreglo** —un enganche sin bit de ejecución que git ignora dejando pasar el push, y suponer
@@ -111,11 +117,28 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **La duración no vive en el elemento:** vive en el `setTimeout` del aviso. Un espía que registre
   lo escrito en el elemento **no puede leerla**, así que ese mutante exige un reloj falso (§5.12),
   no un espía de pantalla.
-- **Estado:** ABIERTA · la ataca **ENTERA el ciclo 01-06**. El borrador del 01-05 sólo cubría seis
-  de los nueve mutantes —se dejaba fuera la familia de los tres avisos de consola— y declaraba «la
-  clase cerrada»: cerrar seis y llamarlo clase habría sido §5.10 con acta. No se difiere: la meta
-  de la Fase 1 dice «en silencio», y un fallo pintado en verde ES el silencio.
-- **Qué la reabre:** que aparezca cualquier aviso al operador sin mutante propio que lo mate.
+- **Estado:** **CERRADA** en el ciclo **01-06** (2026-08-31), por la CLASE y no por los casos.
+  Lo que la cierra, cada pieza con su mutante en `tools/sabotage.py`:
+  - **Los dos pintores se EJECUTAN de verdad** sobre un DOM observable con reloj falso, dentro de
+    una ventana que se retira en un `finally` idempotente. Ya no se les sustituye por espías, que
+    era el agujero. Se afirma el color **por su valor**, la **visibilidad** y la **duración**.
+  - **El `aviso` del juez de subida** entra en las 84 filas de la matriz, con oráculo escrito
+    aparte: ninguna rama de rechazo puede devolver el aviso de éxito.
+  - **`tools/avisos.py`**, cableado a la puerta, con dos redes disjuntas: por RECEPTOR (nadie toca
+    los elementos del aviso fuera de los pintores) y por CANAL (los **34** avisos al operador
+    sellados con su nivel y su prefijo literal, cada uno con su motivo escrito).
+- **Lo que costó cerrarla de verdad:** el ciclo se dio por hecho una vez y **los tres brazos
+  adversarios lo demolieron**, cada uno viendo algo que los otros dos no. El peor hallazgo:
+  los asertos exigían que los colores de éxito y de fallo fueran **DISTINTOS**, nunca **CUÁLES**,
+  así que **intercambiarlos —el fallo pintado en VERDE— salía `rc=0` y «✅ Autopruebas OK»**. Es
+  literalmente el daño que nombra esta ficha, vivo dentro del ciclo escrito para matarlo: mi
+  oráculo heredó mi punto ciego (§5.8). Otros tres del mismo grupo: el error de sincronización en
+  naranja, un aviso de **2 milisegundos**, y el detector de cesión de control pasando con el
+  mecanismo **borrado** (§5.1).
+- **Qué la reabre:** que aparezca cualquier aviso al operador sin entrada sellada en
+  `.paul/baseline-avisos.json`, o cualquier propiedad del aviso que el operador MIRA —color,
+  texto, visibilidad, duración, nivel— sin un mutante que la mate. **No basta con que exista un
+  aserto: tiene que haberse visto rojo.**
 
 ### D-39 · Los trinquetes revientan con `rc=1` y traceback en vez de fallar CERRADO
 - **Qué es:** `cargar_baseline()` de `tools/funcsize.py` valida que la clave `excede` exista, pero
@@ -227,6 +250,40 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué la reabre:** que `install-hooks.sh` pase a contener más de un heredoc, momento en el que el
   mutador mutaría los dos y el caso dejaría de medir lo que dice medir. Se cierra con dos líneas:
   la misma afirmación que ya tiene `sin_unset`.
+
+### D-44 · El censo de avisos es ESTÁTICO y su ámbito se exime a mano
+- **Qué es:** `tools/avisos.py` mide leyendo el texto de `index.html`, no ejecutándolo. De ahí
+  salen tres cegueras, escritas también en la cabecera del propio instrumento:
+  1. **Presencia no es precedencia (§5.11).** Un literal escrito dentro de una CADENA cuenta como
+     cobertura. Los comentarios sí se borran antes de medir, así que un comentario no cuela.
+  2. **La red por RECEPTOR sólo ve `getElementById` con un literal.** Un `getElementById(variable)`
+     que acabara resolviendo a un elemento de aviso le es invisible. No se cierra por lista blanca
+     de variables porque el fichero tiene decenas de identificadores compuestos legítimos
+     (`'bar-' + id`), y una lista blanca sólo protege de lo que ya conoce.
+  3. **El ámbito exime `runSelfTests` a mano.** Es el único CORTE, nombrado con su motivo (sus
+     avisos son el veredicto de la propia suite, y ya tienen juez: el código de salida de la
+     puerta). Quitarlo o cambiarlo es DERIVA (rc=3).
+- **Cómo se midió:** revisión adversaria del diff del 01-06 (2026-08-31), **dos brazos disjuntos
+  llegaron al mismo sitio por caminos distintos**, y el hallazgo se re-verificó a mano sobre copia
+  aislada. El ámbito se intentó acotar **dos veces** y las dos perdió avisos reales:
+  - con **ocho raíces escritas a mano**, escapaban **nueve avisos** del camino de la fase
+    (`applySyncPayload` ×5, `pullFromFirestore`, `listenFirestore`, `repararLibroIlegible`,
+    `migrateOpsToGlobal`): sembrar un aviso nuevo en el guardado por sincronización daba `rc=0`;
+  - con **raíces derivadas y cierre transitivo**, se perdió **`guardarTodo`** —el guardado en
+    persona— porque sólo se alcanza como ARGUMENTO (`setTimeout(guardarTodo, 600)`).
+  Un cierre transitivo sobre JavaScript tiene más formas de escaparse de las que uno puede
+  enumerar. **Por eso hoy se mide TODO el `<script>` y se exime por nombre**: el instrumento MIDE,
+  y quien EXIME es el criterio.
+- **Consecuencia aceptada:** el censo incluye avisos que NO son de guardado ni de arranque (borrar
+  carteras y operaciones, vaciar activos, el texto reconocido de una captura). No se excluyen: se
+  sellan con su motivo. Es más ancho que el alcance declarado del ciclo 01-06, **en la dirección
+  segura**, y se dice por escrito en vez de recortarlo.
+- **Estado:** ABIERTA como ceguera declarada. **No es un falso verde**: es un límite del método,
+  escrito en la cabecera del instrumento y aquí, no un agujero que se descubra mañana.
+- **Qué la reabre:** que aparezca en `index.html` un `getElementById` con identificador calculado
+  que resuelva a un elemento de aviso; que un aviso se emita por un canal que no sea
+  `console.error`, `console.warn`, `alert` ni `confirm`; o que haga falta un segundo CORTE — el
+  segundo corte es la señal de que el criterio está empezando a doblarse.
 
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
 - **Qué es:** `applySyncPayload` sustituye `ops` entero por lo que venga de la nube, con

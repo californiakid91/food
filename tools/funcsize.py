@@ -328,7 +328,8 @@ def cargar_baseline():
         if not isinstance(valores, list) or not all(
                 isinstance(v, int) and not isinstance(v, bool) for v in valores):
             roto(f"funcsize: la foto sellada {BASELINE.name}: la clave "
-                 f"'excede[{nombre}]' deberia ser una lista de enteros")
+                 f"'excede[{nombre}]' deberia ser una lista de enteros",
+                 REMEDIO_FOTO)
     return d
 
 

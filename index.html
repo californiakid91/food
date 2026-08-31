@@ -5088,19 +5088,16 @@ function opsEnDisco() {
 // el AVISO: sin esta prueba, reordenarlas pasaría la batería entera. Cubrir el
 // mecanismo no cubre su aviso.
 function pruebasPrecedenciaDeGuardas(check, base) {
-  const warnReal = console.warn;
-  const errReal = console.error;
   localStorage.setItem(OPS_KEY, '{roto');
   ops = loadOpsAll();
   ops = [Object.assign({}, base, { id: 'p1' })];   // memoria poblada, disco ilegible
-  let warns = 0;
+  const espia = espiaDeConsola('[SYNC] libro recibido vacío: se conservan las');
   try {
-    console.warn = (m) => { if (String(m).includes('libro recibido vacío')) warns++; };
-    console.error = () => {};
     applySyncPayload({ portfolios: [{ id: 1, name: 'P1' }], currentPortId: 1,
                        nextId: 2, opsAll: [] });
-  } finally { console.warn = warnReal; console.error = errReal; }
-  check('AC-1 en el cruce gana el aviso de no-vaciado, no el del cerrojo', warns, 1);
+  } finally { espia.soltar(); }
+  check('AC-1 en el cruce gana el aviso de no-vaciado, no el del cerrojo', espia.aviso, 1);
+  check('AC-5 y ese aviso no se emitio por otro nivel', espia.error, 0);
   check('AC-1 y el blob ilegible sigue intacto', localStorage.getItem(OPS_KEY), '{roto');
 }
 
@@ -5116,7 +5113,6 @@ function pruebasPrecedenciaDeGuardas(check, base) {
 // directa a `repararLibroIlegible` de más abajo. Se dejan porque documentan el
 // estado esperado, no porque protejan.
 function pruebasCerrojoIlegible(check, base) {
-  const errReal = console.error;
   const carteras = { portfolios: [{ id: 1, name: 'P1' }], currentPortId: 1, nextId: 2 };
 
   // AC-1: una nube vacía NO repara. Las tres afirmaciones van por separado a
@@ -5125,18 +5121,19 @@ function pruebasCerrojoIlegible(check, base) {
   localStorage.setItem(OPS_KEY, '{roto');
   ops = loadOpsAll();
   check('AC-1 un libro que no parsea deja el cerrojo puesto', opsIlegible, true);
-  let avisos = 0;
+  // El MENSAJE, no el mero hecho de que algo se queje: el `loadOpsAll` con que
+  // termina `applySyncPayload` emite su propio error siempre, y contar «hubo
+  // algún error» dejaba este aviso sin control ninguno.
+  const espiaCerrojo = espiaDeConsola(
+    'Libro local ilegible y no llega nada con que repararlo: el cerrojo sigue puesto.');
   try {
-    // El MENSAJE, no el mero hecho de que algo se queje: el `loadOpsAll` con que
-    // termina `applySyncPayload` emite su propio error siempre, y contar «hubo
-    // algún error» dejaba este aviso sin control ninguno.
-    console.error = (m) => { if (String(m).includes('no llega nada con que repararlo')) avisos++; };
     applySyncPayload(Object.assign({ opsAll: [] }, carteras));
-  } finally { console.error = errReal; }
+  } finally { espiaCerrojo.soltar(); }
   check('AC-1 el blob ilegible sigue en disco byte a byte',
         localStorage.getItem(OPS_KEY), '{roto');
   check('AC-1 el cerrojo NO se levanta con una nube vacía', opsIlegible, true);
-  check('AC-1 se avisa de que no había con qué reparar', avisos > 0, true);
+  check('AC-1 se avisa de que no había con qué reparar', espiaCerrojo.error, 1);
+  check('AC-5 y ese aviso no se degrada a informativo', espiaCerrojo.aviso, 0);
 
   // AC-2: una nube CON operaciones sí repara, y sólo entonces se levanta.
   localStorage.setItem(OPS_KEY, '{roto');
@@ -5154,15 +5151,14 @@ function pruebasCerrojoIlegible(check, base) {
   // de `repararLibroIlegible` pasaba la batería entera. Se mide la función a solas.
   localStorage.setItem(OPS_KEY, '{roto');
   ops = loadOpsAll();
-  const warnPrev = console.warn;
-  let reparaciones = 0;
+  const espiaReparo = espiaDeConsola('Libro local ilegible REPARADO con');
   try {
-    console.warn = (m) => { if (String(m).includes('REPARADO')) reparaciones++; };
     check('AC-2 la reparación devuelve true cuando la escritura entra',
           repararLibroIlegible([Object.assign({}, base, { id: 'd1' })]), true);
-  } finally { console.warn = warnPrev; }
+  } finally { espiaReparo.soltar(); }
   check('AC-2 y baja el cerrojo ella misma, sin releer el disco', opsIlegible, false);
-  check('AC-2 la reparación deja constancia de que ocurrió', reparaciones, 1);
+  check('AC-2 la reparación deja constancia de que ocurrió', espiaReparo.aviso, 1);
+  check('AC-5 y esa constancia no sale por otro nivel', espiaReparo.error, 0);
 
   // AC-5: el formato ANTIGUO también repara. Sin esto se cerraría el CASO y no
   // la CLASE: un dispositivo sin actualizar no podría levantar el cerrojo jamás.
@@ -5335,9 +5331,38 @@ async function pruebasTuberiaDeSubida(check) {
 
 // LA MATRIZ del juez de subida (01-04). No las condiciones por separado: el
 // CRUCE de dos guardas es justo lo que no medía nada la última vez (§5.5).
-// Se recorre el producto cartesiano entero — 3 libros × 4 estados de nube × 2
-// de activos × 2 de paquete = 48 filas — y se exige la CLAVE del motivo, no
+// Se recorre el producto cartesiano entero — 3 libros × 7 estados de nube × 2
+// de activos × 2 de paquete = 84 filas — y se exige la CLAVE del motivo, no
 // sólo el booleano: un `subir:false` por la razón equivocada pasaría igual.
+// (La cifra decía 48: se quedó rancia cuando el 01-04 amplió los estados de
+// nube de 4 a 7, y este comentario la citaba como si fuera cierta.)
+//
+// Recorre la matriz y devuelve cuantas filas recorrio. Se extrae del cuerpo de
+// `pruebasPuertaDeSubida` porque anadirle la tercera familia (el AVISO) la
+// pasaba del presupuesto de 60 lineas. El SUJETO del troceo es explicito:
+// `pruebasPuertaDeSubida`, no «el fichero».
+function recorrerMatriz(check, libros, nubes, esperado, avisoEsperado) {
+  let filas = 0;
+  Object.keys(libros).forEach(l => Object.keys(nubes).forEach(n =>
+    [true, false].forEach(activos => [[], ['balance-rows-9']].forEach(incompleto => {
+      const d = decidirSubida({ opsLocales: libros[l].ops, libroIlegible: libros[l].ilegible,
+                                nube: nubes[n], hayActivosLocales: activos,
+                                incompleto: incompleto });
+      const q = esperado(l, n, activos, incompleto);
+      const id = `${l}/${n}/activos=${activos}/inc=${incompleto.length}`;
+      check(`AC-1 matriz ${id}: motivo`, d.clave, q);
+      check(`AC-1 matriz ${id}: subir`, d.subir, q === 'ok');
+      // LA TERCERA FAMILIA. Hasta el 01-06 la matriz afirmaba la clave y si se
+      // sube, y NUNCA el aviso: un rechazo por vaciado etiquetado «todo bien»
+      // -- un fallo pintado en VERDE -- salia rc=0 y «Autopruebas OK».
+      check(`AC-4 matriz ${id}: aviso`, d.aviso, avisoEsperado(q));
+      check(`AC-4 matriz ${id}: un rechazo NUNCA se etiqueta como exito`,
+            !d.subir && d.aviso === 'ok', false);
+      filas++;
+    }))));
+  return filas;
+}
+
 function pruebasPuertaDeSubida(check, base) {
   // `estado`, `ops` y `activos` son TRES entradas independientes del juez, y
   // `observarNube` puede producirlas descorrelacionadas de verdad (un documento
@@ -5370,19 +5395,12 @@ function pruebasPuertaDeSubida(check, base) {
     if (!activos && nubes[n].activos > 0) return 'activos';
     return 'ok';
   };
-  let filas = 0;
-  Object.keys(libros).forEach(l => Object.keys(nubes).forEach(n =>
-    [true, false].forEach(activos => [[], ['balance-rows-9']].forEach(incompleto => {
-      const d = decidirSubida({ opsLocales: libros[l].ops, libroIlegible: libros[l].ilegible,
-                                nube: nubes[n], hayActivosLocales: activos,
-                                incompleto: incompleto });
-      const q = esperado(l, n, activos, incompleto);
-      const id = `${l}/${n}/activos=${activos}/inc=${incompleto.length}`;
-      check(`AC-1 matriz ${id}: motivo`, d.clave, q);
-      check(`AC-1 matriz ${id}: subir`, d.subir, q === 'ok');
-      filas++;
-    }))));
-  check('AC-1 la matriz recorre las 84 combinaciones', filas, 84);
+  // Oraculo del AVISO, escrito APARTE como el de la clave: si llamara a
+  // `decidirSubida` mediria su propio reflejo. Un paquete incompleto es un
+  // error del dispositivo (rojo); los demas rechazos son «pendiente».
+  const avisoEsperado = q => (q === 'ok' ? 'ok' : q === 'incompleto' ? 'error' : 'pendiente');
+  check('AC-1 la matriz recorre las 84 combinaciones',
+        recorrerMatriz(check, libros, nubes, esperado, avisoEsperado), 84);
 
   // EL CRUCE que destapó la revisión adversaria, con fila y nombre propios:
   // libro con operaciones, SIN activos, y la nube que no se pudo leer. Hasta
@@ -5393,6 +5411,264 @@ function pruebasPuertaDeSubida(check, base) {
   check('AC-1 CRUCE ops sí · activos no · nube ilegible: NO sube', cruce.subir, false);
   check('AC-1 CRUCE y por el motivo correcto, no por otro', cruce.clave, 'nube-ilegible');
 
+}
+
+// ── EL ARNÉS DE PINTURA (ciclo 01-06) ─────────────────────────────────────
+//
+// Los pintores NO se sustituyen por espías aquí: se EJECUTAN, y se lee su
+// efecto. Sustituirlos es justo el agujero que abrió D-38 — el mecanismo tenía
+// control y la capa que el operador MIRA no tenía ninguno.
+//
+// Eso exige un DOM observable y un reloj falso, pero SÓLO dentro de una ventana
+// que se abre y se cierra: el `getElementById` de base sigue devolviendo `null`
+// siempre, porque el código de arranque se ejecuta al cargar el <script> y
+// darle elementos vivos cambiaría lo que hace.
+//
+// La ventana se cierra en un `finally` y de forma IDEMPOTENTE. Sin eso, un
+// aserto que LANCE dejaría `setTimeout` sustituido para el resto de la vida de
+// la página: el `setTimeout(guardarTodo, 600)` de `schedSave` quedaría
+// capturado y las ediciones del operador dejarían de guardarse EN SILENCIO,
+// que es exactamente el daño que esta fase existe para impedir.
+
+// Identificadores que EXISTEN en el marcado. Se DERIVAN: en node los inyecta
+// tools/run_selftests.py leyendo index.html; en el navegador salen del propio
+// documento. Nunca una lista escrita en el test.
+function idsDelMarcado() {
+  if (Array.isArray(globalThis.__IDS_DEL_MARCADO)) return globalThis.__IDS_DEL_MARCADO;
+  return Array.prototype.map.call(document.querySelectorAll('[id]'), e => e.id);
+}
+
+// Identificadores que los pintores usan DE VERDAD, derivados de su propio
+// texto. Enumerarlos a mano sería la lista blanca que sólo protege de lo que ya
+// conoce: un pintor que empiece a tocar un elemento nuevo entraría sin control.
+function idsDeLosPintores() {
+  const txt = String(showSaveIndicator) + String(setSyncUI);
+  const out = [];
+  const re = /getElementById\(\s*['"`]([^'"`]+)['"`]\s*\)/g;
+  let m;
+  while ((m = re.exec(txt))) if (out.indexOf(m[1]) < 0) out.push(m[1]);
+  return out;
+}
+
+// Estados que `estadoSync` puede EMITIR, derivados de su texto. El repo ya usa
+// este patrón; enumerarlos aquí dejaría fuera al primero que se añadiera.
+function estadosEmisibles() {
+  const out = [];
+  const re = /return\s+'([^']+)'/g;
+  let m;
+  while ((m = re.exec(String(estadoSync)))) if (out.indexOf(m[1]) < 0) out.push(m[1]);
+  return out;
+}
+
+// Abre la ventana. FALLA CERRADO: sin identificadores derivados, o sin los que
+// los pintores usan, LANZA con nombre — jamás «0 hallazgos». Vigilar sólo el
+// conjunto VACÍO no bastaría: el pintor hace `if (!el) return`, así que un
+// conjunto INCOMPLETO de origen lo dejaría irse de vacío y en verde (§5.15).
+function abrirVentanaDePintura() {
+  const marcado = idsDelMarcado();
+  if (!marcado.length) {
+    throw new Error('INSTRUMENTO ROTO: no se derivó ningún identificador del marcado');
+  }
+  const usados = idsDeLosPintores();
+  if (!usados.length) {
+    throw new Error('INSTRUMENTO ROTO: no se derivó ningún identificador de los pintores');
+  }
+  const faltan = usados.filter(id => marcado.indexOf(id) < 0);
+  if (faltan.length) {
+    throw new Error('INSTRUMENTO ROTO: el marcado no tiene identificadores que los ' +
+                    'pintores usan de verdad: ' + faltan.join(', '));
+  }
+  const elems = {};
+  const dame = id => {
+    if (marcado.indexOf(id) < 0) return null;
+    if (!elems[id]) elems[id] = { style: {}, textContent: '', innerHTML: '', title: '' };
+    return elems[id];
+  };
+  const v = { el: dame, programaciones: [], cancelaciones: [], cedido: false };
+  const propio = Object.prototype.hasOwnProperty.call(document, 'getElementById');
+  const real = { get: document.getElementById, set: setTimeout, clr: clearTimeout };
+  // Un temporizador de aviso pendiente de ANTES podría disparar dentro de la
+  // ventana y hacer intermitente lo que se lee. Se cancela con el reloj REAL.
+  if (typeof indicadorTimer !== 'undefined') real.clr.call(globalThis, indicadorTimer);
+  let sig = 900000;
+  document.getElementById = dame;
+  setTimeout = (fn, ms) => { sig++; v.programaciones.push({ id: sig, fn: fn, ms: ms }); return sig; };
+  clearTimeout = id => { v.cancelaciones.push(id); };
+  // MECANISMO explícito del aserto de no-contaminación: si el cuerpo cediera el
+  // control, esta microtarea correría antes de cerrar. Sin mecanismo, «no se
+  // cedió el control» sería un comentario, y un comentario no cablea nada (§5.1).
+  Promise.resolve().then(() => { v.cedido = true; });
+  let cerrada = false;
+  v.cerrar = () => {
+    if (cerrada) return;
+    cerrada = true;
+    v.cedidoAlCerrar = v.cedido;
+    if (propio) document.getElementById = real.get; else delete document.getElementById;
+    setTimeout = real.set;
+    clearTimeout = real.clr;
+  };
+  return v;
+}
+
+// La ÚNICA forma de usar la ventana. El `try/finally` es BLOQUEANTE, no buena
+// práctica: sin él, un aserto que lance secuestra el navegador del operador.
+function conVentanaDePintura(fn) {
+  const v = abrirVentanaDePintura();
+  try { return fn(v); } finally { v.cerrar(); }
+}
+
+// AC-0. Estos asertos miden el ARNÉS, no el producto: su control positivo no es
+// revertir un trozo de index.html, sino su mutante de arnés en tools/sabotage.py.
+async function pruebasArnesDePintura(check) {
+  const getReal = document.getElementById;
+  const setReal = setTimeout;
+  let lanzo = false;
+  try { conVentanaDePintura(() => { throw new Error('lanzamiento a propósito'); }); }
+  catch (e) { lanzo = true; }
+  check('AC-0 la ventana deja escapar el lanzamiento', lanzo, true);
+  check('AC-0 y aun así restauró getElementById', document.getElementById, getReal);
+  check('AC-0 y aun así restauró setTimeout', setTimeout, setReal);
+  // Si el reloj quedó secuestrado, esperar un temporizador aquí COLGARÍA la
+  // suite entera, y colgarse no es un veredicto: se dice y se sale con nombre.
+  if (setTimeout !== setReal || document.getElementById !== getReal) {
+    check('AC-0 el arnés quedó instalado tras un lanzamiento: secuestraría la página',
+          false, true);
+    return;
+  }
+  const v = abrirVentanaDePintura();
+  v.cerrar(); v.cerrar();
+  check('AC-0 cerrar dos veces es inocuo (getElementById)', document.getElementById, getReal);
+  check('AC-0 cerrar dos veces es inocuo (setTimeout)', setTimeout, setReal);
+  check('AC-0 dentro de la ventana no se cedió el control', v.cedidoAlCerrar, false);
+  // CONTROL POSITIVO del detector. Sin esto, el aserto de arriba pasaba con el
+  // MECANISMO BORRADO —`cedido` se queda en `false` por defecto—, o sea que era
+  // un comentario disfrazado de control (§5.1). Medido el 2026-08-31.
+  const vCede = abrirVentanaDePintura();
+  await Promise.resolve();
+  vCede.cerrar();
+  check('AC-0 y el detector REACCIONA cuando sí se cede el control',
+        vCede.cedidoAlCerrar, true);
+  // EL control que de verdad importa: tras restaurar, un temporizador NUEVO se
+  // ejecuta de verdad. Es lo que demuestra que este ciclo no deja al operador
+  // sin guardar. Con timeout propio: si no corriera, colgarse no es veredicto.
+  const corrio = await new Promise(res => {
+    const t = setTimeout(() => res('no'), 3000);
+    setTimeout(() => { clearTimeout(t); res('sí'); }, 0);
+  });
+  check('AC-0 tras restaurar, un setTimeout nuevo SÍ se ejecuta', corrio, 'sí');
+}
+
+// AC-1. El pintor del guardado, EJECUTADO. Hasta este ciclo no lo había llamado
+// jamás ningún test: se le sustituía por un espía.
+function pruebasPintorDelGuardado(check) {
+  conVentanaDePintura(v => {
+    const el = v.el('save-indicator');
+    check('AC-1 el elemento del aviso existe en el marcado', el !== null, true);
+    showSaveIndicator('No se pudo guardar', false);
+    const fallo = { txt: el.textContent, color: el.style.color, op: el.style.opacity };
+    showSaveIndicator();
+    const exito = { txt: el.textContent, color: el.style.color, op: el.style.opacity };
+    check('AC-1 el fallo escribe SU texto', fallo.txt, 'No se pudo guardar');
+    check('AC-1 el éxito escribe el suyo', exito.txt, 'Guardado ✓');
+    check('AC-1 los colores de fallo y de éxito son DISTINTOS',
+          fallo.color !== exito.color && !!fallo.color, true);
+    // «DISTINTOS» NO basta: INTERCAMBIARLOS —el fallo en verde y el éxito en
+    // rojo— lo satisface, y eso es literalmente el daño que da nombre a D-38.
+    // Medido el 2026-08-31 por un brazo adversario y re-verificado a mano sobre
+    // copia aislada: rc=0 y «✅ Autopruebas OK». El oráculo se escribe APARTE.
+    const colorEsperado = { exito: 'var(--green)', fallo: 'var(--red)' };
+    check('AC-1 el fallo se pinta con el color de PELIGRO', fallo.color, colorEsperado.fallo);
+    check('AC-1 el éxito se pinta con el color de OK', exito.color, colorEsperado.exito);
+    check('AC-1 el aviso de fallo queda VISIBLE', fallo.op, '1');
+    check('AC-1 y el de éxito también', exito.op, '1');
+  });
+}
+
+// AC-2. La duración sale del `setTimeout` REAL, y el CRUCE se afirma por el
+// identificador EXACTO: «canceló algo» lo satisface cancelar otra variable.
+function pruebasDuracionDelAviso(check) {
+  conVentanaDePintura(v => {
+    showSaveIndicator();
+    showSaveIndicator('No se pudo guardar', false);
+    check('AC-2 se programaron exactamente dos apagados', v.programaciones.length, 2);
+    const p1 = v.programaciones[0] || {};
+    const p2 = v.programaciones[1] || {};
+    check('AC-2 con identificadores distintos', p1.id !== p2.id, true);
+    check('AC-2 las dos duraciones difieren', p1.ms !== p2.ms, true);
+    check('AC-2 y la del error es la MAYOR', p2.ms > p1.ms, true);
+    // Un aviso que se apaga en 2 ms es un aviso que nadie ve, y «difieren» + «la
+    // del error es mayor» lo daba por bueno (medido el 2026-08-31). Se exige un
+    // MÍNIMO legible, que es la propiedad que de verdad importa al operador.
+    check('AC-2 el aviso de éxito dura lo bastante para leerse', p1.ms >= 1000, true);
+    check('AC-2 y el de fallo, bastante más', p2.ms >= 3000, true);
+    // Sin `clearTimeout(indicadorTimer)`, el apagado del «Guardado ✓» borraría
+    // a los 1,8 s el aviso de error que acaba de sustituirlo. Es un CRUCE.
+    check('AC-2 la segunda pintura canceló el temporizador ANTERIOR, por su id EXACTO',
+          v.cancelaciones[v.cancelaciones.length - 1], p1.id);
+  });
+}
+
+// AC-3. El pintor de la sincronización, EJECUTADO en todos los estados que
+// `estadoSync` puede emitir. Nota: 'auth' no tiene productor hoy — se pinta
+// igualmente para que el día que lo tenga ya esté medido.
+function pruebasPintorDeSincronizacion(check) {
+  const estados = estadosEmisibles();
+  check('AC-3 los estados se DERIVAN de estadoSync', estados.length >= 4, true);
+  check('AC-3 y "ok" está entre ellos', estados.indexOf('ok') >= 0, true);
+  conVentanaDePintura(v => {
+    const dot = v.el('sync-dot');
+    const status = v.el('sync-status');
+    check('AC-3 los elementos del indicador existen', dot !== null && status !== null, true);
+    // Oráculo escrito APARTE. «Distinguible» dejaba pasar pintar el ERROR de
+    // naranja: la firma incluye título y texto, así que cambiar sólo el color
+    // seguía siendo distinguible (medido el 2026-08-31). Un estado NUEVO no
+    // estará en este mapa y saldrá ROJO con su nombre: falla CERRADO.
+    const colorDeEstado = { ok: '#27ae60', pendiente: '#e67e22', error: '#e74c3c',
+                            auth: '#e74c3c', offline: 'var(--border)' };
+    const firmas = [];
+    let verdes = 0;
+    let okVerde = false;
+    estados.forEach(e => {
+      setSyncUI(e);
+      check('AC-3 el estado ' + e + ' pinta SU color', dot.style.background,
+            colorDeEstado[e]);
+      firmas.push([dot.style.background, dot.title, status.textContent,
+                   status.style.display].join('|'));
+      if (dot.title === 'Sincronizado') { verdes++; if (e === 'ok') okVerde = true; }
+      if (e !== 'ok') {
+        check('AC-3 el estado ' + e + ' no deja el texto oculto', status.style.display, 'block');
+      }
+    });
+    check('AC-3 cada estado pinta algo DISTINGUIBLE',
+          Object.keys(firmas.reduce((a, f) => { a[f] = 1; return a; }, {})).length,
+          estados.length);
+    check('AC-3 exactamente UNO pinta el verde de sincronizado', verdes, 1);
+    check('AC-3 y ese es "ok"', okVerde, true);
+  });
+}
+
+// Agrupa la capa de aviso. Todas corren igual en node y en el navegador.
+async function pruebasCapaDeAviso(check) {
+  await pruebasArnesDePintura(check);
+  pruebasPintorDelGuardado(check);
+  pruebasDuracionDelAviso(check);
+  pruebasPintorDeSincronizacion(check);
+}
+
+// AC-5. Espia de consola por PREFIJO LITERAL COMPLETO y por NIVEL.
+// «Una subcadena lo bastante larga» no es un criterio medible: quien juzga
+// «bastante» seria el mismo que escribe el aserto, que es la trampa de
+// `\btest\b` del catalogo. Y el nivel se afirma APARTE del texto, porque
+// degradar un `console.error` a un aviso informativo deja el mecanismo intacto
+// y el aviso muerto (§5.6).
+function espiaDeConsola(prefijo) {
+  const real = { error: console.error, warn: console.warn };
+  const casa = m => String(m).indexOf(prefijo) === 0;
+  const e = { error: 0, aviso: 0, prefijo: prefijo };
+  console.error = m => { if (casa(m)) e.error++; };
+  console.warn = m => { if (casa(m)) e.aviso++; };
+  e.soltar = () => { console.error = real.error; console.warn = real.warn; };
+  return e;
 }
 
 // El indicador es un juez DISTINTO del de la subida: mapa CERRADO, y lo
@@ -5525,6 +5801,14 @@ async function runSelfTests() {
   pruebasNumeros(check);
   pruebasGuardado(check);
   await pruebasSincronizacion(check);
+  // La capa de AVISO (01-06). Con el mismo freno del `await` perdido que usa
+  // `pruebasSincronizacion`: una suite asincrona que no llega a correr dejaria
+  // la puerta verde y sorda, y aqui esa suite es justo la que faltaba.
+  let ejercidosAviso = 0;
+  await pruebasCapaDeAviso((n, g, w) => { ejercidosAviso++; check(n, g, w); });
+  if (!ejercidosAviso) {
+    check('la capa de aviso no ejercio ni un control (falta un await?)', false, true);
+  }
 
   if (fails.length) {
     console.error(`❌ ${fails.length} autopruebas fallidas:\n` + fails.join('\n'));

@@ -40,7 +40,7 @@ Llevar al día tus carteras con precios manuales y sacar de ahí una declaració
 
 ### Active (In Progress)
 
-**Fase 1 — Guardado que no miente.** Cuatro ciclos cerrados: 01-01 (arranque y guardado honestos),
+**Fase 1 — Guardado que no miente.** **Seis ciclos cerrados.** Los cuatro primeros: 01-01 (arranque y guardado honestos),
 01-02 (sincronización que no destruye), 01-03 (el cerrojo del libro ilegible, `96c7a3e`) y **01-04**
 (una sola puerta de subida, `21e1edb`). **Los cuatro están desplegados y verificados en el
 navegador real**; el 01-04 el 2026-08-31 (`e2e8f86`), con sus estados naranja y rojo vistos por
@@ -58,9 +58,23 @@ ni por su código de salida ni por un entorno contaminado; y la variante automá
 `pre-push`) está vigilada en vez de supuesta. Por eso no necesita verificación en navegador — y por
 eso el 01-06 sí la necesitará.
 
-**Sigue abierta** por una sola razón, medida tres veces contra el código: la meta dice «en
-silencio», y **la capa de AVISO no tiene oráculo** (D-38). Un guardado que ha fallado pintado en
-VERDE pasa hoy la puerta entera. Es el ciclo **01-06**, y es lo único que queda.
+El **01-06** (2026-08-31) es el sexto y último ciclo, y **cierra D-38**: la capa de aviso ya tiene
+oráculo. Los dos pintores —el del guardado y el de la sincronización— **se ejecutan de verdad** por
+primera vez, sobre un DOM observable con reloj falso, y se lee lo que hacen: el texto, el color
+**por su valor**, la visibilidad y cuánto dura el aviso. Un instrumento nuevo, `tools/avisos.py`,
+sella los 34 avisos al operador con su nivel y su mensaje, y vigila que nadie pinte esos elementos
+por su cuenta.
+
+Lo que hay que recordar de ese ciclo: **se dio por hecho una vez y estaba mal**. La puerta ya
+estaba verde cuando tres revisiones adversarias independientes encontraron diez cosas, ninguna de
+ellas vista por más de una. La peor: los asertos pedían que los colores de éxito y de fallo fueran
+*distintos*, nunca *cuáles*, así que **intercambiarlos —el fallo de guardado pintado en verde—
+pasaba la puerta entera**. Era exactamente el daño que el ciclo existía para impedir.
+
+**La fase sigue abierta**, pero ya no por falta de trabajo: falta **abrir la app en el navegador**
+y comprobarlo con los ojos, porque las pruebas fuera del navegador no resuelven colores ni aplican
+estilos; y falta la **cuarta medición de la fase contra el código**, que es quien decide si cierra.
+Las tres anteriores cambiaron el resultado al hacerlas.
 
 ### Planned (Next)
 
