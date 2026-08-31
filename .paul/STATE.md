@@ -10,49 +10,45 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 Milestone: v0.1 Datos fiables (v0.1.0)
-Phase: 1 of 6 (Guardado que no miente) — **ABIERTA tras la segunda transición**
+Phase: 1 of 6 (Guardado que no miente) — **ABIERTA; pendiente su TERCERA transición**
 Planes: 01-01 CERRADO (`dd13e42` + `86ad865` + `80d523f`); 01-02 CERRADO (`77f8cef` +
 `56795eb` + acta); 01-03 CERRADO (`96c7a3e`, desplegado y verificado en el navegador);
-**01-04 PLANIFICADO Y REVISADO** (`01-04-PLAN.md`, versión 2)
-Status: la SEGUNDA transición de la Fase 1 midió los tres objetivos del alcance contra el código
-sobre el diff completo `69f728e..HEAD`: los tres en **PASS**. Pero la **META de la fase FALLA**:
-hay tres escrituras a la nube y sólo dos pasan por la guarda de no-vaciado. La tercera, en el
-manejador de inicio de sesión, se recorre también cuando la lectura de la nube FALLA y sube un
-libro vacío encima de uno completo, con el indicador en verde. Fichado como **D-33** (y **D-34**,
-dos `catch` vacíos dentro de `buildSyncPayload`), y **son el objetivo del ciclo 01-04**, no deuda
-diferida: ficharlos y cerrar la fase la blanquearía como hecha.
-Last activity: 2026-08-30 — **APPLY del ciclo 01-04 completo**. Cuatro tareas ejecutadas; la
-puerta VERDE por sus DOS variantes, byte a byte idénticas, con el árbol en exclusiva. 44 sabotajes
-mordiendo, 15 de este ciclo. Los cuatro brazos adversarios devolvieron veredicto: correctness no
-pudo demoler su frase; los otros tres SÍ, con mutantes ejecutados que sobrevivían a la puerta
-entera. Los tres bloqueantes arreglados y con test permanente. D-33, D-34 y D-31 cerradas; D-35,
-D-36 y D-37 abiertas; `onScreenshotPicked` añadida a D-09.
-Actividad anterior: 2026-08-30 — segunda transición de la Fase 1. Puerta verde por sus DOS variantes,
-árbol en exclusiva, despliegue idéntico a lo medido. Cuatro brazos adversarios disjuntos (radio de
-impacto, objetivos contra código, seguridad, documentos contra evidencia). Acta:
-`01-TRANSICION-2.md`. Ocho fichas nuevas: D-27 a D-34.
+**01-04 CERRADO** (`21e1edb` + acta `01-04-SUMMARY.md`) — **sin desplegar**
+Status: el ciclo 01-04 cerró el defecto que paró la fase. Los siete criterios de aceptación en
+PASS con su artefacto, re-medidos en UNIFY con el árbol en exclusiva. Hay **exactamente una**
+escritura a Firestore en `index.html`, dentro de `subirALaNube`, decidida por `decidirSubida` —
+pura, ejecutable en node, que falla CERRADO de forma simétrica para operaciones y activos. Cero
+llamadas literales `setSyncUI('ok')`. D-33, D-34 y D-31 cerradas; D-35, D-36 y D-37 abiertas.
+Last activity: 2026-08-31 — **UNIFY del ciclo 01-04**. Puerta VERDE por sus DOS variantes
+(manual `rc=0` y enganche `pre-push` `rc=0`, salidas idénticas byte a byte salvo la línea de
+anuncio del propio enganche), árbol en exclusiva (`HEAD^{tree}` =
+`5870b9a53d56939119b647e9b64425e550ee7fb6`, idéntico antes y después de medir). Ocho pasos en la
+puerta, dos nuevos de este ciclo. **44 sabotajes mordiendo, 15 de este ciclo**, con el control de
+vacuidad vivo. Cifras re-derivadas en este UNIFY, no copiadas del APPLY.
+Actividad anterior: 2026-08-30 — APPLY del ciclo 01-04; los cuatro brazos adversarios devolvieron
+veredicto y tres de ellos demolieron su frase con mutantes que sobrevivían a la puerta entera.
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [████████░░] 80% (3 ciclos cerrados; la meta de la fase falla por D-33 → falta el 01-04)
+- Phase: [█████████░] 90% (4 ciclos cerrados; falta la tercera transición y ver el ciclo en el navegador)
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ○     [01-04 — APPLY completo, listo para UNIFY]
+  ✓        ✓        ✓     [01-04 CERRADO — listo para la TERCERA transición de la Fase 1]
 ```
 
-Ciclos 01-01, 01-02 y 01-03: cerrados. La transición de fase NO cerró la fase: devolvió un hallazgo
-de correctness que contradice su meta. El PLAN 01-04 está escrito y **ya pasó la revisión
-adversaria**: se le dieron ocho frases concretas a demoler y tumbó CUATRO, todas verificadas
-después contra el código. El plan se reescribió entero (versión 2, diez enmiendas E-1..E-10).
+Ciclos 01-01, 01-02, 01-03 y 01-04: cerrados, cada uno con su acta. La fase NO está cerrada: el
+cierre de un ciclo nunca autoriza el de una fase (§7), y la meta se mide contra el código en una
+transición aparte. Las dos transiciones anteriores cambiaron el resultado al medir — la segunda
+destapó D-33, que es justo lo que acaba de arreglar este ciclo.
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 5
 - Average duration: —
 - Total execution time: —
 
@@ -61,7 +57,7 @@ después contra el código. El plan se reescribió entero (versión 2, diez enmi
 | Phase | Plans | Total Time | Avg/Plan |
 |-------|-------|------------|----------|
 | 00-hotfix-decimal | 1/1 | — | — |
-| 01-guardado-fiable | 3/3 | — | — |
+| 01-guardado-fiable | 4/4 | — | — |
 
 ## Accumulated Context
 
@@ -100,6 +96,11 @@ después contra el código. El plan se reescribió entero (versión 2, diez enmi
 | Se cruzan dos boundaries y se dice en voz alta | 01-04 PLAN | `buildSyncPayload` (sólo su manejo de errores) y `funcsize.py` (extraer el localizador de funciones para no tener dos escáneres). Un boundary cruzado sin decirlo es deriva; dicho, es una decisión |
 | El coste del arreglo se ficha como deuda antes de construirlo | 01-04 PLAN | Rechazar la subida por un paquete incompleto deja el libro sin copia en la nube mientras dure el fallo, sin salida en la interfaz. Es el gemelo de D-23. Mejor para el dato y peor para el operador: se escribe o no existe |
 | Cuatro brazos adversarios disjuntos sustituyen a G7, que sigue ciego | Fase 1 transición 2 | El de seguridad no encontró nada y el de objetivos encontró el hallazgo que paró la fase. Brazos que miden lo mismo se corroboran en su punto ciego; éstos midieron cosas distintas |
+| El fallo cerrado del juez es SIMÉTRICO: operaciones y activos | 01-04 | La asimetría entre los dos predicados ERA el defecto (§5.16). El cruce «ops sí · activos no · nube ilegible» tiene fila propia en la matriz y sabotaje propio |
+| Se cruza el boundary de `funcsize.py` y se dice en voz alta | 01-04 | Copiar el escáner habría dado dos escáneres que se desincronizan a la primera. Prueba de que sigue midiendo igual: `--check` verde sin resellar |
+| El trinquete se resella con semántica v2 a propósito (ámbito ampliado a `async function`) | 01-04 | Volver `runSelfTests` asíncrona la había sacado del trinquete SIN que nada se pusiera rojo. Cambiar la regla de medida es DERIVA (rc=3): el resellado es una decisión escrita, no un trámite |
+| Los tres hallazgos de la revisión adversaria se arreglan dentro del ciclo, no se difieren | 01-04 | Eran correctness y eran huecos del propio aparato de medición: un fixture que ataba el contenido de la nube a su nombre, un CABLE sin medir entre dos piezas ya medidas, y un `await` perdido que dejaba una suite sin ejercer con la puerta verde y sorda |
+| El interruptor `VERIFY_INNER` pasa a AVISAR, y se borra un `VERIFY_DEGRADED` fantasma | 01-04 | Un banco que se salta en silencio es un falso verde; y el `VERIFY_DEGRADED` sólo existía en un comentario que ninguna rama leía — §5.1 en estado puro |
 
 ### Deferred Issues
 
@@ -112,7 +113,9 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 |---------|--------|-----------------|
 | ~~El cerrojo del libro ilegible se levanta antes de confirmar la reparación~~ | **RESUELTO** en el ciclo 01-03 (`96c7a3e`) | Arreglado, con autoprueba del cruce y diez controles positivos. Acta: `01-03-SUMMARY.md` |
 | ~~La FASE 1 no se ha medido contra el código después del 01-03~~ | **RESUELTO**: medida el 2026-08-30 sobre `69f728e..HEAD` | Acta: `01-TRANSICION-2.md`. La medición cambió el resultado: destapó D-33 |
-| **D-33 · una tercera escritura a la nube esquiva la guarda de no-vaciado** | **Impide cerrar la FASE 1**: contradice su meta —puede borrar el libro de la nube en silencio y con el indicador en verde | Ciclo **01-04**: cerrar la CLASE (derivar del código el conjunto de escrituras a la nube) y dejar un control que muerda si aparece una cuarta. Va con D-34 y arrastra D-31 (el aviso) |
+| ~~**D-33** · una tercera escritura a la nube esquiva la guarda de no-vaciado~~ | **RESUELTO** en el ciclo 01-04 (`21e1edb`) | Cerrada por la CLASE: una sola escritura, dos redes disjuntas cableadas a la puerta, control positivo en el banco. Acta: `01-04-SUMMARY.md` |
+| **El ciclo 01-04 no se ha visto en un navegador** | Añade un estado visual nuevo (punto ROJO «No se pudo sincronizar») y está SIN DESPLEGAR: la puerta no prueba la interfaz | Empujar a `main`, confirmar por huella que Pages sirve la versión nueva, recargar dos veces y mirarlo (§7 bis). Es requisito para la tercera transición |
+| **La FASE 1 no se ha medido contra el código después del 01-04** | Sin esa medición no se puede cerrar la fase; las dos veces anteriores medir CAMBIÓ el resultado | Tercera transición de fase sobre el diff completo, con brazos adversarios disjuntos |
 | G7 (radio de impacto) no ve `index.html` | La transición de fase no tiene instrumento propio; hoy se hace a mano | D-22. Se cierra cuando el grafo indexe el `<script>`, o cuando el sustituto sea un script del repo cableado a la puerta |
 
 ## Verificación manual de la Fase 1 — app desplegada, 2026-08-30
@@ -147,14 +150,25 @@ Misma disciplina: confirmado antes de mirar nada que Pages servía la versión n
 
 ## Boundaries (Active)
 
-Del PLAN 01-03 (ya ejecutado; se mantienen como invariantes vivos):
+Del PLAN 01-04 (ya ejecutado; se mantienen como invariantes vivos):
 
-- `vaciariaElLibro` / `tieneOperaciones` / `opsDelDocumento` intactos: son el juez único del 01-02
-- `rescatarOpsIlegible` intacto: es la red que hace que este defecto no sea pérdida de datos
-- `dedupeOps` / `opFingerprint` intactos: los necesitan `migrateOpsToGlobal` y el formato antiguo `opsData`
+- **Exactamente una** escritura a Firestore en `index.html`, dentro de `subirALaNube`. Lo vigilan
+  dos redes disjuntas en `tools/cloudwrites.py`, cableadas a la puerta
+- **Cero** llamadas literales `setSyncUI('ok')`: el verde sólo se alcanza por `estadoSync`
+- `decidirSubida` es pura y no toca red ni DOM: quien decide no hace E/S
+- Cero `catch` vacíos en el camino de subida; los tolerados fuera de él están **nombrados uno a
+  uno** en `.paul/baseline-catches.json`
+
+Del PLAN 01-03 y anteriores (siguen vivos):
+
+- `vaciariaElLibro` / `tieneOperaciones` / `opsDelDocumento` intactos: son el juez único del 01-02,
+  y el 01-04 los **usa** desde un sitio más sin reescribir su criterio
+- `repararLibroIlegible` / `rescatarOpsIlegible` / `escribirOpsAll`: contrato fijado en el 01-03.
+  `opsIlegible` se **lee** como entrada del juez de subida; no cambia quién lo pone ni quién lo quita
+- `dedupeOps` / `opFingerprint` / `dedupeOpsById` intactos
 - `parseNum` / `numIn` / `parseLooseNum` no se tocan (Fase 0)
-- `buildSyncPayload` y la resolución por `savedAt` son Fase 3; `computeFifo` y `exportTaxExcel`, Fase 4
-- No se cierran D-01, D-15, D-18, D-21 ni D-22 en este ciclo
+- La semántica de fusión de `buildSyncPayload` y la resolución por `savedAt` siguen siendo Fase 3
+  (el 01-04 tocó **sólo** su manejo de errores); `computeFifo` y `exportTaxExcel`, Fase 4
 
 Permanentes del proyecto:
 
@@ -163,16 +177,19 @@ Permanentes del proyecto:
 
 ## Session Continuity
 
-Last session: 2026-08-30
-Stopped at: SEGUNDA transición de la Fase 1 terminada. Puerta VERDE por sus dos variantes (manual
-`rc=0` y enganche `pre-push` `rc=0`, comparados byte a byte para descartar deriva), árbol en
-exclusiva (`HEAD^{tree}` idéntico antes y después de medir), y lo desplegado en Pages idéntico a lo
-medido (`md5 661acd6b17aed4808c9d8367a2cd72b4`). Cuatro brazos adversarios disjuntos. **La fase NO
-se cerró**: D-33 contradice su meta. Ocho fichas nuevas en el libro: D-27 a D-34.
-Next action: **`/paul:apply .paul/phases/01-guardado-fiable/01-04-PLAN.md`**, en contexto LIMPIO.
-El plan ya incorpora la decisión sobre D-31: entra en este ciclo y se cierra por la CLASE, no por
-el caso. Cuatro tareas; la 4 es la revisión adversaria del diff, y es BLOQUEANTE.
-Resume file: .paul/phases/01-guardado-fiable/01-04-PLAN.md
+Last session: 2026-08-31
+Stopped at: **UNIFY del ciclo 01-04 cerrado.** Acta escrita
+(`01-04-SUMMARY.md`), estado actualizado en los cuatro sitios donde vive (`STATE.md`,
+`ROADMAP.md`, `PROJECT.md`, `paul.json`) y libro de deudas al día. Puerta VERDE por sus dos
+variantes, árbol en exclusiva, cifras re-derivadas en el propio UNIFY.
+Next action: dos cosas, **en este orden**, y ninguna es «seguir con el siguiente ciclo»:
+  1. **Desplegar y MIRARLO** — empujar a `main`, confirmar por huella que Pages sirve la versión
+     nueva, recargar dos veces y comprobar el indicador de sincronía, incluido el estado ROJO
+     nuevo. La puerta ejerce funciones puras en node: no prueba la interfaz (§7 bis).
+  2. **TERCERA transición de la Fase 1** — medir la meta de la fase contra el código sobre el diff
+     completo, con brazos adversarios disjuntos. Las dos veces anteriores, medir cambió el
+     resultado. Sólo después se puede decidir si la fase cierra.
+Resume file: .paul/phases/01-guardado-fiable/01-04-SUMMARY.md
 
 ---
 *STATE.md — Updated after every significant action*

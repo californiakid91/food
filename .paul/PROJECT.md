@@ -40,11 +40,19 @@ Llevar al día tus carteras con precios manuales y sacar de ahí una declaració
 
 ### Active (In Progress)
 
-**Fase 1 — Guardado que no miente.** Tres ciclos cerrados y desplegados: 01-01 (arranque y guardado
-honestos), 01-02 (sincronización que no destruye) y 01-03 (el cerrojo del libro ilegible, `96c7a3e`).
-Los tres objetivos del scope están en el código y verificados en el navegador real.
-**Sigue abierta**: falta repetir la transición de fase midiendo los objetivos contra el código
-sobre `abe5e80..96c7a3e`. El cierre de un ciclo nunca autoriza el de una fase.
+**Fase 1 — Guardado que no miente.** Cuatro ciclos cerrados: 01-01 (arranque y guardado honestos),
+01-02 (sincronización que no destruye), 01-03 (el cerrojo del libro ilegible, `96c7a3e`) y **01-04**
+(una sola puerta de subida, `21e1edb`). Los tres primeros están desplegados y verificados en el
+navegador real; **el 01-04 no**.
+
+El 01-04 cerró el hallazgo que paró la fase en su segunda transición: había tres escrituras a
+Firestore y sólo dos pasaban por la guarda de no-vaciado. Ahora hay **una**, decidida por una
+función pura que falla cerrado —de forma simétrica para operaciones y activos— cuando no puede
+mirar la nube, y dos instrumentos nuevos ponen la puerta roja si aparece otra.
+
+**Sigue abierta** por dos razones: falta su TERCERA transición (el cierre de un ciclo nunca
+autoriza el de una fase) y **nada del último ciclo se ha visto en un navegador** — está sin
+desplegar y añade un estado visual nuevo.
 
 ### Planned (Next)
 
@@ -105,7 +113,7 @@ sobre `abe5e80..96c7a3e`. El cierre de un ciclo nunca autoriza el de una fase.
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
 | La puerta (`tools/verify.sh`) en verde antes de cada push | 100% | enganchada a pre-push | On track |
-| Controles de la puerta con sabotaje que demuestra que muerden | 100% | 9 de 9 | Achieved |
+| Controles de la puerta con sabotaje que demuestra que muerden | 100% | todos (cifra viva en la salida de `tools/sabotage.py`; no se copia aquí) | Achieved |
 | Invariantes cubiertos por `runSelfTests()` | 4 (decimal, FIFO, año fiscal, sync) | 1 | On track |
 | Escenarios de pérdida de datos abiertos | 0 | 4 (ops sin cargar, dedupe, sync, sin backup) | At risk |
 | Riesgos fiscales conocidos sin resolver | 0 | 4 (orden intradía, split, 2 meses, opFx) | At risk |

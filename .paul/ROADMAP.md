@@ -56,32 +56,34 @@ Phases: 1 of 7 complete (Fase 0)
   su cerrojo, que ahora sólo se levanta tras confirmar la reparación; el cruce «ilegible × nube vacía» con
   autoprueba propia; el formato antiguo también repara; 10 controles positivos nuevos en el banco
 
-**La fase SIGUE abierta — segunda transición, 2026-08-30.**
+- [x] 01-04: Una sola puerta de subida — cerrado 2026-08-31 (`21e1edb`) — las tres escrituras a
+  Firestore reducidas a UNA, decidida por una función pura que falla cerrado y de forma simétrica
+  cuando no puede mirar la nube; cero verdes escritos a mano; dos instrumentos nuevos cableados a
+  la puerta (`cloudwrites.py`, `emptycatch.py`); 15 sabotajes nuevos mordiendo
 
-Los tres objetivos del alcance están en el código y medidos uno a uno contra él (PASS), desplegados
-y verificados en el navegador real. Lo que NO se sostiene es la META de la fase: *«que ningún fallo
-de guardado ni de arranque pueda borrar el libro de operaciones en silencio»*.
+**La fase SIGUE abierta tras el ciclo 01-04 — pendiente su TERCERA transición.**
 
-Hay **tres** escrituras al documento de Firestore y sólo **dos** pasan por la guarda de no-vaciado.
-La tercera, en el manejador de inicio de sesión, se recorre también cuando la lectura de la nube
-FALLA —no sólo cuando está vacía— y sube un libro vacío encima de uno completo mientras el
-indicador de sincronía se queda verde. Es la misma forma del defecto que abrió el 01-03: el
-mecanismo existe y hay un camino que no lo atraviesa. **Presencia ≠ precedencia.**
+El defecto que paró la fase (D-33) está cerrado y con control positivo: hay exactamente una
+escritura a la nube, dentro de `subirALaNube`, y dos redes disjuntas ponen la puerta roja si
+aparece otra. También se cerraron D-34 y D-31 (esta última por la CLASE: cero llamadas literales
+que pinten el indicador en verde).
 
-Se arregla en el ciclo **01-04**, cuyo objetivo es cerrar la CLASE —derivar del código el conjunto
-de escrituras a la nube y dejar un control que se ponga rojo si aparece una cuarta— y no los dos
-casos conocidos. Fichas: **D-33** y **D-34**. Acta: `01-TRANSICION-2.md`.
+Lo que impide declarar la fase cerrada ahora mismo son dos cosas, ninguna opinable:
+
+1. **El cierre de un ciclo nunca autoriza el de una fase** (`CLAUDE.md` §7). La meta se mide
+   contra el código en una transición aparte, y medir cambia el resultado: eso fue justo lo que
+   destapó D-33 la vez anterior.
+2. **Nada de este ciclo se ha visto en un navegador.** El commit está en local, sin desplegar, y
+   añade un estado visual nuevo (punto ROJO «No se pudo sincronizar»). La puerta ejerce funciones
+   puras en node sobre un DOM de mentira: no prueba la interfaz (§7 bis).
 
 **Aviso para quien repita la transición:** G7 (radio de impacto) sigue **DEGRADADO** —
-`code-review-graph` no ve el JS dentro de `index.html` (**D-22**). Se sustituyó a mano por cuatro
-brazos adversarios disjuntos; el brazo de seguridad no encontró nada y el de objetivos encontró el
-hallazgo que paró la fase. Un solo brazo la habría cerrado.
+`code-review-graph` no ve el JS dentro de `index.html` (**D-22**). Se sustituye a mano por brazos
+adversarios disjuntos; en la transición anterior el brazo de seguridad no encontró nada y el de
+objetivos encontró el hallazgo que paró la fase. Un solo brazo la habría cerrado.
 
-**Planes:** 01-01, 01-02 y 01-03 cerrados; **01-04 planificado y revisado** (`01-04-PLAN.md`,
-versión 2). La revisión adversaria del plan tumbó cuatro de sus ocho afirmaciones antes de
-ejecutarlo — entre ellas un cruce sin medir que la primera versión habría convertido en una
-escritura destructiva nueva, y un instrumento que habría degenerado en la lista blanca que la
-propia ficha D-33 prohíbe. El ciclo cubre D-33, D-34 y D-31.
+**Planes:** 01-01, 01-02, 01-03 y 01-04 cerrados. Fichas abiertas por el último ciclo: **D-35**,
+**D-36** y **D-37**. Acta: `01-04-SUMMARY.md`.
 
 ### Phase 2: Backup y restauración
 
