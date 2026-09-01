@@ -13,11 +13,11 @@
   },
   "loop": {
     "plan": "01-07",
-    "position": "PLAN_PENDING"
+    "position": "PLAN"
   },
   "timestamps": {
     "created_at": "2026-08-29T00:00:00Z",
-    "updated_at": "2026-09-01T00:00:00Z"
+    "updated_at": "2026-09-01T12:00:00Z"
   },
   "satellite": {
     "groom": true

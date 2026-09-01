@@ -10,57 +10,50 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 Milestone: v0.1 Datos fiables (v0.1.0)
-Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. Su CUARTA transición (2026-09-01) tampoco la
-cerró: abre el ciclo **01-07**.
-Planes: 01-01 a 01-06 **CERRADOS**, todos con su loop completo y su verificación en el navegador.
-Status: los TRES objetivos del ALCANCE siguen en PASS. La META —«sin que se entere nadie»— sigue
-sin cumplirse, por DOS defectos nuevos medidos hoy: **D-45** (al arrancar, una nube más vieja
-empobrece el libro y la pantalla queda en VERDE) y **D-46** (quitar la lista de carteras del
-veredicto de guardado deja la puerta en `rc=0`). **D-15 CERRADA** re-midiéndola. Abiertas además
-D-42, D-43, D-44 (cegueras declaradas, acotadas y re-medidas hoy) y la nueva **D-47**. **D-03**
-sigue marcada A RE-MEDIR.
-Last activity: 2026-09-01 — **CUARTA TRANSICIÓN de la Fase 1**. Cuatro brazos adversarios
-disjuntos, cada uno con su frase que demoler. Dos novedades respecto a las tres transiciones
-anteriores:
+Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. La CUARTA transición abrió el ciclo **01-07**.
+Plan: **01-07 CREADO** (2026-09-01), esperando aprobación para APPLY.
+Status: PLAN escrito, decidido por dialéctica adversaria y **demolido y reescrito** tras dos brazos
+disjuntos. Cierra **D-45**, **D-46**, **D-27** y **D-29**; deja fichadas por escrito las que no
+cierra. Abiertas D-42, D-43, D-44, D-47 y D-03 (a re-medir).
+Last activity: 2026-09-01 — **PLAN del ciclo 01-07**. El enfoque lo decidió una **dialéctica
+adversaria** que rechazó las DOS posturas del debate y propuso una tercera: vigilar los **sumideros**
+del daño (quién sube y quién anuncia éxito) en vez de los llamantes que ignoran un booleano — el
+censo de llamantes habría nacido con diez exenciones por nombre, que es la lista blanca prohibida.
 
-1. **Por primera vez un brazo NO demolió su frase.** El del aparato de medición intentó cinco
-   roturas concretas —que una deriva de semántica imprimiera el comando de resellado, que un delta
-   mixto dirigiera la mano al sellado, colar `VERIFY_INNER` por el enganche, que un `rc=2` tapara un
-   hallazgo `rc=1`, encontrar un script huérfano— y **ninguna cedió**. El fallo cerrado se reprodujo
-   uno a uno en los ocho instrumentos: rc=2 con nombre y remedio.
-2. **Por primera vez ninguna cifra publicada es falsa.** Las cuatro re-derivadas en fresco —74
-   controles del banco, 34 avisos censados, diez pasos de la puerta y la huella de lo desplegado—
-   dieron exactamente lo que dicen los documentos. En la tercera transición había tres falsas.
+**Y entonces el borrador fue demolido por dos brazos disjuntos: diez hallazgos, ninguno visto por
+los dos.** Los cinco decisivos, re-verificados a mano:
 
-Y aun así **la fase no cierra**, porque la meta se mide contra el CÓDIGO y no contra el aparato:
-`hasRealLocalData()` mira sólo los activos y nunca el libro, así que al arrancar sin activos
-cualquier nube gana por vieja que sea; y el cruce «sólo falla el guardado de la lista de carteras»
-no lo mide nadie, así que quitarlo del veredicto sale VERDE. Los dos re-verificados a mano sobre
-copia aislada.
-Acta: `01-TRANSICION-4.md`.
-Actividad anterior: 2026-08-31 — **ciclo 01-06 CERRADO**, la capa de aviso, con su loop completo y
-el navegador hecho. Cerró D-38.
-Actividad anterior: 2026-08-31 — **UNIFY del ciclo 01-05**, la vara de medir (`4e81e6c`).
-Actividad anterior: 2026-08-31 — **TERCERA TRANSICIÓN**: cuatro brazos, los cuatro demolieron su
-frase, la fase NO se cerró. Acta: `01-TRANSICION-3.md`.
+1. **El arranque repinta VERDE encima.** La bajada devuelve el mismo valor tanto si aplica como si
+   rechaza, y el arranque lo traduce a verde. El borrador habría cerrado D-45 **con la pantalla
+   mintiendo en el escenario exacto de la ficha**.
+2. **La protección por fecha está VACÍA en producción.** Al aplicar, la marca de tiempo local se
+   pierde, así que tras el primer sync todo documento parece más nuevo y la rama que cierra D-45
+   **no dispararía nunca**. El control habría pasado y el daño seguiría vivo (§5.10).
+3. **Unificar el predicado habría causado una REGRESIÓN**: `hasRealLocalData` alimenta hoy dos
+   preguntas distintas, y una es la guarda de activos del 01-04, que se habría apagado.
+4. **Nada era ejecutable fuera del navegador**: la bajada pide la referencia a Firebase por su
+   cuenta y se rinde en la primera línea. Sin inyección, la matriz mediría el mecanismo y nunca el
+   cable a la pantalla (§5.6).
+5. **El instrumento prometía algo indecidible**: «¿esta llamada está gobernada por un veredicto?» no
+   se decide estáticamente sobre JS. Se rebaja la promesa a lo que la huella sostiene, en vez de
+   meterle juicio al instrumento.
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [█████████░] 6 ciclos cerrados; la CUARTA transición abre el 01-07, que es el séptimo
+- Phase: [█████████░] 6 ciclos cerrados; el 01-07 planificado y sin ejecutar
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [ciclo 01-07 por planificar: lo abre la CUARTA transición del
-                            2026-09-01. Siguiente: /paul:plan 01-07]
+  ✓        ○        ○     [01-07 creado el 2026-09-01, esperando aprobación.
+                            Siguiente: /paul:apply .paul/phases/01-guardado-fiable/01-07-PLAN.md]
 ```
 
-Ciclos 01-01 a 01-06: cerrados, cada uno con su acta. La fase NO está cerrada. Sus CUATRO
-transiciones midieron la meta contra el código y **las cuatro cambiaron el resultado**: la primera
-abrió el 01-03, la segunda destapó D-33 y abrió el 01-04, la tercera abrió el 01-05 y el 01-06, y
-la cuarta abre el 01-07. `PLAN == SUMMARY` habría cerrado la fase las cuatro veces.
+Ciclos 01-01 a 01-06: cerrados, cada uno con su acta. Sus CUATRO transiciones midieron la meta
+contra el código y **las cuatro cambiaron el resultado**. `PLAN == SUMMARY` habría cerrado la fase
+las cuatro veces.
 
 ## Performance Metrics
 
@@ -145,6 +138,12 @@ la cuarta abre el 01-07. `PLAN == SUMMARY` habría cerrado la fase las cuatro ve
 | D-15 se CIERRA re-midiéndola, no heredando el acta del 01-04 | Fase 1 transición 4 | Su ficha se contradecía a sí misma desde la tercera transición. Se volvió a mutar `subirALaNube` para ignorar el veredicto del juez: `rc=1`. El 01-04 la había cerrado sin que nadie lo anotara. Una medición commiteada no se hereda (§7) |
 | D-27, D-29 y D-46 van JUNTAS al 01-07: son la misma familia | Fase 1 transición 4 | La invariante «un fallo de guardado no se anuncia como éxito y no se sincroniza» existe dentro de `guardarTodo` y no en los demás caminos. Arreglar sólo el cruce de META repetiría el defecto por los otros seis llamantes: se cierra la CLASE (§5.15) |
 | La prohibición a los brazos se escribe por lo que EJECUTAN, no por lo que editan | Fase 1 transición 4 | Un brazo corrió el banco de sabotaje sobre el árbol real para re-derivar una cifra; el banco muta `index.html` en vivo, y al detenerlo lo dejó sucio. No desobedeció ni una palabra. Regla nueva en `CLAUDE.md` §3.4: todo brazo trabaja sobre COPIA y sobre el árbol real sólo LEE |
+| El enfoque del 01-07 lo decide una DIALÉCTICA, y ésta rechaza las DOS posturas | 01-07 PLAN | Ni censo de llamantes (nace con ~10 exenciones por nombre: la lista blanca de §5.15, y mide un proxy sintáctico §5.11) ni refactor de doce sitios (toca flujos con `prompt`/`confirm` que la puerta no ve, y cierra «por construcción» sin artefacto §5.1). Gana vigilar los SUMIDEROS: el daño no es «booleano descartado», es ANUNCIAR VERDE y SUBIR, y esas salidas son pocas y derivables del código |
+| El cierre de D-45 exige arreglar el reloj del sync, y eso CRUZA un boundary de Fase 3 | 01-07 PLAN | Al aplicar, la marca de tiempo se pierde: tras el primer sync todo documento parece más nuevo y la rama que cierra D-45 no dispara nunca. Sin esto el cierre sería ficticio —control verde, daño vivo, §5.10—. Se cruza el boundary y se dice en voz alta; la SEMÁNTICA DE FUSIÓN sigue entera en la Fase 3 |
+| `hasRealLocalData` NO se unifica: conserva su semántica de activos | 01-07 PLAN | Alimenta dos preguntas distintas de `decidirSubida`, y una es la guarda de activos del 01-04. Convertirla en el predicado combinado la habría apagado, dejando que una subida machaque los activos de la nube — invisible a la puerta, porque la matriz recibe los booleanos ya inyectados. El «predicado único» se reformula como «los dos jueces consumen los mismos primitivos» |
+| El juez de bajada gobierna los DOS caminos, no sólo el del arranque | 01-07 PLAN | La escucha en vivo tiene su propio desempate escrito aparte: es literalmente el segundo predicado que el ciclo existe para eliminar. Cerrar sólo uno habría sido el caso disfrazado de clase |
+| El instrumento sella una HUELLA y promete menos, en vez de prometer lo indecidible | 01-07 PLAN | «¿Está esta llamada gobernada por un veredicto?» no se decide estáticamente sobre JS: o se atribuye por función contenedora —presencia, no precedencia (§5.11)— o se sella la huella. Se sella, y el criterio se rebaja a «ningún sumidero nuevo nace sin que alguien lo mire». Un instrumento con juicio dentro se dobla (§9) |
+| Un criterio que no puede MORIR no es criterio | 01-07 PLAN | El borrador marcaba el predicado único con un `grep` de nombres, que es una aserción de nombre satisfecha por accidente (§5.8) y que revertir el arreglo no mata. Se sustituye por controles de comportamiento sobre los dos caminos, y el plan exige nombrar por escrito todo arreglo que no pueda tener control positivo |
 | Los hallazgos de los brazos se re-verifican a mano antes de aceptarlos | Fase 1 transición 3 | Un brazo puede inventar agujeros (§5.4). Los cuatro decisivos se reprodujeron con comando propio sobre copias aisladas; el resto se marca explícitamente como no re-verificado |
 
 ### Deferred Issues
@@ -280,29 +279,24 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-09-01
-Stopped at: **CUARTA TRANSICIÓN de la Fase 1 hecha. La fase NO cierra: abre el ciclo 01-07.**
-Medida sobre `571659c`, árbol `23c169f1…`, `index.html` con huella
-`66e6dd20e9ec76163a332a06f5ef2598` — la misma que sirve Pages, comprobado con `curl`. Puerta fresca
-al empezar: `rc=0`, diez pasos, VERDE.
+Stopped at: **PLAN 01-07 escrito, atacado por dos brazos disjuntos y REESCRITO.** Sin ejecutar
+todavía. Árbol limpio; `index.html` intacto (`66e6dd20e9ec76163a332a06f5ef2598`).
 
-Lo que hay que recordar de esta transición:
+Lo que hay que recordar de este PLAN:
 
-- **El aparato de medición ya no es el eslabón débil.** Por primera vez el brazo de instrumentos no
-  demolió su frase, y por primera vez ninguna cifra publicada era falsa. Lo que impide cerrar ya no
-  son huecos del instrumental: son **dos defectos del producto**, medidos.
-- **Los dos son de la misma forma que los que pararon las transiciones 2 y 3: una ASIMETRÍA.** El
-  juez de subida mira el libro Y los activos; el de bajada mira sólo los activos. `guardarTodo`
-  exige las tres escrituras; los otros seis llamantes no exigen ninguna. Cerrar el caso en vez de
-  la clase repetiría el defecto por el otro lado (§5.15).
-- **Se rompió la exclusividad del árbol** durante la revisión: un brazo corrió el banco de sabotaje
-  sobre el repositorio real y lo dejó mutado. Detectado por el control de huella de otro brazo,
-  restaurado y verificado byte a byte contra HEAD; nada se perdió. La regla nueva está en
-  `CLAUDE.md` §3.4: los brazos trabajan sobre COPIA y sobre el árbol real sólo LEEN.
+- **La dialéctica rechazó las dos posturas que se le dieron** y propuso una tercera. Vigilar los
+  SUMIDEROS del daño en vez de los llamantes reduce la cirugía de doce sitios a dos y evita la
+  lista blanca prohibida.
+- **El borrador ya estaba escrito y era coherente cuando dos brazos lo demolieron con diez
+  hallazgos**, ninguno visto por los dos. Dos de ellos habrían producido un **cierre ficticio de
+  D-45**: la pantalla del arranque repintando verde encima, y la protección por fecha vacía en
+  producción, que habría dejado el control en verde con el daño vivo.
+- **El plan declara un cruce de boundary** (el reloj del sync es Fase 3) porque sin él el cierre no
+  es real. Dicho en voz alta, es una decisión; callado, sería deriva.
 
-Next action: **`/paul:plan 01-07`** — el ciclo que cierra la asimetría de los dos jueces (D-45) y la
-de la invariante de guardado (D-46, con D-27 y D-29). Es diseño con más de una solución plausible:
-toca convocar la dialéctica adversaria antes de fijar el enfoque.
-Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION-4.md
+Next action: **`/paul:apply .paul/phases/01-guardado-fiable/01-07-PLAN.md`** — seis tareas y un
+punto de verificación en el navegador antes de UNIFY.
+Resume file: .paul/phases/01-guardado-fiable/01-07-PLAN.md
 
 ---
 *STATE.md — Updated after every significant action*
