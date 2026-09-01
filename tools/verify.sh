@@ -86,6 +86,15 @@ paso "censo de catch vacios" python3 tools/emptycatch.py --check
 #     entera (D-38). Va FUERA de cualquier interruptor de degradado.
 paso "capa de aviso (censo y receptores)" python3 tools/avisos.py --check
 
+# 6c. Los SUMIDEROS del dano: por donde sale al mundo un guardado que fallo.
+#     Subir lo que hay en memoria tras un fallo local, y anunciar exito. El
+#     conjunto se deriva del codigo y se sella con su motivo uno a uno. NO
+#     promete que cada llamada este gobernada por un veredicto --eso no es
+#     decidible estaticamente sobre JS-- sino que ningun sumidero nuevo nace
+#     sin que alguien lo mire. Va FUERA de cualquier interruptor de degradado
+#     y ANTES del banco, para que un hallazgo real gane al "no pude medir".
+paso "sumideros del dano (subir y anunciar)" python3 tools/sumideros.py --check
+
 # 7. El banco de sabotaje: demuestra que lo de arriba MUERDE.
 #    Se salta cuando la puerta corre DENTRO del propio banco (VERIFY_INNER=1),
 #    que es la unica forma de que no se llame a si misma en bucle.

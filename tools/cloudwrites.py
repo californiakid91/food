@@ -10,9 +10,13 @@ puerta unica; si aparece una cuarta, esto se pone rojo.
 DOS REDES DISJUNTAS, a proposito. Dos revisores ciegos que coinciden no se
 corroboran: comparten el punto ciego. Estas dos miden cosas distintas.
 
-  Red A — por el RECEPTOR. Deriva que variables estan ligadas a una referencia
-    de Firestore (asignadas desde `userDocRef()` o desde una cadena
-    `db.collection(...)`). Sobre ellas, CUALQUIER metodo mutador
+  Red A — por el RECEPTOR. Deriva que NOMBRES estan ligados a una referencia
+    de Firestore: declarados desde `userDocRef()` / `db.collection(...)`, o
+    escritos como propiedad de un objeto de dependencias (`{ ref: userDocRef() }`).
+    Vale tanto si el nombre se usa suelto (`ref.set(`) como si viaja dentro de
+    otro objeto (`d.ref.set(`) — esta segunda forma es la que trajo la inyeccion
+    de dependencias del 01-07, y hasta entonces se escapaba de esta red.
+    Sobre ellos, CUALQUIER metodo mutador
     (set/update/add/delete/merge) fuera de la puerta unica es un hallazgo.
     Caza un `ref.delete()`, que borra el documento entero y que la red B no ve.
 
@@ -66,8 +70,36 @@ MUTADORES = ('set', 'update', 'add', 'delete', 'merge')
 RE_MUTADOR = re.compile(r'\.\s*(' + '|'.join(MUTADORES) + r')\s*\(')
 RE_SET = re.compile(r'\.\s*set\s*\(')
 # Variables ligadas a una referencia de Firestore.
-RE_REF = re.compile(r'\b(?:const|let|var)\s+(\w+)\s*=\s*(?:await\s+)?'
+#
+# El 01-07 amplio esta red porque fallo CERRADO y tenia razon: al hacer
+# inyectables `pullFromFirestore` y `listenFirestore`, la referencia dejo de
+# escribirse como `const ref = userDocRef();` y el instrumento derivo CERO
+# referencias -- o sea, la red A midiendo el vacio. Se amplia lo que VE en vez
+# de aflojar lo que exige: son dos formas mas de ligar el mismo objeto.
+#
+#   RE_REF      declaracion, con cualquier cosa antes de la llamada en la misma
+#               sentencia: `const ref = (deps && deps.ref) || userDocRef();`
+#   RE_REF_PROP propiedad de un objeto de dependencias: `{ ref: userDocRef() }`.
+#               Ata el NOMBRE a la dependencia inyectada, que es como viaja hoy.
+#
+# Sobre-derivar aqui es la direccion SEGURA: mete mas receptores bajo vigilancia,
+# nunca menos. Sub-derivar es lo que deja una escritura sin mirar.
+#
+# Anclado POR DECLARADOR, no por sentencia. Con `[^;\n]*?` desde la palabra
+# clave, `const a = 1, refX = userDocRef();` ligaba `a` --que no es referencia de
+# nada-- y NUNCA `refX`, dejando `refX.update(...)` sin que lo mirara ninguna
+# red y ademas manteniendo satisfecha la guarda de vacuidad con basura. Y con
+# `\n` excluido se perdia `const ref = await\n    userDocRef();`, que la version
+# anterior SI cazaba. Las dos las destapo un brazo adversario ejecutando.
+RE_REF = re.compile(r'(?:\b(?:const|let|var)\s+|,\s*)(\w+)\s*=\s*[^;{},]*?'
                     r'(?:userDocRef\s*\(|db\s*\.\s*collection\s*\()')
+# La propiedad tiene que estar dentro de un literal de objeto: el caracter no
+# blanco anterior es `{` o `,`. Sin ese ancla, `usar ? planB : userDocRef()`
+# ligaba `planB` --un Map local-- y la red A lo cantaba como referencia de
+# Firestore. Un falso rojo empuja al operador a aflojar el instrumento, que es
+# peor que el agujero que se pretendia cerrar.
+RE_REF_PROP = re.compile(r'[{,]\s*(\w+)\s*:\s*(?:await\s+)?'
+                         r'(?:userDocRef\s*\(|db\s*\.\s*collection\s*\()')
 # Receptores que son colecciones locales, no la nube.
 RE_COLECCION = re.compile(r'\b(?:const|let|var)\s+(\w+)\s*=\s*new\s+(?:Map|Set)\s*\(')
 # El verde del indicador, escrito a mano.
@@ -137,7 +169,8 @@ def main():
     sin_comentarios = enmascarar(js)          # con cadenas: para ver 'ok'
 
     # ── Red A — por el RECEPTOR ──────────────────────────────────────────────
-    refs = {m.group(1) for m in RE_REF.finditer(codigo)}
+    refs = ({m.group(1) for m in RE_REF.finditer(codigo)}
+            | {m.group(1) for m in RE_REF_PROP.finditer(codigo)})
     if not refs:
         roto("no he derivado NINGUNA referencia de Firestore: la red A no mide "
              "nada. O el codigo cambio de forma, o el patron dejo de casar.")
@@ -146,13 +179,19 @@ def main():
     try:
         for m in RE_MUTADOR.finditer(codigo):
             tipo, nombre = receptor(codigo, m.start())
-            if tipo != 'nombre' or nombre not in refs:
+            # 'miembro' entra desde el 01-07. Con la inyeccion de dependencias
+            # la referencia viaja como PROPIEDAD (`d.ref.set(...)`), no como
+            # nombre suelto, y esa forma se escapaba de la red A entera: la
+            # red B la cazaba de rebote porque mira `.set(`, pero un
+            # `d.ref.update(...)` no lo veia NADIE. Lo destapo el banco de
+            # sabotaje al reanclar su caso, no un razonamiento.
+            if tipo not in ('nombre', 'miembro') or nombre not in refs:
                 continue
             fn, _ = ambito(funciones, m.start(), codigo)
             if fn != PUERTA:
                 hallazgos_a.append(
-                    f"linea {linea(js, m.start())}: `{nombre}.{m.group(1)}(` sobre una "
-                    f"referencia de Firestore, dentro de `{fn}` y no de `{PUERTA}`")
+                    f"linea {linea(js, m.start())}: `{nombre}.{m.group(1)}(` ({tipo}) sobre "
+                    f"una referencia de Firestore, dentro de `{fn}` y no de `{PUERTA}`")
     except EscanerRoto as e:
         roto(str(e))
 

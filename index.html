@@ -197,6 +197,10 @@
     .ocr-status:empty { display: none; }
     .ocr-status.ocr-ok   { color: var(--green); }
     .ocr-status.ocr-warn { color: var(--yellow); }
+    /* Rojo propio para el fallo de guardado de una importacion: sin esta
+       clase el mensaje se pintaba del color por defecto y un fallo
+       parecia una nota mas. El color es parte del aviso, no adorno. */
+    .ocr-status.ocr-err  { color: var(--red); font-weight: 600; }
 
     /* Chip de "revisado" en la tabla de operaciones */
     .review-chip {
@@ -2174,7 +2178,11 @@ async function importSelectedOps() {
 
   const n = sel.length;
   pendingImport = [];
-  persistOps();
+  if (!persistOps()) {
+    show(`No se pudieron guardar las <strong>${n} operaciones</strong> importadas. ` +
+         'NO están guardadas en este dispositivo: vuelve a importar la captura.', 'ocr-err');
+    return;
+  }
   show(`Importadas <strong>${n} operaciones</strong>, todas marcadas como pendientes de revisar.
         ${aprox ? `<br><span style="color:var(--yellow)">⚠ En ${aprox} fecha(s) no pude consultar el cambio oficial y he usado el de hoy: revísalas.</span>` : ''}`,
        aprox ? 'ocr-warn' : 'ocr-ok');
@@ -2205,13 +2213,29 @@ function deleteOp(id) {
 }
 
 // Guarda las operaciones y propaga sus efectos a la cartera.
+//
+// Aquí vivía D-27: el resultado de `saveOpsAll` se tiraba y `saveRows()`
+// anunciaba «Guardado ✓» EN VERDE aunque el libro no se hubiera escrito. Es la
+// meta literal de la fase —perder el libro en silencio— por el camino de borrar
+// una operación y el de confirmar una importación. Ahora el reparto es el mismo
+// que en `guardarTodo`: se capturan los dos resultados, los activos se guardan
+// SIN anunciar, y el aviso lo decide esta función al final.
 function persistOps() {
-  saveOpsAll(ops);
+  const okOps  = saveOpsAll(ops);
   syncAllPortfoliosFromOps();
-  saveRows();
+  const okRows = saveRows(false);   // el aviso lo decide esta función, al final
   autoSnapshot();   // la foto del mes refleja la cartera ya actualizada
+  const todoBien = okOps && okRows;
+  showSaveIndicator(todoBien ? 'Guardado ✓' : 'No se pudo guardar', todoBien);
+  if (!todoBien) console.error('El guardado de las operaciones falló: no se anuncia éxito.');
   schedSave();
   render();
+  // DEVUELVE el veredicto: el panel de importación tiene su PROPIO anuncio de
+  // éxito, mucho más grande que el indicador, y lo pintaba en verde pasara lo
+  // que pasara — encima después de haber vaciado `pendingImport`, así que el
+  // operador no podía reintentar y al recargar las operaciones ya no estaban.
+  // Cerrar sólo el indicador habría sido el CASO disfrazado de clase (§5.10).
+  return todoBien;
 }
 
 // ── Render de la tarjeta Operaciones ──
@@ -3036,7 +3060,16 @@ function applySyncPayload(data) {
       if (!ok) console.error('No se pudo guardar el libro recibido en formato antiguo.');
     }
   }
-  localStorage.setItem(META_KEY, JSON.stringify({ portfolios, currentPortId, nextId }));
+  // La marca de tiempo del documento APLICADO se conserva. Sin ella esta
+  // escritura dejaba META sin `savedAt`, así que tras el primer sync
+  // `localSaved` valía 0 y CUALQUIER documento posterior parecía más nuevo: la
+  // rama que cierra D-45 no habría disparado nunca en la app real, y su control
+  // habría pasado con el daño vivo (§5.10). NO se pone la hora actual: eso
+  // marcaría lo local como más nuevo que la nube y bloquearía sincronizaciones
+  // legítimas. Cruce de boundary DECLARADO: la resolución por `savedAt` es Fase 3;
+  // aquí se toca el RELOJ, no la semántica de fusión.
+  localStorage.setItem(META_KEY, JSON.stringify({ portfolios, currentPortId, nextId,
+                                                  savedAt: Number(data.savedAt) || 0 }));
   rows = loadRows(currentPortId);
   ops  = loadOpsAll();
   syncAllPortfoliosFromOps();
@@ -3079,23 +3112,135 @@ function hasRealLocalData() {
   });
 }
 
-async function pullFromFirestore() {
-  const ref = userDocRef();
-  if (!ref) return false;
+// EL JUEZ ÚNICO DE LA BAJADA (01-07). Función pura: sin red, sin DOM y sin
+// globales, igual que `decidirSubida`, para poder ejercer la MATRIZ entera
+// fuera del navegador. Lo consultan los DOS caminos por los que la nube puede
+// entrar: el arranque (`pullFromFirestore`) y la escucha en vivo
+// (`listenFirestore`), que hasta este ciclo tenía su propio desempate escrito
+// aparte — o sea, el segundo predicado que este ciclo existe para eliminar.
+//
+// Aquí vivía D-45: el desempate miraba SÓLO los activos (`hasRealLocalData`),
+// así que un dispositivo con libro de operaciones y sin activos aceptaba
+// CUALQUIER documento por viejo que fuera, y la pantalla quedaba en VERDE.
+//
+// «Hay datos que proteger» son DOS primitivos, no uno:
+//   - `tieneOperaciones(ops)`, el juez único del 01-02 — es lo que faltaba;
+//   - `hayActivosLocales`, que es lo que se miraba ANTES.
+// Se suman en vez de sustituirse a propósito: quedarse sólo con las
+// operaciones habría abierto el agujero simétrico (un dispositivo con activos
+// y sin operaciones dejaría ganar a cualquier documento), que es exactamente la
+// asimetría que el 01-04 cerró en el camino de subida (§5.16). Y `hasRealLocalData`
+// NO cambia de significado: alimenta además la guarda de activos de
+// `decidirSubida`, que se apagaría si pasara a significar otra cosa.
+function decidirBajada(estadoLocal, documento) {
+  const doc   = documento || {};
+  const local = estadoLocal || {};
+  if (!doc.portfolios || !doc.portfolios.length) {
+    return { aplicar: false, utilizable: false, aviso: 'pendiente', clave: 'sin-carteras',
+             motivo: 'el documento de la nube no trae carteras' };
+  }
+  const hayQueProteger = tieneOperaciones(local.ops) || !!local.hayActivosLocales;
+  if (!hayQueProteger) {
+    return { aplicar: true, utilizable: true, aviso: 'ok', clave: 'sin-datos-locales',
+             motivo: 'no hay datos locales que proteger: la nube gana' };
+  }
+  // La MISMA coerción en los dos lados y en `applySyncPayload`: dos predicados
+  // sobre la misma magnitud tienen que ser el MISMO predicado (§5.16).
+  const localSaved = Number(local.savedAt) || 0;
+  const remoto     = Number(doc.savedAt) || 0;
+  // RELOJ DESCONOCIDO. Sin marca en alguno de los dos lados no hay desempate
+  // posible, y «lo desconocido vale cero» hace ganar a CUALQUIER documento.
+  //
+  // No es un caso de laboratorio: es el estado de TODOS los dispositivos ya
+  // sincronizados el día que se despliegue este ciclo, porque hasta hoy
+  // `applySyncPayload` reescribía META sin `savedAt` (D-30). Sin esta rama, el
+  // arreglo de D-45 no habría protegido a nadie en su primer arranque — control
+  // en verde y daño vivo (§5.10). Lo destapó un brazo adversario ejecutando.
+  //
+  // El coste está declarado en el acta y en D-50: un dispositivo en ese estado
+  // no acepta la nube hasta que guarde algo en local una vez, que es lo que
+  // vuelve a poner su reloj en hora. Se prefiere quedarse quieto a perder libro.
+  if (!localSaved || !remoto) {
+    return { aplicar: false, utilizable: true, aviso: 'pendiente', clave: 'reloj-desconocido',
+             motivo: 'sin marca de tiempo en ' + (!localSaved ? 'lo local' : 'el documento') +
+                     ': no se puede desempatar y hay datos que proteger' };
+  }
+  // ESTRICTO a propósito. Con `>=`, y ahora que lo local adopta la marca del
+  // documento aplicado, el empate es el estado NORMAL tras sincronizar: el
+  // primer snapshot de la escucha en vivo volvía a aplicar el documento entero
+  // y se comía la edición que el operador tuviera sin guardar, anunciando
+  // «Guardado ✓» encima. Reproducido por un brazo adversario.
+  if (remoto > localSaved) {
+    return { aplicar: true, utilizable: true, aviso: 'ok', clave: 'nube-mas-nueva',
+             motivo: 'el documento es más nuevo que lo local' };
+  }
+  return { aplicar: false, utilizable: true, aviso: 'pendiente', clave: 'nube-no-mas-nueva',
+           motivo: 'documento NO más nuevo (' + remoto + ' <= ' + localSaved + ') con ' +
+                   (local.ops || []).length + ' operaciones locales que proteger' };
+}
+
+// Baja el documento de la nube. NO contiene ninguna regla: observa, pregunta al
+// juez y actúa — el mismo reparto que `subirALaNube` desde el 01-04.
+//
+// Dependencias inyectables por la MISMA razón que allí: sin ellas esta función
+// pedía la referencia a Firebase por su cuenta y en node se rendía en la primera
+// línea, así que NADA de lo que hay debajo era ejercible y la matriz habría
+// medido el juez aislado —el MECANISMO— y jamás el cable hasta la pantalla (§5.6).
+//
+// Devuelve un VEREDICTO, no un booleano. Antes devolvía el mismo `true` tanto si
+// aplicaba como si rechazaba, y el arranque traducía ese `true` a VERDE: el
+// escenario exacto de D-45 acababa con la pantalla mintiendo.
+// EL CABLEADO DE PRODUCCIÓN, extraído a una factoría con nombre.
+//
+// Mientras vivió como literal dentro de `pullFromFirestore(deps)` era código
+// que corre en el navegador en TODOS los arranques y que NINGUNA prueba tocaba:
+// las suites inyectan siempre el suyo. Medido por un brazo adversario:
+// cambiar `ops: () => ops` por `ops: () => []` reabría D-45 ENTERA en la app
+// real con la puerta en rc=0. Hacer inyectable una función crea, por
+// construcción, un cableado por defecto sin oráculo; extraerlo es lo que
+// permite afirmarlo miembro a miembro (`pruebasCableadoPorDefecto`).
+function depsDeBajada() {
+  return { ref: userDocRef(), leerMeta: () => localStorage.getItem(META_KEY),
+           aplicar: applySyncPayload, ops: () => ops,
+           activos: hasRealLocalData, pintar: setSyncUI };
+}
+
+async function pullFromFirestore(deps) {
+  const d = deps || depsDeBajada();
+  if (!d.ref) return { sincronizado: false, aplicado: false, aviso: 'offline',
+                       clave: 'sin-sesion', motivo: 'sin sesión' };
+  let data;
   try {
-    const doc = await ref.get();
-    if (!doc.exists) return false;
-    const data = doc.data();
-    if (!data.portfolios) return false;
-    const localMeta  = localStorage.getItem(META_KEY);
-    const localSaved = localMeta ? (JSON.parse(localMeta).savedAt || 0) : 0;
-    // Si lo local no tiene activos reales (solo carteras por defecto vacías,
-    // recién creadas con un savedAt "de ahora"), la nube debe ganar siempre.
-    // La comparación de fechas solo aplica cuando hay datos locales que proteger.
-    if (!hasRealLocalData() || (data.savedAt || 0) >= localSaved) applySyncPayload(data);
-    setSyncUI(estadoSync('ok'));
-    return true;
-  } catch(e) { console.error('pullFromFirestore:', e); return false; }
+    const doc = await d.ref.get();
+    if (!doc.exists) return { sincronizado: false, aplicado: false, aviso: 'pendiente',
+                              clave: 'sin-documento', motivo: 'no hay documento en la nube' };
+    data = doc.data();
+  } catch (e) {
+    console.error('pullFromFirestore:', e);
+    return { sincronizado: false, aplicado: false, aviso: 'error',
+             clave: 'lectura-fallida', motivo: 'la nube no se pudo leer' };
+  }
+  let localSaved;
+  try { const m = d.leerMeta(); localSaved = m ? (JSON.parse(m).savedAt || 0) : 0; }
+  catch (e) {
+    // Falla CERRADO: sin saber de cuándo es lo local no se puede desempatar, y
+    // adivinar «del año cero» dejaría ganar a cualquier documento.
+    console.error('pullFromFirestore: la marca de tiempo local no se pudo leer:', e);
+    return { sincronizado: false, aplicado: false, aviso: 'error',
+             clave: 'meta-ilegible', motivo: 'la marca de tiempo local no se pudo leer' };
+  }
+  const decision = decidirBajada({ ops: d.ops(), hayActivosLocales: d.activos(),
+                                   savedAt: localSaved }, data);
+  if (!decision.utilizable) {
+    return { sincronizado: false, aplicado: false, aviso: decision.aviso,
+             clave: decision.clave, motivo: decision.motivo };
+  }
+  let aplicado = false;
+  if (decision.aplicar) aplicado = d.aplicar(data);
+  else console.warn('[SYNC] documento de la nube NO aplicado:', decision.motivo);
+  d.pintar(estadoSync(decision.aviso));
+  return { sincronizado: true, aplicado: aplicado, aviso: decision.aviso,
+           clave: decision.clave, motivo: decision.motivo };
 }
 
 // ¿Cuántos activos reales tiene ese documento de la nube?
@@ -3174,6 +3319,15 @@ async function observarNube(ref) {
   }
 }
 
+// El cableado de producción de la SUBIDA, extraído por la misma razón que el de
+// la bajada: era un literal que nadie ejercía. Misma clase de defecto, cerrada
+// en el mismo commit para no dejar viva la mitad simétrica (§5.15).
+function depsDeSubida() {
+  return { ref: userDocRef(), paquete: buildSyncPayload,
+           mirar: observarNube, cerrojo: () => opsIlegible,
+           activos: hasRealLocalData };
+}
+
 // LA ÚNICA FUNCIÓN DEL FICHERO CON UNA ESCRITURA A LA NUBE. No contiene
 // ninguna regla: observa, pregunta al juez y actúa. Sin transacciones a
 // propósito: fallan sin conexión y romperían el guardado offline (01-02).
@@ -3182,9 +3336,7 @@ async function subirALaNube(motivo, deps) {
   // ellas, el cable entre el productor del paquete y el juez no lo medía nadie.
   // Medido el 2026-08-30: cambiar `incompleto` por `[]` aquí sobrevivía a la
   // puerta ENTERA, con el productor y el juez cada uno con su control.
-  const d = deps || { ref: userDocRef(), paquete: buildSyncPayload,
-                      mirar: observarNube, cerrojo: () => opsIlegible,
-                      activos: hasRealLocalData };
+  const d = deps || depsDeSubida();
   const ref = d.ref;
   if (!ref) return { subido: false, aviso: 'offline', motivo: 'sin sesión' };
   const construido = d.paquete();
@@ -3218,19 +3370,45 @@ function schedulePush() {
   pushTimer = setTimeout(() => { subirALaNube('guardado local'); }, 800);
 }
 
-function listenFirestore() {
+// `deps.ref` se inyecta por la misma razón que en `pullFromFirestore`: sin ella
+// este camino pedía la referencia a Firebase por su cuenta y en node no se
+// ejercía NUNCA — y es el segundo de los dos caminos por los que la nube entra.
+function listenFirestore(deps) {
   if (unsubFirestore) unsubFirestore();
-  const ref = userDocRef();
+  const ref = (deps && deps.ref) || userDocRef();
   if (!ref) return;
   unsubFirestore = ref.onSnapshot(doc => {
     if (!doc.exists) return;
     const data = doc.data();
-    const localMeta  = localStorage.getItem(META_KEY);
-    const localSaved = localMeta ? (JSON.parse(localMeta).savedAt || 0) : 0;
-    if ((data.savedAt || 0) > localSaved) {
-      applySyncPayload(data);
-      repintarTrasSync();
+    // El MISMO juez que el arranque. Aquí vivía el segundo desempate escrito
+    // aparte —sólo por fecha, ciego al libro—: cerrar sólo el del arranque
+    // habría sido cerrar el CASO disfrazado de clase (§5.15).
+    let localSaved;
+    try {
+      const m = localStorage.getItem(META_KEY);
+      localSaved = m ? (JSON.parse(m).savedAt || 0) : 0;
+    } catch (e) {
+      // PINTA, no sólo avisa por consola. Sin esto, un META ilegible dejaba la
+      // app tragándose TODO cambio de la nube durante el resto de la vida de la
+      // página con el punto en VERDE: el mecanismo tenía guarda y su aviso no
+      // llegaba a la pantalla (§5.6). Lo destapó la revisión del diff.
+      console.error('[SYNC] la marca de tiempo local no se pudo leer:', e);
+      setSyncUI(estadoSync('error'));
+      return;
     }
+    const decision = decidirBajada({ ops: ops, hayActivosLocales: hasRealLocalData(),
+                                     savedAt: localSaved }, data);
+    if (!decision.aplicar) {
+      // Los dos caminos de bajada tienen que coincidir TAMBIÉN en lo que el
+      // operador mira. El arranque pintaba el aviso del veredicto y esto no
+      // pintaba nada: un rechazo repetido dejaba el punto verde para siempre
+      // mientras los dispositivos divergían en silencio.
+      console.warn('[SYNC] cambio de la nube NO aplicado:', decision.motivo);
+      setSyncUI(estadoSync(decision.aviso));
+      return;
+    }
+    applySyncPayload(data);
+    repintarTrasSync();
   }, e => {
     // El escucha ha muerto. Con el callback vacío que había aquí el punto se
     // quedaba VERDE para siempre mientras la app dejaba de recibir cambios.
@@ -3259,9 +3437,14 @@ function repintarTrasSync() {
 // no-vaciado. Ahora la subida es `subir(...)`, o sea `subirALaNube`, o sea el
 // juez único. Y ya no se pinta verde al entrar: se pinta al terminar, con el
 // resultado real.
+// El cableado de producción del ARRANQUE. Tercero de la misma clase.
+function depsDeSesion() {
+  return { leerNube: pullFromFirestore, subir: subirALaNube,
+           escuchar: listenFirestore, pintar: repintarTrasSync };
+}
+
 async function alIniciarSesion(user, deps) {
-  const d = deps || { leerNube: pullFromFirestore, subir: subirALaNube,
-                      escuchar: listenFirestore, pintar: repintarTrasSync };
+  const d = deps || depsDeSesion();
   currentUser = user;
   if (!user) {
     if (unsubFirestore) { unsubFirestore(); unsubFirestore = null; }
@@ -3270,8 +3453,16 @@ async function alIniciarSesion(user, deps) {
   }
   let resultado;
   try {
-    const sincronizado = await d.leerNube();
-    resultado = sincronizado ? 'ok' : (await d.subir('inicio de sesión')).aviso;
+    // El VEREDICTO de la bajada, no un booleano. Antes esto era
+    // `sincronizado ? 'ok' : ...`: la bajada devolvía el mismo `true` tanto si
+    // aplicaba como si RECHAZABA, y el arranque repintaba VERDE encima. En el
+    // escenario exacto de D-45 —libro local protegido de una nube más vieja—
+    // la pantalla acababa diciendo «Sincronizado» (§5.5: dos piezas con control
+    // por separado y el CRUCE sin medir).
+    const lectura = await d.leerNube();
+    resultado = (lectura && lectura.sincronizado)
+      ? lectura.aviso
+      : (await d.subir('inicio de sesión')).aviso;
     d.escuchar();
     d.pintar();
   } catch (e) {
@@ -4194,8 +4385,16 @@ function onUseTargetsToggle(on) {
   const port = portfolios.find(p => p.id === currentPortId);
   if (!port) return;
   port.useTargets = !!on;
-  saveMeta();
-  schedulePush();
+  // D-29: antes se subía a la nube pasara lo que pasara con el guardado local.
+  // Si lo que hay en memoria no se pudo escribir, subirlo machaca la copia
+  // buena de la nube — que puede ser la última que quede. Misma regla que
+  // `guardarTodo`: si el guardado local falla, ni se anuncia ni se sincroniza.
+  if (saveMeta()) {
+    schedulePush();
+  } else {
+    showSaveIndicator('No se pudo guardar', false);
+    console.error('No se sincroniza: la lista de carteras no se pudo guardar.');
+  }
   render();
 }
 
@@ -5207,6 +5406,28 @@ function pruebasReparacionFallida(check, base) {
 // Sincronización (plan 01-02). Escriben en localStorage y tocan los globales,
 // así que se guarda todo y se devuelve al final pase lo que pase: ?selftest=1
 // también corre en el navegador del usuario, con sus datos reales delante.
+// Las suites SÍNCRONAS de sincronización, en una lista propia. Se extraen para
+// que el orquestador quepa en el presupuesto sin recortar cobertura: el criterio
+// de parada tiene sujeto —«las que no son asíncronas»—, no «las que sobran».
+function suitesSincronasDeSync(check, base) {
+  pruebasIdentificadores(check);
+  pruebasDeduplicacion(check, base);
+  pruebasPayloadAntiguo(check, base);
+  pruebasNoVaciar(check, base);
+  pruebasCerrojoIlegible(check, base);
+  pruebasPrecedenciaDeGuardas(check, base);
+  pruebasReparacionFallida(check, base);
+  pruebasPuertaDeSubida(check, base);
+  pruebasPaqueteIncompleto(check);
+  pruebasIndicador(check);
+  pruebasJuezDeBajada(check);
+  pruebasCableadoPorDefecto(check);
+  pruebasEscuchaEnVivo(check);
+  pruebasCruceSoloMeta(check);
+  pruebasBorradoDeOperacion(check);
+  pruebasInterruptorDeObjetivos(check);
+}
+
 async function pruebasSincronizacion(check) {
   const base = { date: '2026-03-01', type: 'buy', ticker: 'AAA',
                  titulos: 1, price: 10, currency: 'EUR' };
@@ -5232,18 +5453,15 @@ async function pruebasSincronizacion(check) {
     }
   };
   try {
-    pruebasIdentificadores(check);
-    pruebasDeduplicacion(check, base);
-    pruebasPayloadAntiguo(check, base);
-    pruebasNoVaciar(check, base);
-    pruebasCerrojoIlegible(check, base);
-    pruebasPrecedenciaDeGuardas(check, base);
-    pruebasReparacionFallida(check, base);
-    pruebasPuertaDeSubida(check, base);
-    pruebasPaqueteIncompleto(check);
-    pruebasIndicador(check);
+    suitesSincronasDeSync(check, base);
+    await ejercida('pruebasBajadaDelArranque', () => pruebasBajadaDelArranque(contado));
+    await ejercida('pruebasBajadaFallosCerrados',
+                   () => pruebasBajadaFallosCerrados(contado));
+    await ejercida('pruebasBajadaSinReloj', () => pruebasBajadaSinReloj(contado));
     await ejercida('pruebasTuberiaDeSubida', () => pruebasTuberiaDeSubida(contado));
     await ejercida('pruebasInicioDeSesion', () => pruebasInicioDeSesion(contado));
+    await ejercida('pruebasArranqueTrasRechazo',
+                   () => pruebasArranqueTrasRechazo(contado));
     await ejercida('pruebasCierreDeSesion', () => pruebasCierreDeSesion(contado));
   } finally {
     localStorage.clear();
@@ -5711,6 +5929,484 @@ function pruebasPaqueteIncompleto(check) {
   check('AC-2 y el indicador no se pone verde', d.aviso, 'error');
 }
 
+// ── Ciclo 01-07: la BAJADA de la nube. ────────────────────────────────────
+// Documentos de mentira compartidos por las tres suites de este bloque.
+function docsDeBajada() {
+  const nube = { portfolios: [{ id: 'pN', name: 'nube' }], currentPortId: 'pN',
+                 nextId: 1, opsAll: [{ id: 'o1' }], portfolioData: {}, historyData: {} };
+  return { viejo: Object.assign({}, nube, { savedAt: 500 }),
+           nuevo: Object.assign({}, nube, { savedAt: 2000 }) };
+}
+
+// AC-1. LA MATRIZ del juez puro. Sin E/S y sin globales: se le dan los dos
+// primitivos de «hay datos que proteger» por separado, para que la fila que
+// cierra D-45 —libro SÍ, activos NO— tenga existencia propia. Con un solo
+// primitivo esa fila no se podría escribir, que es justo lo que pasaba antes.
+function pruebasJuezDeBajada(check) {
+  const d = docsDeBajada();
+  const libro = [{ id: 'o1' }, { id: 'o2' }];
+  const sinNada  = { ops: [],    hayActivosLocales: false, savedAt: 9999 };
+  const soloOps  = { ops: libro, hayActivosLocales: false, savedAt: 1000 };
+  const soloAct  = { ops: [],    hayActivosLocales: true,  savedAt: 1000 };
+  check('AC-1 sin datos locales, la nube gana aunque sea vieja',
+        decidirBajada(sinNada, d.viejo).aplicar, true);
+  // LA FILA DE D-45: libro local, CERO activos, documento más viejo.
+  check('AC-1 con LIBRO local y documento más viejo, NO se aplica',
+        decidirBajada(soloOps, d.viejo).aplicar, false);
+  check('AC-1 y ese rechazo NO se etiqueta como todo bien',
+        decidirBajada(soloOps, d.viejo).aviso, 'pendiente');
+  check('AC-1 y lo dice por su nombre',
+        decidirBajada(soloOps, d.viejo).clave, 'nube-no-mas-nueva');
+  // La fila SIMÉTRICA: activos sin libro. Quitarla habría abierto por el otro
+  // lado el agujero que este ciclo cierra por éste (§5.16).
+  check('AC-1 con ACTIVOS locales y documento más viejo, tampoco se aplica',
+        decidirBajada(soloAct, d.viejo).aplicar, false);
+  check('AC-1 con libro local y documento más nuevo, sí se aplica',
+        decidirBajada(soloOps, d.nuevo).aplicar, true);
+  // El AVISO de las ramas que SÍ aplican. Sin estas dos filas se podía poner
+  // 'pendiente' en el camino feliz —pantalla mintiendo en la otra dirección—
+  // y la puerta entera salía verde (medido por un brazo adversario).
+  check('AC-1 y el camino feliz se anuncia en verde',
+        decidirBajada(soloOps, d.nuevo).aviso, 'ok');
+  check('AC-1 y el de un dispositivo nuevo también',
+        decidirBajada(sinNada, d.viejo).aviso, 'ok');
+  check('AC-1 y lo dicen por su nombre',
+        decidirBajada(soloOps, d.nuevo).clave, 'nube-mas-nueva');
+  // EMPATE: NO se aplica. Ahora que lo local adopta la marca del documento
+  // aplicado, el empate es el estado normal tras sincronizar, y re-aplicar se
+  // comía la edición sin guardar del operador.
+  check('AC-1 un empate NO se aplica',
+        decidirBajada({ ops: libro, hayActivosLocales: false, savedAt: 500 }, d.viejo).aplicar, false);
+  // RELOJ DESCONOCIDO en cualquiera de los dos lados. Es el estado de todo
+  // dispositivo ya sincronizado el día del despliegue (D-30), y sin esta rama
+  // el arreglo de D-45 no protegía a nadie en su primer arranque.
+  check('AC-1 sin marca de tiempo LOCAL y con libro, no se aplica',
+        decidirBajada({ ops: libro, hayActivosLocales: false, savedAt: 0 }, d.nuevo).aplicar, false);
+  check('AC-1 y lo dice por su nombre',
+        decidirBajada({ ops: libro, hayActivosLocales: false, savedAt: 0 }, d.nuevo).clave,
+        'reloj-desconocido');
+  check('AC-1 sin marca en el DOCUMENTO y con libro, tampoco',
+        decidirBajada(soloOps, { portfolios: [{ id: 'pN' }] }).aplicar, false);
+  // Pero un dispositivo SIN datos que proteger sigue aceptando la nube aunque
+  // ninguno de los dos tenga reloj: es el arranque de una instalación nueva.
+  check('AC-1 sin datos locales, un documento sin marca SÍ se aplica',
+        decidirBajada(sinNada, { portfolios: [{ id: 'pN' }] }).aplicar, true);
+  check('AC-1 un documento sin carteras no es utilizable',
+        decidirBajada(soloOps, { savedAt: 9999 }).utilizable, false);
+  check('AC-1 y tampoco se aplica',
+        decidirBajada(soloOps, { savedAt: 9999 }).aplicar, false);
+  check('AC-1 un documento ausente no es utilizable',
+        decidirBajada(soloOps, null).utilizable, false);
+}
+
+// EL CABLEADO DE PRODUCCIÓN, afirmado miembro a miembro. Hacer una función
+// inyectable crea POR CONSTRUCCIÓN un objeto de dependencias por defecto que es
+// el que corre en el navegador y que ninguna prueba toca, porque todas inyectan
+// el suyo. Medido por un brazo adversario sobre este mismo ciclo: cambiar
+// `ops: () => ops` por `ops: () => []` reabría D-45 entera en la app real con
+// las seis piezas de la puerta en rc=0.
+//
+// Se afirma por IDENTIDAD de la función, no por su nombre ni por «que exista»:
+// una aserción de nombre se satisface por accidente (§5.8). Los miembros que
+// son flechas se ejercen contra un centinela, que es la única forma de
+// distinguir `() => ops` de `() => []`.
+function pruebasCableadoPorDefecto(check) {
+  const previo = { ops: ops, portfolios: portfolios, currentPortId: currentPortId,
+                   rows: rows };
+  const metaPrevia = localStorage.getItem(META_KEY);
+  try {
+    const centinelaOps = [{ id: 'CENTINELA-CABLEADO' }];
+    ops = centinelaOps;
+    localStorage.setItem(META_KEY, 'CENTINELA-META');
+    portfolios = [{ id: 'pC', name: 'centinela' }];
+    currentPortId = 'pC';
+    rows = [{ id: 1, name: 'ACTIVO' }];
+
+    const b = depsDeBajada();
+    check('AC-2 el cableado de la bajada lee EL libro de verdad', b.ops(), centinelaOps);
+    check('AC-2 y lee LA clave de META de verdad', b.leerMeta(), 'CENTINELA-META');
+    check('AC-2 y su juez de activos es hasRealLocalData', b.activos, hasRealLocalData);
+    check('AC-2 y ese juez ve los activos sembrados', b.activos(), true);
+    check('AC-2 y aplica con applySyncPayload', b.aplicar, applySyncPayload);
+    check('AC-2 y pinta con setSyncUI', b.pintar, setSyncUI);
+
+    const s = depsDeSubida();
+    check('AC-2 el cableado de la subida construye con buildSyncPayload',
+          s.paquete, buildSyncPayload);
+    check('AC-2 y mira la nube con observarNube', s.mirar, observarNube);
+    check('AC-2 y su juez de activos es el mismo', s.activos, hasRealLocalData);
+    check('AC-2 y su cerrojo lee el de verdad', s.cerrojo(), opsIlegible);
+
+    const a = depsDeSesion();
+    check('AC-4 el cableado del arranque baja con pullFromFirestore',
+          a.leerNube, pullFromFirestore);
+    check('AC-4 y sube por la puerta única', a.subir, subirALaNube);
+    check('AC-4 y escucha con listenFirestore', a.escuchar, listenFirestore);
+    check('AC-4 y repinta con repintarTrasSync', a.pintar, repintarTrasSync);
+  } finally {
+    ops = previo.ops; portfolios = previo.portfolios;
+    currentPortId = previo.currentPortId; rows = previo.rows;
+    if (metaPrevia === null) localStorage.removeItem(META_KEY);
+    else localStorage.setItem(META_KEY, metaPrevia);
+  }
+}
+
+// Arnés de la bajada: TODAS las dependencias son las de producción menos la
+// referencia a la nube y el pintor. Sustituir sólo lo imprescindible es lo que
+// hace que esto mida el CABLE hasta la pantalla y no un juez aislado (§5.6).
+function arnesDeBajada(documento) {
+  const t = { pintados: [] };
+  t.deps = {
+    ref: { get: async () => ({ exists: documento !== null, data: () => documento }) },
+    leerMeta: () => localStorage.getItem(META_KEY),
+    aplicar: applySyncPayload,
+    ops: () => ops,
+    activos: hasRealLocalData,
+    pintar: (estado) => { t.pintados.push(estado); },
+  };
+  return t;
+}
+
+// La marca de tiempo del disco, leida sin lanzar. Un aserto que revienta mata el
+// proceso entero y se lleva por delante el veredicto de las demás suites: se vio
+// al sabotear el `await` que cablea las suites asíncronas, donde el crash tapaba
+// el mensaje que ESE sabotaje existe para producir.
+function savedAtEnDisco() {
+  try { return JSON.parse(localStorage.getItem(META_KEY)).savedAt; }
+  catch (e) { return 'META-ILEGIBLE'; }
+}
+
+// Deja el disco y la memoria en el estado de D-45: libro con dos operaciones,
+// CERO activos, y una marca de tiempo local posterior a la del documento viejo.
+function sembrarEstadoDeD45() {
+  localStorage.clear();
+  portfolios = [{ id: 'pL', name: 'local' }];
+  currentPortId = 'pL'; nextId = 1; rows = []; opsIlegible = false;
+  ops = [{ id: 'o1', date: '2026-01-01', type: 'buy', ticker: 'AAA', titulos: 1,
+           price: 10, currency: 'EUR' },
+         { id: 'o2', date: '2026-01-02', type: 'buy', ticker: 'BBB', titulos: 2,
+           price: 20, currency: 'EUR' }];
+  saveOpsAll(ops);
+  localStorage.setItem(META_KEY, JSON.stringify({ portfolios, currentPortId, nextId,
+                                                  savedAt: 1000 }));
+}
+
+// AC-2 y AC-3. La FUNCIÓN REAL del arranque, ejecutada entera. El juez tiene su
+// matriz arriba; esto mide que el veredicto llega al disco Y a la pantalla.
+async function pruebasBajadaDelArranque(check) {
+  const d = docsDeBajada();
+  const enDisco = () => parseOpsBlob(localStorage.getItem(OPS_KEY)).length;
+
+  sembrarEstadoDeD45();
+  check('AC-2 de partida NO hay activos locales: es la fila de D-45', hasRealLocalData(), false);
+  const t1 = arnesDeBajada(d.viejo);
+  const r1 = await pullFromFirestore(t1.deps);
+  check('AC-2 una nube MÁS VIEJA no se aplica', r1.aplicado, false);
+  check('AC-2 y el veredicto lo dice por su nombre', r1.clave, 'nube-no-mas-nueva');
+  check('AC-2 el libro conserva su recuento EN MEMORIA', ops.length, 2);
+  check('AC-2 y EN DISCO', enDisco(), 2);
+  check('AC-2 y la pantalla NO queda en verde',
+        t1.pintados[t1.pintados.length - 1], 'pendiente');
+
+  // AC-3. Sin conservar la marca al aplicar, `localSaved` volvía a 0 y todo
+  // documento parecía más nuevo: la rama de arriba no dispararía NUNCA en la
+  // app real. El control habría pasado con el daño vivo (§5.10).
+  const t2 = arnesDeBajada(d.nuevo);
+  const r2 = await pullFromFirestore(t2.deps);
+  check('AC-3 un documento más nuevo sí se aplica', r2.aplicado, true);
+  check('AC-3 la marca de tiempo del documento SOBREVIVE al aplicar',
+        savedAtEnDisco(), 2000);
+  const t3 = arnesDeBajada(d.viejo);
+  const r3 = await pullFromFirestore(t3.deps);
+  check('AC-3 y por eso, DESPUÉS de aplicar, uno más viejo sigue sin pasar',
+        r3.aplicado, false);
+  check('AC-3 el libro sigue en disco con lo que trajo el bueno', enDisco(), 1);
+
+}
+
+// AC-2 y AC-4, segunda familia: los FALLOS CERRADOS y los campos del veredicto
+// que nadie afirmaba. Criterio de parada declarado, con su sujeto: una función
+// por familia de escenario — arriba el desempate y el reloj, aquí lo que pasa
+// cuando NO se puede medir y lo que el veredicto dice de sí mismo.
+async function pruebasBajadaFallosCerrados(check) {
+  const d = docsDeBajada();
+  const enDisco = () => parseOpsBlob(localStorage.getItem(OPS_KEY)).length;
+
+  // Sin sesión: no se toca nada y no se pinta verde.
+  const t4 = arnesDeBajada(null);
+  t4.deps.ref = null;
+  const r4 = await pullFromFirestore(t4.deps);
+  check('AC-2 sin referencia a la nube no hay sincronización', r4.sincronizado, false);
+  check('AC-2 y el aviso es offline, no verde', r4.aviso, 'offline');
+
+  // `sincronizado` es un campo del veredicto REAL que nadie afirmaba, y el
+  // arranque lo usa para decidir si sube. Con `sincronizado: false` en un
+  // rechazo, el arranque lo trata como «no hay nada arriba» y SUBE encima de la
+  // nube: justo lo que AC-4 existe para impedir, y sólo estaba medido contra un
+  // stub. Lo destapó un mutante adversario que sobrevivía a la puerta entera.
+  sembrarEstadoDeD45();
+  const t5 = arnesDeBajada(d.viejo);
+  const r5 = await pullFromFirestore(t5.deps);
+  check('AC-4 un rechazo SÍ leyó la nube: sincronizado es true', r5.sincronizado, true);
+  check('AC-4 y no aplicó nada', r5.aplicado, false);
+
+  // La guarda `utilizable`, ejercida sobre la función ENTERA. Sólo se medía
+  // sobre el juez aislado, así que borrar el bloque entero salía verde.
+  const t6 = arnesDeBajada({ savedAt: 9999, opsAll: [] });
+  const r6 = await pullFromFirestore(t6.deps);
+  check('AC-2 un documento sin carteras no cuenta como sincronizado',
+        r6.sincronizado, false);
+  check('AC-2 y lo dice por su nombre', r6.clave, 'sin-carteras');
+
+  // FALLO CERRADO del reloj, con control positivo. El aviso por consola estaba
+  // sellado por el censo, pero el EFECTO de la guarda —no aplicar— no lo medía
+  // nadie: sustituir el `return` por `localSaved = 0` salía verde y aplicaba
+  // cualquier documento con META corrupta (§5.6).
+  sembrarEstadoDeD45();
+  localStorage.setItem(META_KEY, '{esto no parsea');
+  const errReal = console.error;
+  let r7;
+  try { console.error = () => {}; r7 = await pullFromFirestore(arnesDeBajada(d.nuevo).deps); }
+  finally { console.error = errReal; }
+  check('AC-2 con META ilegible no se aplica nada', r7.aplicado, false);
+  check('AC-2 y lo dice por su nombre', r7.clave, 'meta-ilegible');
+  check('AC-2 y el aviso es de error, no verde', r7.aviso, 'error');
+  check('AC-2 y el libro sigue en disco', enDisco(), 2);
+
+}
+
+// AC-2 y AC-3, tercera familia: el RELOJ DESCONOCIDO. Sujeto del corte: los
+// escenarios en que alguno de los dos lados no tiene marca de tiempo. Es el
+// estado de TODOS los dispositivos ya sincronizados el día del despliegue,
+// porque hasta este ciclo META se reescribía sin marca (D-30).
+async function pruebasBajadaSinReloj(check) {
+  const d = docsDeBajada();
+  const enDisco = () => parseOpsBlob(localStorage.getItem(OPS_KEY)).length;
+  sembrarEstadoDeD45();
+  localStorage.setItem(META_KEY, JSON.stringify({ portfolios, currentPortId, nextId }));
+  const t8 = arnesDeBajada(d.nuevo);
+  const r8 = await pullFromFirestore(t8.deps);
+  check('AC-2 sin marca de tiempo local NO se aplica nada', r8.aplicado, false);
+  check('AC-2 y lo dice por su nombre', r8.clave, 'reloj-desconocido');
+  check('AC-2 y el libro sigue entero en disco', enDisco(), 2);
+  check('AC-2 y la pantalla no queda verde',
+        t8.pintados[t8.pintados.length - 1], 'pendiente');
+
+  // El `|| 0` del reloj al aplicar, afirmado por su VALOR. Antes sólo moría por
+  // el ancla de un caso del banco, que es una muerte frágil: si el ancla se
+  // redacta distinto, `|| Date.now()` —que el comentario prohíbe— sobrevive.
+  localStorage.clear();
+  ops = []; portfolios = []; currentPortId = null; rows = []; opsIlegible = false;
+  await pullFromFirestore(arnesDeBajada({ portfolios: [{ id: 'pN', name: 'nube' }],
+                                          currentPortId: 'pN', nextId: 1,
+                                          opsAll: [{ id: 'z1' }] }).deps);
+  check('AC-3 un documento SIN marca deja el reloj local en cero, no en la hora actual',
+        savedAtEnDisco(), 0);
+}
+
+// AC-2, SEGUNDO CAMINO. La escucha en vivo tenía su propio desempate escrito
+// aparte —sólo por fecha—: cerrar sólo el arranque habría dejado vivo el
+// segundo predicado que este ciclo existe para eliminar.
+function pruebasEscuchaEnVivo(check) {
+  const d = docsDeBajada();
+  const previo = { unsub: unsubFirestore };
+  const repintarReal = repintarTrasSync;
+  const warnReal = console.warn;
+  const errReal = console.error;
+  const pintarReal = setSyncUI;
+  const enDisco = () => parseOpsBlob(localStorage.getItem(OPS_KEY)).length;
+  let entregar = null;
+  let repintados = 0;
+  const pintados = [];
+  try {
+    console.warn = () => {};
+    console.error = () => {};
+    // Se CUENTA. Stubearlo sin contar dejaba borrar el repintado entero: los
+    // datos entraban al disco y la pantalla no se enteraba (§5.6).
+    repintarTrasSync = () => { repintados++; };
+    setSyncUI = (estado) => { pintados.push(estado); };
+    unsubFirestore = null;
+    sembrarEstadoDeD45();
+    listenFirestore({ ref: { onSnapshot: (cb) => { entregar = cb; return () => {}; } } });
+    check('AC-2 la escucha quedó registrada', typeof entregar, 'function');
+    entregar({ exists: true, data: () => d.viejo });
+    check('AC-2 la escucha EN VIVO tampoco aplica una nube más vieja', ops.length, 2);
+    check('AC-2 y el disco tampoco se toca', enDisco(), 2);
+    check('AC-2 y no repinta nada', repintados, 0);
+    // Los DOS caminos coinciden también en lo que el operador MIRA. Antes esto
+    // rechazaba sin pintar y el punto se quedaba verde mientras los
+    // dispositivos divergían en silencio.
+    check('AC-4 un rechazo en vivo también pinta el aviso del veredicto',
+          pintados[pintados.length - 1], 'pendiente');
+    entregar({ exists: true, data: () => d.nuevo });
+    check('AC-2 pero sí aplica una más nueva', enDisco(), 1);
+    check('AC-2 y conserva su marca de tiempo',
+          savedAtEnDisco(), 2000);
+    check('AC-2 y AHÍ sí repinta la pantalla', repintados, 1);
+    // EMPATE: el mismo documento reentregado no se vuelve a aplicar. Ahora que
+    // lo local adopta la marca del documento, el empate es el estado normal
+    // tras sincronizar, y re-aplicar se comía la edición sin guardar.
+    entregar({ exists: true, data: () => d.nuevo });
+    check('AC-2 el MISMO documento reentregado no se vuelve a aplicar', repintados, 1);
+    // FALLO CERRADO del reloj en vivo, con su efecto Y su aviso.
+    localStorage.setItem(META_KEY, '{esto no parsea');
+    pintados.length = 0;
+    entregar({ exists: true, data: () => d.nuevo });
+    check('AC-2 con META ilegible la escucha no aplica nada', repintados, 1);
+    check('AC-2 y lo pinta como error, no en verde',
+          pintados[pintados.length - 1], 'error');
+  } finally {
+    console.warn = warnReal;
+    console.error = errReal;
+    setSyncUI = pintarReal;
+    repintarTrasSync = repintarReal;
+    unsubFirestore = previo.unsub;
+  }
+}
+
+// AC-6 y AC-7. Los DOS sitios que producían el daño, y el CRUCE sólo-META.
+//
+// Troceado en una función POR SUMIDERO MEDIDO —ése es el criterio de parada, y
+// su sujeto es el sumidero, no «lo que quepa»—: el cruce sólo-META, el borrado
+// de operación y el interruptor de objetivos. Cada una monta y desmonta lo suyo.
+//
+// «Cero subidas» se comprueba REASIGNANDO el lanzador y contando llamadas:
+// fuera del navegador no hay sesión y `schedulePush` no hace nada por su cuenta,
+// así que un aserto sobre subidas REALES pasaría con y sin el arreglo — la
+// inyección tiene que caer donde el error PROPAGA (§5.9).
+//
+// El almacenamiento sustituido se restaura en `try/finally` SIEMPRE: sin él, un
+// aserto que lance deja la escritura rota para el resto de la página, y el 01-06
+// midió que eso deja de guardar los datos del operador en silencio.
+function bancoDeSumideros(fn) {
+  const real = { guardar: localStorage.setItem.bind(localStorage), err: console.error,
+                 push: schedulePush, ops: saveOpsAll, sched: schedSave,
+                 render: render, sync: syncAllPortfoliosFromOps, snap: autoSnapshot };
+  const b = { subidas: 0, propagaciones: 0, fotos: 0, real: real };
+  b.soloMetaFalla = () => {
+    localStorage.setItem = (k, v) => {
+      if (k === META_KEY) throw new Error('QuotaExceededError');
+      return real.guardar(k, v);
+    };
+  };
+  b.almacenSano = () => { localStorage.setItem = real.guardar; };
+  try {
+    console.error = () => {};
+    schedulePush = () => { b.subidas++; };
+    schedSave = () => {};
+    render = () => {};
+    syncAllPortfoliosFromOps = () => { b.propagaciones++; };
+    autoSnapshot = () => { b.fotos++; };
+    sembrarEstadoDeD45();
+    return fn(b);
+  } finally {
+    localStorage.setItem = real.guardar;
+    console.error = real.err;
+    schedulePush = real.push;
+    saveOpsAll = real.ops;
+    schedSave = real.sched;
+    render = real.render;
+    syncAllPortfoliosFromOps = real.sync;
+    autoSnapshot = real.snap;
+  }
+}
+
+// AC-6 · D-46: falla ÚNICAMENTE la lista de carteras. No el libro, no los
+// activos. Nadie medía este cruce: quitar `okMeta` del veredicto dejaba la
+// puerta en rc=0 y, con la cuota llena, «Guardado ✓» en verde Y subida a la nube.
+function pruebasCruceSoloMeta(check) {
+  bancoDeSumideros(b => conVentanaDePintura(v => {
+    const el = v.el('save-indicator');
+    b.soloMetaFalla();
+    b.subidas = 0;
+    check('AC-6 con SÓLO la lista de carteras rota, el guardado dice que no',
+          guardarTodo(), false);
+    check('AC-6 y el aviso es ROJO, por su VALOR', el.style.color, 'var(--red)');
+    check('AC-6 y con el texto del fallo', el.textContent, 'No se pudo guardar');
+    check('AC-6 y NO se sube nada a la nube', b.subidas, 0);
+  }));
+}
+
+// AC-7 · D-27: borrar una operación o confirmar una importación. El resultado
+// de la escritura del libro se tiraba y se anunciaba «Guardado ✓» en VERDE.
+function pruebasBorradoDeOperacion(check) {
+  bancoDeSumideros(b => conVentanaDePintura(v => {
+    const el = v.el('save-indicator');
+    saveOpsAll = () => false;
+    check('AC-7 y devuelve false para que el panel de importación no mienta',
+          persistOps(), false);
+    check('AC-7 un libro que no se guarda NO se anuncia en verde',
+          el.style.color, 'var(--red)');
+    check('AC-7 y el texto es el del fallo', el.textContent, 'No se pudo guardar');
+  }));
+  // Control de VACUIDAD del aserto de arriba: sin fallo sembrado tiene que
+  // seguir saliendo verde. Sin esta fila, un pintor siempre-rojo lo satisface.
+  bancoDeSumideros(b => conVentanaDePintura(v => {
+    const el = v.el('save-indicator');
+    check('AC-7 y cuando sí se guarda, devuelve true', persistOps(), true);
+    check('AC-7 y sigue anunciándose en verde', el.style.color, 'var(--green)');
+    // Los efectos laterales que el arnés stubea: sin contarlos, borrarlos del
+    // producto salía verde. Guardar el libro sin propagarlo a la cartera deja
+    // memoria y disco desincronizados; sin la foto del mes, el histórico deja
+    // de reflejar borrados e importaciones.
+    check('AC-7 y propaga el libro a la cartera', b.propagaciones, 1);
+    check('AC-7 y actualiza la foto del mes', b.fotos, 1);
+  }));
+}
+
+// AC-7 · D-29: el interruptor de objetivos por cartera subía a la nube pasara
+// lo que pasara con el guardado local.
+function pruebasInterruptorDeObjetivos(check) {
+  bancoDeSumideros(b => conVentanaDePintura(v => {
+    const el = v.el('save-indicator');
+    portfolios = [{ id: 'pT', name: 'con objetivos' }];
+    currentPortId = 'pT';
+    b.soloMetaFalla();
+    b.subidas = 0;
+    onUseTargetsToggle(false);
+    check('AC-7 el interruptor NO sube si la lista de carteras no se guardó',
+          b.subidas, 0);
+    check('AC-7 y avisa en ROJO', el.style.color, 'var(--red)');
+    b.almacenSano();
+    b.subidas = 0;
+    onUseTargetsToggle(true);
+    check('AC-7 y sí sube cuando el guardado local va bien', b.subidas, 1);
+  }));
+}
+
+// AC-4. EL CRUCE DE D-45 SOBRE EL ARRANQUE ENTERO, en suite propia: la bajada
+// leyó la nube BIEN (`sincronizado: true`) y aun así RECHAZÓ el documento.
+// Antes la bajada devolvía el mismo `true` en los dos casos y el arranque lo
+// traducía a VERDE — la pantalla mintiendo en el escenario exacto de la ficha.
+// §5.5: las dos piezas tenían control por separado y el CRUCE no lo medía nadie.
+// Reponer aquí un verde incondicional MATA las cuatro filas.
+async function pruebasArranqueTrasRechazo(check) {
+  const previo = { user: currentUser, unsub: unsubFirestore };
+  const pintadoReal = setSyncUI;
+  const pintado = [];
+  let subidas = 0;
+  try {
+    unsubFirestore = null;
+    setSyncUI = (estado) => { pintado.push(estado); };
+    const deps = {
+      leerNube: async () => ({ sincronizado: true, aviso: 'pendiente',
+                               clave: 'nube-mas-vieja' }),
+      subir: async () => { subidas++; return { aviso: 'ok' }; },
+      escuchar: () => {}, pintar: () => {},
+    };
+    check('AC-4 un rechazo de la bajada NO acaba en verde',
+          await alIniciarSesion({ uid: 'u5' }, deps), 'pendiente');
+    check('AC-4 y el indicador PINTADO tampoco queda verde',
+          pintado[pintado.length - 1], 'pendiente');
+    check('AC-4 y no se sube nada encima de la nube', subidas, 0);
+    check('AC-4 y en ningún instante se pintó el verde',
+          pintado.indexOf('ok') >= 0, false);
+  } finally {
+    setSyncUI = pintadoReal;
+    currentUser = previo.user; unsubFirestore = previo.unsub;
+  }
+}
+
 // El manejador de inicio de sesión, EJECUTADO de verdad. Aquí vivía D-33.
 // Fuera del navegador no se registraba siquiera, así que hasta el 01-04 no
 // había oráculo posible: cualquier prueba habría sido una aserción por
@@ -5741,7 +6437,9 @@ async function pruebasInicioDeSesion(check) {
     check('AC-3 una lectura de nube que LANZA no acaba en verde', a1, 'error');
     check('AC-1 y no intenta escribir nada', t1.subidas, 0);
 
-    const t2 = arnes(async () => false, 'pendiente');
+    const veredicto = (o) => async () => o;
+    const t2 = arnes(veredicto({ sincronizado: false, aviso: 'pendiente',
+                                 clave: 'sin-documento' }), 'pendiente');
     pintado.length = 0;
     check('AC-3 sin datos arriba delega en la puerta única y adopta SU aviso',
           await alIniciarSesion({ uid: 'u2' }, t2.deps), 'pendiente');
@@ -5751,7 +6449,8 @@ async function pruebasInicioDeSesion(check) {
     check('AC-1 y deja el escucha de la nube puesto', t2.escuchas, 1);
     check('AC-1 y repinta la pantalla con lo que llegó', t2.pintados, 1);
 
-    const t3 = arnes(async () => true, 'ok');
+    const t3 = arnes(veredicto({ sincronizado: true, aviso: 'ok',
+                                 clave: 'nube-al-dia' }), 'ok');
     check('AC-3 con datos arriba el resultado es verde',
           await alIniciarSesion({ uid: 'u3' }, t3.deps), 'ok');
     check('AC-1 y no sube nada encima', t3.subidas, 0);
@@ -5759,7 +6458,8 @@ async function pruebasInicioDeSesion(check) {
     // Cubrir el mecanismo no cubre su CABLEADO (§5.6): si el manejador dejara
     // de pasar por `estadoSync`, un aviso desconocido llegaría crudo al
     // indicador. Sólo esta fila lo distingue.
-    const t4 = arnes(async () => false, 'vete a saber');
+    const t4 = arnes(async () => ({ sincronizado: false, aviso: 'pendiente' }),
+                     'vete a saber');
     check('AC-3 un aviso desconocido pasa por estadoSync y sale ROJO',
           await alIniciarSesion({ uid: 'u4' }, t4.deps), 'error');
 
@@ -5780,7 +6480,8 @@ async function pruebasCierreDeSesion(check) {
   try {
     setSyncUI = (estado) => { pintado.push(estado); };
     unsubFirestore = () => { soltados++; };
-    const deps = { leerNube: async () => true, subir: async () => ({ aviso: 'ok' }),
+    const deps = { leerNube: async () => ({ sincronizado: true, aviso: 'ok' }),
+                   subir: async () => ({ aviso: 'ok' }),
                    escuchar: () => {}, pintar: () => {} };
     check('AC-3 sin usuario, offline', await alIniciarSesion(null, deps), 'offline');
     check('AC-1 y al salir se suelta el escucha de la nube', soltados, 1);

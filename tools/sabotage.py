@@ -39,6 +39,8 @@ EMPTYCATCH = ROOT / 'tools' / 'emptycatch.py'
 CATCHES = ROOT / '.paul' / 'baseline-catches.json'
 AVISOS = ROOT / 'tools' / 'avisos.py'
 BASELINE_AVISOS = ROOT / '.paul' / 'baseline-avisos.json'
+SUMIDEROS = ROOT / 'tools' / 'sumideros.py'
+BASELINE_SUMIDEROS = ROOT / '.paul' / 'baseline-sumideros.json'
 RUNSELFTESTS = ROOT / 'tools' / 'run_selftests.py'
 VERIFY = ROOT / 'tools' / 'verify.sh'
 SABOTAGE = ROOT / 'tools' / 'sabotage.py'
@@ -79,7 +81,8 @@ VERDE_INTERIOR = 4
 # de un sabotaje que los mutara no probaba nada sobre ellos.
 TOCABLES = [INDEX, FUNCSIZE, BASELINE, CLOUDWRITES, EMPTYCATCH, CATCHES,
             VERIFY, SABOTAGE, INSTALLHOOKS, HOOKCHECK, PREPUSH,
-            AVISOS, BASELINE_AVISOS, RUNSELFTESTS]
+            AVISOS, BASELINE_AVISOS, RUNSELFTESTS,
+            SUMIDEROS, BASELINE_SUMIDEROS]
 
 
 def hash_arbol():
@@ -166,9 +169,13 @@ CASOS = [
          "  showSaveIndicator(todoBien ? (saveMensaje || 'Guardado \u2713') : 'No se pudo guardar', todoBien);",
          "  showSaveIndicator('Guardado \u2713', true);",
          1, "AC-2"),
+    # Ancla REDISENADA en el 01-07: el mismo reparto --y el mismo comentario--
+    # viven ahora tambien en `persistOps`, asi que la linea sola aparecia DOS
+    # veces y el banco lo canto como "el defecto esta en el BANCO". Se ancla con
+    # la firma de la funcion, que es lo que distingue una de otra.
     Caso("los activos vuelven a cantar exito antes de tiempo", INDEX,
-         "  const okRows = saveRows(false);   // el aviso lo decide esta función, al final",
-         "  const okRows = saveRows(true);",
+         "function guardarTodo() {\n  const okRows = saveRows(false);",
+         "function guardarTodo() {\n  const okRows = saveRows(true);",
          1, "AC-2"),
     # Las dos suites escriben en el localStorage REAL del usuario (?selftest=1
     # tambien corre en su navegador), asi que cada una tiene su propio control
@@ -290,18 +297,38 @@ CASOS = [
     # ── Controles positivos del plan 01-04 (la puerta unica de la nube). ────
     # 1. Una CUARTA escritura fuera de la puerta. Es la clase que cierra D-33:
     #    no hay lista de sitios permitidos, hay una puerta y todo lo demas es rojo.
+    # Ancla REDISENADA en el 01-07: vivia dentro del `pullFromFirestore` viejo,
+    # que este ciclo reescribio entero para hacerlo inyectable. Se re-ancla en la
+    # lectura de la nube del camino de bajada, que sigue siendo el sitio donde
+    # una escritura colada seria mas dificil de ver.
     Caso("aparece una cuarta escritura a la nube fuera de la puerta", INDEX,
-         "    const doc = await ref.get();\n    if (!doc.exists) return false;",
-         "    const doc = await ref.get();\n    await ref.set({ colado: 1 });\n    if (!doc.exists) return false;",
+         "    const doc = await d.ref.get();",
+         "    const colada = userDocRef();\n"
+         "    if (colada) await colada.set({ colado: 1 });\n"
+         "    const doc = await d.ref.get();",
+         1, "ESCRITURA A LA NUBE FUERA DE LA PUERTA"),
+    # 1b. La forma que trajo la INYECCION de dependencias: la referencia viaja
+    #     como propiedad (`d.ref`), no como nombre suelto. Con el `.set(` la
+    #     cazaba la red B de rebote; con `.update(` no la veia NADIE, y esa es
+    #     exactamente la forma que este ciclo introdujo en el codigo. La red A se
+    #     amplio a receptores compuestos por culpa de este sabotaje.
+    #     La llamada va tras un `if (false)`: lo que se mide es que el analisis
+    #     ESTATICO la vea. Ejecutarla reventaria las pruebas con un rc=2 de
+    #     instrumento roto que TAPARIA el hallazgo que este caso persigue.
+    Caso("escritura a la nube por RECEPTOR COMPUESTO (d.ref.update)", INDEX,
+         "    const doc = await d.ref.get();",
+         "    if (false) await d.ref.update({ colado: 1 });\n    const doc = await d.ref.get();",
          1, "ESCRITURA A LA NUBE FUERA DE LA PUERTA"),
     # 2. CONTROL POSITIVO DE D-33: el manejador de inicio de sesion vuelve a
     #    escribir por su cuenta, como hacia antes de este ciclo. Si esto no se
     #    pusiera rojo, el arreglo no estaria medido por nada.
+    # Ancla REDISENADA en el 01-07: la linea del arranque paso de un booleano a
+    # un VEREDICTO. El sabotaje es el mismo: colar una escritura propia.
     Caso("el manejador de inicio de sesion vuelve a escribir por su cuenta", INDEX,
-         "    resultado = sincronizado ? 'ok' : (await d.subir('inicio de sesión')).aviso;",
+         "    const lectura = await d.leerNube();",
          "    const refColada = userDocRef();\n"
          "    if (refColada) await refColada.set(buildSyncPayload().payload);\n"
-         "    resultado = 'ok';",
+         "    const lectura = await d.leerNube();",
          1, "ESCRITURA A LA NUBE FUERA DE LA PUERTA"),
     # 4. El juez deja de mirar si el paquete esta incompleto (D-34, lado juez).
     Caso("el juez deja de mirar si el paquete esta incompleto", INDEX,
@@ -373,10 +400,27 @@ CASOS = [
     # 15. EL CABLEADO ASINCRONO. Sin el `await`, la suite del manejador deja de
     #     ejercer y la puerta sale VERDE Y SORDA. Medido: con el await quitado,
     #     el sabotaje 9 dejaba de morder. Cubrir el mecanismo no cubre su cable.
+    # Ancla REDISENADA en el 01-07. Quitar el `await` de `ejercida` ya no produce
+    # este mensaje: con las suites nuevas, las promesas sueltas se pisan el
+    # estado y el proceso muere antes de imprimirlo. Se separa en DOS casos, que
+    # miden dos cosas distintas:
+    #   (a) el guardian `ejercida` en persona: una suite que no ejerce nada;
+    #   (b) la red nueva contra promesas sin manejar, que antes daba rc=1 MUDO.
+    Caso("una suite asincrona no llega a ejercer ni un control", INDEX,
+         "    await ejercida('pruebasTuberiaDeSubida', () => pruebasTuberiaDeSubida(contado));",
+         "    await ejercida('pruebasTuberiaDeSubida', () => { pruebasTuberiaDeSubida(contado); });",
+         1, "pruebasTuberiaDeSubida no ejerci\u00f3 ni un control"),
     Caso("se pierde el await que cablea las suites asincronas", INDEX,
          "    const antes = ejercidos;\n    await fn();",
          "    const antes = ejercidos;\n    fn();",
          1, "no ejerci\u00f3 ni un control"),
+    # La red nueva contra promesas SIN MANEJAR. Antes una promesa suelta mataba
+    # el proceso con rc=1 y sin una palabra: un rojo sin nombre.
+    Caso("una promesa suelta mata el proceso sin decir por que", INDEX,
+         "function pruebasIndicador(check) {",
+         "function pruebasIndicador(check) {\n"
+         "  Promise.reject(new Error('promesa suelta de sabotaje'));",
+         2, "una promesa quedo sin manejar"),
     # ── Controles del ciclo 01-05: la vara de medir. ────────────────────────
     # N1/N2. Una foto sellada MALFORMADA tiene que decir "no pude medir" con su
     #     nombre, no reventar con un traceback y rc=1 disfrazado de hallazgo del
@@ -509,6 +553,231 @@ CASOS = [
          "      console.error('Operaciones antiguas ilegibles en la cartera '",
          "      console.log('Operaciones antiguas ilegibles en la cartera '",
          1, "han DESAPARECIDO avisos que la foto sellaba"),
+    # ── Controles del ciclo 01-07: la BAJADA de la nube y los SUMIDEROS. ───
+    # A. Cada arreglo, revertido POR SEPARADO, tiene que matar su propia prueba.
+    #    Los ocho se re-verificaron a mano sobre una COPIA aislada antes de
+    #    cablearlos aqui (CLAUDE.md 3.4: el brazo trabaja sobre copia).
+    #
+    # D-45 en persona: el desempate del arranque miraba SOLO los activos, asi
+    # que un dispositivo con libro y sin activos aceptaba cualquier documento
+    # por viejo que fuera, y la pantalla quedaba en VERDE.
+    Caso("D-45: el desempate vuelve a mirar solo los activos", INDEX,
+         "  const hayQueProteger = tieneOperaciones(local.ops) || !!local.hayActivosLocales;",
+         "  const hayQueProteger = !!local.hayActivosLocales;",
+         1, "AC-1 con LIBRO local y documento más viejo, NO se aplica"),
+    # La fila SIMETRICA. Sin ella, cerrar D-45 por el lado del libro habria
+    # abierto el mismo agujero por el lado de los activos (5.16).
+    Caso("el desempate vuelve a mirar solo el libro", INDEX,
+         "  const hayQueProteger = tieneOperaciones(local.ops) || !!local.hayActivosLocales;",
+         "  const hayQueProteger = tieneOperaciones(local.ops);",
+         1, "AC-1 con ACTIVOS locales y documento más viejo, tampoco se aplica"),
+    # El hallazgo 2 de la revision adversaria del plan: sin conservar la marca
+    # de tiempo al aplicar, `localSaved` volvia a 0 y TODO documento parecia mas
+    # nuevo. La rama que cierra D-45 no habria disparado nunca en la app real: el
+    # control habria pasado con el dano vivo (5.10).
+    Caso("el reloj del sync vuelve a ponerse a cero al aplicar", INDEX,
+         ",\n                                                  savedAt: Number(data.savedAt) || 0 }));",
+         " }));",
+         1, "AC-3 la marca de tiempo del documento SOBREVIVE al aplicar"),
+    # El hallazgo 1: la bajada devolvia el mismo valor tanto si aplicaba como si
+    # rechazaba, y el arranque lo traducia a VERDE. Cerrar solo la bajada habria
+    # dejado la pantalla mintiendo en el escenario exacto de la ficha (5.5).
+    Caso("el arranque vuelve a repintar VERDE encima del rechazo", INDEX,
+         "      ? lectura.aviso",
+         "      ? 'ok'",
+         1, "AC-4 un rechazo de la bajada NO acaba en verde"),
+    # El SEGUNDO camino de bajada. Cerrar solo el del arranque habria sido el
+    # caso disfrazado de clase: la escucha en vivo tenia su desempate aparte.
+    Caso("la escucha en vivo deja de consultar al juez", INDEX,
+         "    if (!decision.aplicar) {",
+         "    if (false) {",
+         1, "AC-2 la escucha EN VIVO tampoco aplica una nube más vieja"),
+    # D-27. Ancla con la linea de la firma: `const okOps  = saveOpsAll(ops);`
+    # aparece TAMBIEN en `guardarTodo`, y sin la firma el banco casaria de mas
+    # y no sabria cual esta midiendo.
+    Caso("D-27: el borrado de operacion vuelve a tirar el resultado del libro", INDEX,
+         "function persistOps() {\n  const okOps  = saveOpsAll(ops);",
+         "function persistOps() {\n  saveOpsAll(ops);\n  const okOps  = true;",
+         1, "AC-7 un libro que no se guarda NO se anuncia en verde"),
+    Caso("D-29: el interruptor de objetivos vuelve a subir siempre", INDEX,
+         "  if (saveMeta()) {",
+         "  if (saveMeta() || true) {",
+         1, "AC-7 el interruptor NO sube si la lista de carteras no se guardó"),
+    # D-46: el CRUCE que no medía nadie. Antes de este ciclo, quitar `okMeta`
+    # dejaba la puerta ENTERA en rc=0 y, con la cuota llena, "Guardado OK" en
+    # verde Y subida a la nube.
+    Caso("D-46: el veredicto del guardado deja de mirar la lista de carteras", INDEX,
+         "  const todoBien = okRows && okOps && okMeta;",
+         "  const todoBien = okRows && okOps;",
+         1, "AC-6 con SÓLO la lista de carteras rota, el guardado dice que no"),
+    # B. El instrumento NUEVO, tools/sumideros.py. Un control que nunca se ha
+    #    visto rojo no se ha visto.
+    Caso("aparece un sumidero de SUBIDA nuevo sin sellar", INDEX,
+         "function isMobile() {",
+         "function isMobile() {\n  schedulePush();",
+         1, "sumidero NUEVO, sin cobertura sellada"),
+    # La direccion CONTRARIA, que es la mitad que este instrumento no hereda de
+    # funcsize: una boca de aviso que se CIERRA es el silencio de la fase.
+    Caso("desaparece una boca de aviso del guardado", INDEX,
+         "  showSaveIndicator(todoBien ? 'Guardado ✓' : 'No se pudo guardar', todoBien);\n"
+         "  if (!todoBien) console.error('El guardado de las operaciones falló: no se anuncia éxito.');\n",
+         "",
+         1, "ha DESAPARECIDO una boca de aviso"),
+    Caso("la foto de sumideros tiene 'motivos' del tipo equivocado", BASELINE_SUMIDEROS,
+         '"motivos": {', '"motivos": null,\n  "_sabotaje": {',
+         2, "sumideros: la foto sellada"),
+    Caso("la foto de sumideros no parsea", BASELINE_SUMIDEROS,
+         None, "{esto no es json",
+         2, "la foto sellada no se puede leer"),
+    # Un receptor sellado que ya no existe es un sumidero que dejo de medirse.
+    # Callarlo seria vigilar una ficcion.
+    Caso("un sumidero sellado ya no existe en el codigo", SUMIDEROS,
+         "        'schedulePush': 'subir',",
+         "        'schedulePush': 'subir',\n        'noExisteJamas': 'subir',",
+         2, "sumideros sellados que ya no existen"),
+    Caso("deriva: se afloja la direccion de la comparacion de sumideros", SUMIDEROS,
+         "'direccion': {'subir': 'dominacion', 'anunciar': 'ambas',",
+         "'direccion': {'subir': 'dominacion', 'anunciar': 'dominacion',",
+         3, "DERIVA (rc=3): sumideros del dano"),
+    # ── Lo que destaparon los CINCO brazos adversarios del 01-07. ─────────
+    # Cada uno de estos salia rc=0 con el ciclo ya escrito y la puerta VERDE, y
+    # se re-verifico a mano sobre copia aislada antes de aceptarlo.
+    #
+    # EL PEOR: hacer inyectable una funcion crea POR CONSTRUCCION un cableado
+    # por defecto que corre en el navegador y que ninguna prueba toca, porque
+    # todas inyectan el suyo. Con este mutante D-45 volvia ENTERA a produccion.
+    Caso("el cableado por defecto de la bajada deja de ver el libro", INDEX,
+         "           aplicar: applySyncPayload, ops: () => ops,",
+         "           aplicar: applySyncPayload, ops: () => [],",
+         1, "AC-2 el cableado de la bajada lee EL libro de verdad"),
+    Caso("el cableado por defecto deja de leer la marca de tiempo", INDEX,
+         "  return { ref: userDocRef(), leerMeta: () => localStorage.getItem(META_KEY),",
+         "  return { ref: userDocRef(), leerMeta: () => null,",
+         1, "AC-2 y lee LA clave de META de verdad"),
+    Caso("el cableado por defecto deja de pintar", INDEX,
+         "           activos: hasRealLocalData, pintar: setSyncUI };",
+         "           activos: hasRealLocalData, pintar: () => {} };",
+         1, "AC-2 y pinta con setSyncUI"),
+    Caso("el cableado del arranque deja de subir por la puerta unica", INDEX,
+         "  return { leerNube: pullFromFirestore, subir: subirALaNube,",
+         "  return { leerNube: pullFromFirestore, subir: async () => ({ aviso: 'ok' }),",
+         1, "AC-4 y sube por la puerta única"),
+    # El estado de MIGRACION: el dia del despliegue TODOS los dispositivos ya
+    # sincronizados tienen META sin marca de tiempo (D-30). Sin esta rama, el
+    # arreglo de D-45 no protegia a nadie en su primer arranque: control en
+    # verde y dano vivo (5.10).
+    Caso("con el reloj local desconocido se vuelve a aplicar cualquier cosa", INDEX,
+         "  if (!localSaved || !remoto) {",
+         "  if (false) {",
+         1, "AC-2 sin marca de tiempo local NO se aplica nada"),
+    # El empate: ahora que lo local adopta la marca del documento aplicado, el
+    # empate es el estado NORMAL tras sincronizar. Con `>=` el primer snapshot
+    # de la escucha reaplicaba el documento y se comia la edicion sin guardar.
+    Caso("el desempate vuelve a aceptar el empate", INDEX,
+         "  if (remoto > localSaved) {",
+         "  if (remoto >= localSaved) {",
+         1, "AC-1 un empate NO se aplica"),
+    # El campo del veredicto que nadie afirmaba. Con el, el arranque trata un
+    # rechazo como «no hay nada arriba» y SUBE encima de la nube.
+    Caso("la bajada miente sobre si llego a leer la nube", INDEX,
+         "  return { sincronizado: true, aplicado: aplicado, aviso: decision.aviso,",
+         "  return { sincronizado: false, aplicado: aplicado, aviso: decision.aviso,",
+         1, "AC-4 un rechazo SÍ leyó la nube: sincronizado es true"),
+    # El AVISO de las ramas que SI aplican: pantalla mintiendo en la direccion
+    # contraria (verde que se queda naranja para siempre).
+    Caso("el camino feliz de la bajada se anuncia como pendiente", INDEX,
+         "    return { aplicar: true, utilizable: true, aviso: 'ok', clave: 'nube-mas-nueva',",
+         "    return { aplicar: true, utilizable: true, aviso: 'pendiente', clave: 'nube-mas-nueva',",
+         1, "AC-1 y el camino feliz se anuncia en verde"),
+    # El fallo CERRADO del reloj: el aviso estaba sellado por el censo, pero el
+    # EFECTO de la guarda no lo medía nadie (5.6).
+    Caso("con META ilegible el arranque adivina que lo local es del ano cero", INDEX,
+         "    return { sincronizado: false, aplicado: false, aviso: 'error',\n"
+         "             clave: 'meta-ilegible', motivo: 'la marca de tiempo local no se pudo leer' };",
+         "    localSaved = 0;",
+         1, "AC-2 y el aviso es de error, no verde"),
+    Caso("con META ilegible la escucha en vivo sigue adelante", INDEX,
+         "      setSyncUI(estadoSync('error'));\n      return;",
+         "      setSyncUI(estadoSync('error'));",
+         1, "AC-2 y lo pinta como error, no en verde"),
+    # Los dos caminos tienen que coincidir tambien en lo que el operador MIRA.
+    Caso("la escucha en vivo rechaza sin pintar nada", INDEX,
+         "      console.warn('[SYNC] cambio de la nube NO aplicado:', decision.motivo);\n"
+         "      setSyncUI(estadoSync(decision.aviso));",
+         "      console.warn('[SYNC] cambio de la nube NO aplicado:', decision.motivo);",
+         1, "AC-4 un rechazo en vivo también pinta el aviso del veredicto"),
+    Caso("un cambio de la nube entra al disco y la pantalla no se entera", INDEX,
+         "    applySyncPayload(data);\n    repintarTrasSync();",
+         "    applySyncPayload(data);",
+         1, "AC-2 y AHÍ sí repinta la pantalla"),
+    # La guarda `utilizable`, ejercida sobre la funcion ENTERA y no sobre el
+    # juez aislado.
+    Caso("la bajada deja de distinguir un documento inutilizable", INDEX,
+         "  if (!decision.utilizable) {",
+         "  if (false) {",
+         1, "AC-2 un documento sin carteras no cuenta como sincronizado"),
+    # El `|| 0` del reloj, afirmado por su VALOR y no solo por un ancla.
+    Caso("el reloj se sella con la hora actual en vez de con la del documento", INDEX,
+         "savedAt: Number(data.savedAt) || 0 }));",
+         "savedAt: Number(data.savedAt) || Date.now() }));",
+         1, "AC-3 un documento SIN marca deja el reloj local en cero"),
+    # D-27 cerrada por la CLASE: el panel de importacion tenia su PROPIO anuncio
+    # de exito, mas grande que el indicador, y lo pintaba en verde pasara lo que
+    # pasara -- despues de haber vaciado la importacion pendiente.
+    Caso("persistOps deja de devolver su veredicto al panel de importacion", INDEX,
+         "  render();\n  // DEVUELVE el veredicto",
+         "  render();\n  return true;\n  // DEVUELVE el veredicto",
+         1, "AC-7 y devuelve false para que el panel de importación no mienta"),
+    # Los efectos laterales que el arnes stubea: sin CONTARLOS, borrarlos del
+    # producto salia verde.
+    Caso("borrar una operacion deja de propagarla a la cartera", INDEX,
+         "  const okOps  = saveOpsAll(ops);\n  syncAllPortfoliosFromOps();",
+         "  const okOps  = saveOpsAll(ops);",
+         1, "AC-7 y propaga el libro a la cartera"),
+    Caso("borrar una operacion deja de actualizar la foto del mes", INDEX,
+         "  autoSnapshot();   // la foto del mes refleja la cartera ya actualizada",
+         "  ",
+         1, "AC-7 y actualiza la foto del mes"),
+    # ── Los instrumentos, saboteados a ELLOS (5.7). ────────────────────────
+    # Una llamada opcional es una llamada DIRECTA por nombre: dejarla fuera del
+    # censo era una ceguera NO declarada.
+    Caso("un sumidero de subida abierto con llamada opcional `?.()`", INDEX,
+         "function isMobile() {",
+         "function isMobile() {\n  schedulePush?.();",
+         1, "sumidero NUEVO, sin cobertura sellada"),
+    # El sumidero del ARRANQUE: la funcion de subida pasada como VALOR.
+    Caso("aparece un sumidero de subida pasado como referencia", INDEX,
+         "function isMobile() {",
+         "function isMobile() {\n  const colado = subirALaNube;\n  return !!colado;",
+         1, "sumidero NUEVO, sin cobertura sellada"),
+    # El MOTIVO, cableado: antes era prosa y un sumidero sellado con el marcador
+    # de relleno pasaba verde para siempre (5.1 dentro del propio instrumento).
+    Caso("un sumidero sellado se queda sin motivo escrito", BASELINE_SUMIDEROS,
+         '"guardarTodo|subir|schedulePush": "La subida del guardado completo',
+         '"guardarTodo|subir|schedulePush": "SIN MOTIVO ESCRITO — escribelo. La subida',
+         2, "marcador de relleno"),
+    Caso("la foto de sumideros se queda sin motivos de golpe", BASELINE_SUMIDEROS,
+         '  "motivos": {', '  "motivos": {},\n  "motivos_apartados": {',
+         2, "SIN motivo escrito"),
+    # El `--update` de sumideros se niega a aflojar: hasta ahora solo tenia caso
+    # permanente el de funcsize, y una reproduccion manual es una anecdota
+    # fechada (4.5.6).
+    Caso("deriva: se afloja la direccion de referencia de sumideros", SUMIDEROS,
+         "'subir-referencia': 'dominacion', 'anunciar-referencia': 'dominacion'},",
+         "'subir-referencia': 'ambas', 'anunciar-referencia': 'dominacion'},",
+         3, "DERIVA (rc=3): sumideros del dano"),
+    # cloudwrites: las dos regresiones que destapo el brazo del aparato.
+    #     El ancla del multi-declarador. Con la expresion anterior --que barria
+    #     desde la palabra clave-- se ligaba `basura`, que no es referencia de
+    #     nada, y NUNCA `refColada`: la escritura quedaba sin que la mirara
+    #     ninguna red, y la guarda de vacuidad seguia satisfecha con basura.
+    #     `userDocRef()` da null sin sesion, asi que el `if` no ejecuta nada.
+    Caso("cloudwrites liga el declarador equivocado y deja la escritura sin ver", INDEX,
+         "  const d = deps || depsDeBajada();",
+         "  const basura = 0, refColada = userDocRef();\n"
+         "  if (refColada) await refColada.update({ colado: 1 });\n"
+         "  const d = deps || depsDeBajada();",
+         1, "ESCRITURA A LA NUBE FUERA DE LA PUERTA"),
     Caso("no se puede medir: index.html vacio", INDEX,
          None, "",
          2, "INSTRUMENTO ROTO"),
@@ -598,8 +867,18 @@ def main():
     if hashlib.sha256(BASELINE_AVISOS.read_bytes()).hexdigest() != antes:
         print("  NO MUERDE: avisos --check ha ESCRITO en su foto sellada")
         fallos.append("avisos --check escribe")
+
     else:
         print("  OK    --check no escribe en la foto sellada (avisos)")
+
+    antes = hashlib.sha256(BASELINE_SUMIDEROS.read_bytes()).hexdigest()
+    subprocess.run([sys.executable, str(SUMIDEROS), '--check'],
+                   capture_output=True, text=True, check=False, cwd=ROOT)
+    if hashlib.sha256(BASELINE_SUMIDEROS.read_bytes()).hexdigest() != antes:
+        print("  NO MUERDE: sumideros --check ha ESCRITO en su foto sellada")
+        fallos.append("sumideros --check escribe")
+    else:
+        print("  OK    --check no escribe en la foto sellada (sumideros)")
 
     antes = hashlib.sha256(CATCHES.read_bytes()).hexdigest()
     subprocess.run([sys.executable, str(EMPTYCATCH), '--check'],

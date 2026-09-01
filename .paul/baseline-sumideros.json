@@ -1,0 +1,55 @@
+{
+  "motivos": {
+    "bancoDeSumideros|subir-referencia|schedulePush": "AUTOPRUEBAS. El arnes del 01-07 hace lo mismo: guarda el lanzador, lo sustituye por un contador y lo restaura en `finally`.",
+    "depsDeSesion|subir-referencia|subirALaNube": "EL SUMIDERO DEL ARRANQUE, nombrado. El manejador de inicio de sesion recibe la funcion de subida como dependencia (`subir: subirALaNube`) y la llama por el alias. El plan del 01-07 lo prometia como exencion nombrada; sin contar las REFERENCIAS se habria quedado invisible en vez de exento, que es justo lo que 5.15 prohibe.",
+    "guardarTodo|anunciar|showSaveIndicator": "EL anuncio del guardado completo. Sale del veredicto `todoBien`, que exige las TRES escrituras (activos, libro y lista de carteras).",
+    "guardarTodo|subir|schedulePush": "La subida del guardado completo, condicionada a `todoBien`. Si el guardado local fallo, lo que hay en memoria no es de fiar y subirlo machacaria la copia buena de la nube.",
+    "idsDeLosPintores|anunciar-referencia|showSaveIndicator": "NO es un sumidero: es el NOMBRE del pintor escrito dentro de una cadena, porque el arnes observable deriva de ahi los identificadores del marcado. Ceguera declarada en la cabecera (las cadenas se conservan a proposito, porque el prefijo de un aviso vive en una cadena).",
+    "onUseTargetsToggle|anunciar|showSaveIndicator": "D-29, cerrado en el 01-07: el interruptor de objetivos avisa EN ROJO cuando la lista de carteras no se pudo guardar. Antes no avisaba de nada.",
+    "onUseTargetsToggle|subir|schedulePush": "D-29, cerrado en el 01-07: la subida esta condicionada al resultado de `saveMeta()`.",
+    "persistOps|anunciar|showSaveIndicator": "D-27, cerrado en el 01-07: borrar una operacion o confirmar una importacion decide el aviso al final, con el resultado de la escritura del libro Y el de los activos.",
+    "pruebasCableadoPorDefecto|subir-referencia|subirALaNube": "AUTOPRUEBAS. Afirma por IDENTIDAD que el cableado por defecto del arranque sube por la puerta unica. Es la prueba que impide que ese literal se cambie sin que nada se ponga rojo.",
+    "pruebasDuracionDelAviso|anunciar|showSaveIndicator": "AUTOPRUEBAS. Ejerce el pintor dos veces para medir la duracion real de cada aviso y el cruce del temporizador.",
+    "pruebasFalloDeEscritura|anunciar-referencia|showSaveIndicator": "AUTOPRUEBAS. Sustituye el pintor por un espia y lo restaura: son las referencias del guardado y la restauracion, no llamadas.",
+    "pruebasFalloDeEscritura|subir-referencia|schedulePush": "AUTOPRUEBAS. Sustituye el lanzador de subidas por un contador y lo restaura, para poder exigir CERO subidas tras un fallo parcial.",
+    "pruebasPintorDelGuardado|anunciar|showSaveIndicator": "AUTOPRUEBAS. Ejecuta el pintor de verdad sobre un DOM observable para afirmar sus colores POR VALOR. No es un aviso al operador real.",
+    "pruebasTuberiaDeSubida|subir|subirALaNube": "AUTOPRUEBAS. Las ocho filas de la matriz de la puerta de subida, todas con dependencias inyectadas: ninguna escribe en la nube.",
+    "saveRows|anunciar|showSaveIndicator": "Los dos avisos --exito y fallo-- del guardado de activos, y SOLO cuando quien llama pide `anunciar:true`. Los caminos que forman parte de un guardado mayor pasan `false`.",
+    "schedulePush|subir|subirALaNube": "El unico sitio del producto que LLAMA a la funcion de subida: el lanzador aplazado."
+  },
+  "semantica": {
+    "ambito": "bloque <script> inline de index.html",
+    "ambito_funciones": "todas las de primer nivel, mas el codigo suelto; SIN cortes",
+    "direccion": {
+      "anunciar": "ambas",
+      "anunciar-referencia": "dominacion",
+      "subir": "dominacion",
+      "subir-referencia": "dominacion"
+    },
+    "huella": "multiconjunto {funcion|sumidero|receptor}: cuantos, sin numero de linea",
+    "receptores": {
+      "schedulePush": "subir",
+      "showSaveIndicator": "anunciar",
+      "subirALaNube": "subir"
+    },
+    "version": 1
+  },
+  "sumideros": {
+    "bancoDeSumideros|subir-referencia|schedulePush": 3,
+    "depsDeSesion|subir-referencia|subirALaNube": 1,
+    "guardarTodo|anunciar|showSaveIndicator": 1,
+    "guardarTodo|subir|schedulePush": 1,
+    "idsDeLosPintores|anunciar-referencia|showSaveIndicator": 1,
+    "onUseTargetsToggle|anunciar|showSaveIndicator": 1,
+    "onUseTargetsToggle|subir|schedulePush": 1,
+    "persistOps|anunciar|showSaveIndicator": 1,
+    "pruebasCableadoPorDefecto|subir-referencia|subirALaNube": 1,
+    "pruebasDuracionDelAviso|anunciar|showSaveIndicator": 2,
+    "pruebasFalloDeEscritura|anunciar-referencia|showSaveIndicator": 3,
+    "pruebasFalloDeEscritura|subir-referencia|schedulePush": 3,
+    "pruebasPintorDelGuardado|anunciar|showSaveIndicator": 2,
+    "pruebasTuberiaDeSubida|subir|subirALaNube": 8,
+    "saveRows|anunciar|showSaveIndicator": 2,
+    "schedulePush|subir|subirALaNube": 1
+  }
+}

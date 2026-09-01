@@ -82,7 +82,17 @@ if (__perdidas.length) {
     # lo es, y partir el veredicto en dos sitios seria justo la puerta por donde
     # entra un falso verde. Se espera de verdad; una promesa que se rechaza o
     # que no resuelve una lista da rc=2, no "0 hallazgos".
-    runner = harness + siembra + "\n" + js + """
+    # Una promesa sin manejar mataba el proceso con rc=1 y SIN UNA PALABRA: un
+    # rojo sin nombre, que manda a mirar al sitio equivocado. Se descubrio
+    # saboteando el `await` que cablea las suites asincronas: el crash tapaba el
+    # mensaje que ese sabotaje existe para producir. Falla CERRADO con nombre.
+    guardia = """
+process.on('unhandledRejection', (e) => {
+  console.error('INSTRUMENTO ROTO: una promesa quedo sin manejar: ' + (e && e.stack || e));
+  process.exit(2);
+});
+"""
+    runner = guardia + harness + siembra + "\n" + js + """
 if (typeof runSelfTests !== 'function') {
   console.error('INSTRUMENTO ROTO: runSelfTests no quedo definida tras cargar el script');
   process.exit(2);
@@ -98,7 +108,16 @@ if (typeof runSelfTests !== 'function') {
     console.error('INSTRUMENTO ROTO: runSelfTests no devolvio la lista de fallos');
     process.exit(2);
   }
-  if (fails.length) process.exit(1);
+  if (fails.length) {
+    // ESCRITURA SINCRONA. `console.error` sobre una tuberia es asincrono, y
+    // `process.exit` no la vacia: con suites asincronas aun vivas, el veredicto
+    // se PERDIA y la puerta imprimia un rojo SIN UNA PALABRA. Un rojo sin
+    // nombre manda a mirar al sitio equivocado. Se descubrio saboteando el
+    // `await` que cablea las suites, no razonandolo.
+    require('fs').writeSync(2, '\\u274c ' + fails.length +
+                            ' autopruebas fallidas:\\n' + fails.join('\\n') + '\\n');
+    process.exit(1);
+  }
 """ + comprobacion + """
   process.exit(0);
 })();

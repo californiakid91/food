@@ -6,6 +6,18 @@
 >
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
+**Ciclo 01-07 (2026-09-01): la bajada de la nube y los sumideros del daño.** Cierra **D-45,
+D-46, D-27, D-29 y D-30**; abre **D-48 a D-53**. **CINCO brazos adversarios disjuntos demolieron el
+ciclo ya escrito y con la puerta en verde**, y ninguno vio lo mismo que otro: 13 mutantes que
+rompen comportamiento real dejaban las seis piezas de la puerta en `rc=0`. El peor —y el que da
+nombre a **D-49**— es estructural: **hacer inyectable una función crea POR CONSTRUCCIÓN un cableado
+por defecto que corre en el navegador y que ninguna prueba toca**, porque todas inyectan el suyo;
+cambiar `ops: () => ops` por `ops: () => []` reabría **D-45 entera en producción** con la puerta
+verde. El segundo peor: el arreglo de D-45 **no habría protegido a nadie el día del despliegue**,
+porque todos los dispositivos ya sincronizados tienen META sin marca de tiempo (D-30) y «lo
+desconocido vale cero» hace ganar a cualquier documento — control en verde y daño vivo (§5.10).
+Acta: `.paul/phases/01-guardado-fiable/01-07-SUMMARY.md`.
+
 **CUARTA TRANSICIÓN de la Fase 1 (2026-09-01): la fase NO cierra, abre el ciclo 01-07.** Cuatro
 brazos adversarios disjuntos; por primera vez uno —el del aparato de medición— **no demolió su
 frase**, y por primera vez **ninguna cifra publicada era falsa**. Pero la META sigue sin cumplirse:
@@ -55,45 +67,68 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 
 ## Abiertas — riesgo de pérdida de datos
 
-### D-45 · Al arrancar, una nube MÁS VIEJA empobrece el libro y la pantalla queda en VERDE
-- **Qué es:** `pullFromFirestore` decide si el documento de la nube gana con
-  `if (!hasRealLocalData() || (data.savedAt || 0) >= localSaved)`. `hasRealLocalData()` mira **sólo
-  los activos** (`rows`) de cada cartera; **nunca el libro de operaciones**. Un operador que lo
-  tenga todo vendido —activos vacíos, libro fiscal rico, que es cuando el libro más importa— cae en
-  la primera rama, la comparación de fechas se desactiva y **cualquier** documento de la nube gana,
-  por viejo que sea. `vaciariaElLibro` sólo bloquea el caso vacío, así que una nube rancia con una
-  operación sustituye a un libro local de tres. Y al terminar, el punto de sync se pinta en VERDE.
-- **Cómo se midió:** brazo de caminos de pérdida de la CUARTA transición (2026-09-01), reproducido
-  sobre copia aislada: `ANTES ops 3 / DESPUÉS ops 1`, con la nube declarando un `savedAt` de 1000
-  frente a un local de 2000000000000. La puerta entera sobre esa copia: **`rc=0`, VERDE**.
-- **Por qué es Fase 1 y no Fase 3:** el ROADMAP lista este arreglo en el alcance de la Fase 3, pero
-  el daño es **pérdida de libro en el ARRANQUE con estado tranquilizador**, que es la meta literal
-  de la Fase 1, y **no exige fusionar**: basta que el predicado cuente el libro. Es además la misma
-  asimetría que el 01-04 cerró en el otro lado (§5.16): el juez de subida `decidirSubida` ya mira
-  las dos cosas —`tieneOperaciones` **y** `hayActivosLocales`—; el camino de bajada se quedó con el
-  predicado viejo. **La asimetría ES el defecto.** Fusionar `ops` por `id` sigue siendo Fase 3.
-- **Estado:** abierta. **Abre el ciclo 01-07.**
-- **Qué la reabre:** nada la cierra sola. Se cierra cuando las dos direcciones usen el MISMO juez
-  para «¿hay datos locales que proteger?», con un control que ejerza el desempate de
-  `pullFromFirestore` y muerda si vuelve a mirar sólo los activos.
+### D-48 · Cinco llamantes de `saveMeta` siguen ignorando su booleano
+- **Qué es:** el ciclo 01-07 cerró **D-29** por el sumidero del daño —subir a la nube tras un
+  guardado local fallido— y por el anuncio en verde. Quedan **cinco** llamantes que ignoran el
+  booleano de `saveMeta` y que **ni suben ni anuncian**: `createDefaultPortfolios`,
+  `switchPortfolio`, `addPortfolio`, `deletePortfolio` y `renamePortfolio`. Su daño es OTRO y por
+  eso tienen ficha propia en vez de dejar D-29 medio abierta: **un cambio de la lista de carteras
+  que no se pudo escribir se ve en pantalla y no está en el disco**, sin una palabra.
+  **El peor con diferencia es `deletePortfolio`**: hace `localStorage.removeItem(rowsKey(id))`
+  ANTES de `saveMeta()`, así que si la escritura falla los activos ya están borrados y la cartera
+  sigue listada — apuntando a datos que ya no existen.
+- **Cómo se midió:** brazo de alcance del 01-07 (2026-09-01), `grep -n "saveMeta("` sobre el árbol
+  del ciclo: siete llamantes de producción, dos comprueban el booleano (`guardarTodo`,
+  `onUseTargetsToggle`) y cinco no. Ninguno de los cinco llama a `schedulePush`, verificado por el
+  censo de `tools/sumideros.py`.
+- **Estado:** abierta. **El plan del 01-07 la declaró fuera de alcance por escrito**; esta ficha es
+  el cumplimiento de esa promesa, en el mismo commit.
+- **Qué la reabre:** nada la cierra sola. Se cierra cuando los cinco decidan qué anunciar con el
+  resultado, y `deletePortfolio` además invierta el orden (guardar la lista ANTES de borrar los
+  activos) o repare si falla.
 
-### D-46 · El cruce «sólo falla el guardado de la lista de carteras» no tiene oráculo
-- **Qué es:** `guardarTodo` sólo canta victoria si las tres escrituras van bien
-  (`todoBien = okRows && okOps && okMeta`). Quitar `okMeta` de esa conjunción —o sea, dejar de
-  mirar si la lista de carteras se guardó— **deja la puerta entera en `rc=0` y VERDE**. Si
-  `localStorage.setItem(META_KEY, …)` falla por cuota, el operador ve «Guardado ✓» en verde y
-  además se sube a la nube.
-- **Cómo se midió:** brazo del oráculo de la CUARTA transición (2026-09-01), **re-verificado a
-  mano** sobre copia aislada con unicidad de ancla afirmada antes de mutar y estímulo demostrado en
-  el fichero: `bash tools/verify.sh` → `rc=0`, diez pasos, «VERDE — todo ejercido y en verde».
-  Escapa porque `pruebasFalloDeEscritura` inyecta su fallo parcial siempre en `saveOpsAll`, nunca
-  en `saveMeta` a solas: los tres sumandos tienen control por separado y **el CRUCE no lo mide
-  nadie** (`CLAUDE.md` §5.5).
-- **Estado:** abierta. **Abre el ciclo 01-07**, junto con **D-27** y **D-29**, que son la misma
-  familia: la invariante «un fallo de guardado no se anuncia como éxito y no se sincroniza» existe
-  en un sitio y no en los demás.
-- **Qué la reabre:** nada la cierra sola. Se cierra con un control que haga fallar **únicamente**
-  `saveMeta` y exija `guardarTodo() === false`, aviso en rojo y cero subidas.
+### D-49 · El censo de sumideros y el de escrituras a la nube son ESTÁTICOS y por NOMBRE
+- **Qué es:** `tools/sumideros.py` cuenta llamadas (`f(`, `f?.(`) y referencias por nombre. Una
+  llamada indirecta —`const g = schedulePush; g();`, `schedulePush.call(null)`, o el nombre llegado
+  por un parámetro— le es invisible. `tools/cloudwrites.py` tiene el gemelo: no ve el alias
+  `const r = d.ref; r.update(...)`. Cerrar la clase exigiría análisis de flujo, que este proyecto
+  no tiene.
+- **Cómo se midió:** brazo del aparato de medición del 01-07 (2026-09-01), reproducido ejecutando:
+  `schedulePush?.()` sembrado en `isMobile` daba `rc=0` antes del arreglo de este ciclo (ahora
+  muerde, con caso propio en el banco); `schedulePush.call(null)` sigue dando `rc=0`.
+- **Estado:** abierta como **ceguera declarada**, no como falso verde: está escrita en la cabecera
+  de los dos instrumentos. Lo que este ciclo SÍ cerró es la llamada opcional y la referencia como
+  valor, que no estaban declaradas y por las que se escapaba el sumidero real del arranque.
+- **Qué la reabre:** que aparezca en el código una llamada indirecta a un sumidero, o un alias de
+  la referencia de Firestore. Entonces el censo mide una ficción.
+
+### D-50 · Tras desplegar el 01-07, un dispositivo ya sincronizado no acepta la nube hasta guardar una vez
+- **Qué es:** el juez de bajada se niega a aplicar cuando **no hay marca de tiempo** en alguno de
+  los dos lados y hay datos locales que proteger (rama `reloj-desconocido`). Es lo que impide que
+  el arreglo de D-45 sea ficticio. Pero **todos los dispositivos ya sincronizados llegan al
+  despliegue con META sin marca**, porque hasta este ciclo `applySyncPayload` la borraba (D-30):
+  en su primer arranque quedan en NARANJA («cambios sin subir») y **no reciben datos de la nube
+  hasta que el operador guarde algo en local una vez**, que es lo que vuelve a poner el reloj en
+  hora. Los datos locales están intactos; lo que no llega es lo de fuera.
+- **Cómo se midió:** brazo de correctness del 01-07 (2026-09-01), reproducido ejecutando sobre
+  copia aislada: con META sin `savedAt`, un documento de la nube con `savedAt: 500` y un libro
+  local de 2 operaciones, el veredicto es `reloj-desconocido` y el libro se conserva.
+- **Estado:** abierta como **coste declarado**, no como defecto. Se prefiere quedarse quieto y
+  naranja a perder libro en verde. El texto del naranja dice «este dispositivo no tiene operaciones
+  y no se pisa el libro de la nube», que en este caso **no describe bien la causa**.
+- **Qué la reabre:** nada; se cierra sola en cuanto el operador guarde algo. Lo que sí queda
+  pendiente es el TEXTO del aviso, que miente sobre el motivo.
+
+### D-51 · El desempate es «gana el último reloj», y los relojes de dos dispositivos no coinciden
+- **Qué es:** al conservar la marca del documento aplicado (D-30 cerrada), un dispositivo adopta el
+  reloj del que escribió. Si ese reloj iba adelantado, una edición legítima posterior hecha en un
+  dispositivo con el reloj en hora parece MÁS VIEJA y se rechaza. Antes del ciclo esto «funcionaba»
+  sólo porque el bug de D-30 hacía que se aplicara todo.
+- **Cómo se midió:** brazo de correctness del 01-07 (2026-09-01), ejecutado: local `savedAt=2000`
+  (adoptado), documento posterior con `savedAt=1500` → `aplicar: false`.
+- **Estado:** abierta. Es inherente a resolver por reloj de pared y **la meta declarada de la Fase
+  3** es sustituirlo por fusión por `id` y marca por sección.
+- **Qué la reabre:** nada; va con la Fase 3.
 
 ### D-47 · No hay volcado al cerrar la pestaña: una ventana de 600 ms sin guardar
 - **Qué es:** apuntar una operación llama a `schedSave()`, que aplaza el guardado 600 ms. **No
@@ -502,23 +537,6 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   quita el `if (opsIlegible)` de `saveOpsAll` para «desatascarlo», el sabotaje «saveOpsAll deja de
   consultar el cerrojo» se pone rojo: esta deuda se paga con interfaz, no aflojando el cerrojo.
 
-### D-27 · `persistOps` canta «Guardado ✓» antes de saber si el libro entró
-- **Qué es:** `persistOps` —el camino de borrar una operación y el de confirmar una importación—
-  llama a `saveOpsAll(ops)` **ignorando su booleano**, luego a `saveRows()`, que pinta «Guardado ✓»
-  en VERDE por su cuenta. Con el cerrojo puesto (D-23) o el almacenamiento lleno, la pantalla dice
-  que se guardó mientras el libro NO se guardó. El `schedSave()` posterior lo corrige a rojo ~600 ms
-  después. Es exactamente la mentira que el objetivo OBJ-2 de la fase prohibía, en un llamante que
-  ninguna prueba ejerce.
-- **Cómo se midió:** brazo de radio de impacto de la segunda transición (2026-08-30).
-  `grep -n "persistOps(" index.html` da dos llamantes de producción y **cero** en la zona de
-  autopruebas. Las pruebas de fallo de escritura ejercen `saveRows` y `guardarTodo` por separado,
-  nunca esta secuencia — el CRUCE no lo mide nadie (`CLAUDE.md` §5.5).
-- **Estado:** abierta. Severidad menor (se autocorrige), pero matiza **D-23**: su ficha dice que el
-  único aviso es un `console.error`; en realidad al editar sí sale el rojo, **precedido de un verde
-  mentiroso**. La experiencia no es muda, es contradictoria.
-- **Qué la reabre:** nada la cierra sola. Se cierra cuando `persistOps` decida el aviso al final,
-  como hace `guardarTodo`, y una autoprueba ejerza el cruce.
-
 ### D-28 · La migración del formato antiguo se declara exitosa aunque su escritura falle
 - **Qué es:** la Fase 1 cambió el contrato de `saveOpsAll`, que ahora devuelve `false` si no pudo
   escribir. `migrateOpsToGlobal` **ignora ese booleano** y devuelve `migrated: true` igualmente. Si
@@ -535,34 +553,6 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   contrato roto.
 - **Qué la reabre:** nada la cierra sola. El arreglo es propagar el booleano al resultado; hace
   falta además una autoprueba que falle la escritura y exija `migrated: false`.
-
-### D-29 · La invariante «si el guardado local falló, no se sube» sólo la respeta `guardarTodo`
-- **Qué es:** la fase estableció que un guardado local fallido no debe sincronizarse: subir lo que
-  hay en memoria machacaría la copia buena de la nube. Esa regla vive **sólo dentro de
-  `guardarTodo`**. Seis llamantes de `saveMeta` ignoran su booleano, y uno de ellos
-  (`onUseTargetsToggle`) hace `saveMeta(); schedulePush();` seguido: con `saveMeta` fallido, sube
-  igualmente. La asimetría ES el defecto (`CLAUDE.md` §5.16).
-- **Cómo se midió:** brazos de radio de impacto y de objetivos de la segunda transición
-  (2026-08-30). `grep -n "saveMeta()" index.html` da el llamante de `guardarTodo` —que sí lo
-  comprueba— y seis que lo ignoran.
-- **Estado:** abierta. **No es una regresión**: esos llamantes ya empujaban así antes de la fase.
-  Lo que la fase hizo fue crear la invariante y dejarla asimétrica.
-- **Qué la reabre:** nada la cierra sola. Se cierra cuando la decisión de subir dependa del
-  resultado del guardado en TODOS los caminos, no sólo en uno.
-
-### D-30 · `applySyncPayload` escribe META sin `savedAt`
-- **Qué es:** tras aplicar un documento de la nube, `applySyncPayload` reescribe META **sin el
-  campo `savedAt`**. La siguiente lectura calcula `localSaved = 0`, con lo que cualquier snapshot
-  posterior se considera más nuevo y se vuelve a aplicar. Amplifica **D-01** y **D-24**.
-- **Cómo se midió:** brazo de objetivos de la segunda transición (2026-08-30), leyendo el objeto
-  que se serializa al final de `applySyncPayload` y comparándolo con el que escribe `saveMeta`,
-  que sí lleva `savedAt`. Otra asimetría entre dos escrituras de la misma clave.
-- **Estado:** abierta. El ROADMAP ya lo tenía en el alcance de la **Fase 3** («`applySyncPayload`
-  debe guardar META con su `savedAt`»); esta ficha lo saca del roadmap y lo pone en la lista viva,
-  que es lo que se lee al arrancar.
-- **Qué la reabre:** nada; va con la Fase 3.
-
----
 
 ## Abiertas — corrección fiscal
 
@@ -690,6 +680,36 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 
 ## Abiertas — limpieza
 
+### D-52 · La DERIVA (rc=3) sólo ve el diccionario de semántica, no el código que mide
+- **Qué es:** los cuatro trinquetes (`funcsize`, `emptycatch`, `avisos`, `sumideros`) declaran
+  DERIVA comparando un diccionario `SEMANTICA` sellado. Pero la regla de medida real vive también
+  en el CÓDIGO: la expresión regular del censo, el enmascarado, el detector de declaraciones.
+  Cambiar cualquiera de ésos cambia lo que se mide **sin que salga rc=3**: sale rotulado como
+  hallazgo o como mejora, y el operador resella.
+- **Cómo se midió:** brazo del aparato de medición del 01-07 (2026-09-01), leyendo los cuatro
+  instrumentos. Ejemplo vivo del propio ciclo: al ampliar el censo de sumideros para ver
+  `f?.()` y las referencias, la foto cambió de 10 a 16 claves y el instrumento lo llamó
+  «sumideros NUEVOS», no deriva.
+- **Estado:** abierta. Afecta a los cuatro por igual; **no es un defecto del 01-07**, es la forma
+  del patrón. Se ficha porque la cabecera de `sumideros.py` vende «la dirección viaja DENTRO de la
+  semántica sellada» como si el diccionario fuera la regla entera, y no lo es.
+- **Qué la reabre:** nada la cierra sola. El arreglo natural es meter en la semántica una huella
+  del propio código de medida (por ejemplo, de las expresiones regulares).
+
+### D-53 · El veredicto de `verify.sh` deja que un rc=2 posterior pise un rc=1 anterior
+- **Qué es:** el bloque de veredicto imprime DERIVA, luego ROTO, luego HALLAZGOS. Si un paso da un
+  hallazgo real (rc=1) y **otro posterior** da instrumento roto (rc=2) —por ejemplo `hookcheck` en
+  una máquina sin el enganche, o `ruff` ausente—, el veredicto sale «DEGRADADO (rc=2)» **sin
+  nombrar el hallazgo**, y manda a mirar las herramientas en vez del código. Es la misma trampa que
+  §4.3 dice arreglada, arreglada sólo para el banco de sabotaje.
+- **Cómo se midió:** brazo de alcance del 01-07 (2026-09-01), observado ejecutando la puerta sobre
+  una copia sin `.git`: FALLO del banco + ROTO de hookcheck → rc=2 sin mencionar el hallazgo.
+- **Estado:** abierta. **Preexistente**, viene del 01-05 (D-41); el 01-07 no la introduce ni la
+  agrava.
+- **Qué la reabre:** nada la cierra sola. Se cierra decidiendo el orden a propósito: el mensaje del
+  hallazgo tiene que aparecer aunque el rc final sea 2.
+
+
 ### D-22 · El instrumento de radio de impacto no ve el producto
 - **Qué es:** el brazo G7 de la transición de fase es `code-review-graph`, que construye un grafo
   del código y calcula el alcance de un cambio. **No parsea el JavaScript inline de un `.html`**,
@@ -729,6 +749,103 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Cómo se midió:** confirmado en la auditoría del 2026-08-29.
 - **Estado:** Fase 6, plan 06-04. Incluye borrar también el Worker en el panel de Cloudflare.
 - **Qué la reabre:** nada; está en cola.
+
+---
+
+## Cerradas en el ciclo 01-07 (2026-09-01)
+
+> Las cinco se cerraron **midiendo contra el código**, y cada arreglo tiene su control positivo en
+> `tools/sabotage.py`: revertirlo pone la puerta en rojo con un mensaje propio. Las transcripciones
+> literales de rc y mensaje están en el acta del ciclo.
+
+### D-45 · Al arrancar, una nube MÁS VIEJA empobrecía el libro y la pantalla quedaba en VERDE — CERRADA 2026-09-01
+- **Qué era:** `pullFromFirestore` decidía el desempate con `hasRealLocalData()`, que mira **sólo
+  los activos**. Un operador que lo tuviera todo vendido —activos vacíos, libro fiscal rico— caía
+  en la primera rama y **cualquier** documento de la nube ganaba, por viejo que fuera. Y al
+  terminar, el punto de sync se pintaba en VERDE.
+- **Cómo se cerró, por la CLASE y no por el caso:** un juez PURO `decidirBajada`, consultado por
+  los **dos** caminos de bajada —el arranque y la escucha en vivo, que tenía su propio desempate
+  escrito aparte—. «Hay datos que proteger» son DOS primitivos que se suman: `tieneOperaciones`
+  (el juez único del 01-02, que es lo que faltaba) y los activos (lo que se miraba antes). Sumarlos
+  en vez de sustituir evita abrir la mitad simétrica (§5.16). `hasRealLocalData` **conserva** su
+  semántica, porque alimenta además la guarda de activos de `decidirSubida`.
+- **Y hubo que arreglar tres cosas más para que el cierre no fuera FICTICIO:**
+  1. **El reloj** (D-30): sin conservar la marca del documento aplicado, `localSaved` volvía a 0 y
+     todo documento parecía más nuevo. La rama que cierra D-45 no habría disparado NUNCA.
+  2. **El reloj DESCONOCIDO**: el día del despliegue, todos los dispositivos ya sincronizados
+     tienen META sin marca. Sin la rama `reloj-desconocido`, el arreglo no protegía a nadie en su
+     primer arranque — control verde y daño vivo (§5.10). Coste declarado en **D-50**.
+  3. **La pantalla**: la bajada devolvía el mismo valor aplicara o rechazara, y el arranque lo
+     traducía a verde. Ahora devuelve un VEREDICTO y el arranque deriva de él lo que pinta. La
+     escucha en vivo también pinta el aviso de su veredicto: los dos caminos tenían que coincidir
+     TAMBIÉN en lo que el operador mira, y sólo uno pintaba.
+- **Controles positivos:** ocho, uno por pieza. Volver el desempate a «sólo activos», a «sólo
+  libro», quitar la rama del reloj desconocido, quitar el `savedAt` al aplicar, reponer el verde
+  incondicional del arranque, dejar la escucha en vivo sin consultar al juez, o dejarla rechazando
+  sin pintar: **todos rc=1**.
+- **Estado:** **CERRADA**.
+- **Qué la reabre:** que aparezca un tercer camino por el que la nube entre sin pasar por
+  `decidirBajada`, o que la Fase 3 reescriba la fusión sin traerse este juez.
+
+### D-46 · El cruce «sólo falla el guardado de la lista de carteras» no tenía oráculo — CERRADA 2026-09-01
+- **Qué era:** quitar `okMeta` del veredicto de `guardarTodo` dejaba **la puerta entera en `rc=0` y
+  VERDE**. Con la cuota llena, el operador veía «Guardado ✓» en verde Y además se subía a la nube.
+- **Cómo se cerró:** `pruebasCruceSoloMeta` hace fallar **únicamente** la escritura de la lista de
+  carteras —no el libro, no los activos— y exige `guardarTodo() === false`, el aviso ROJO **por su
+  valor** (`var(--red)`) y **cero** subidas, espiadas reasignando el lanzador (§5.9). El
+  almacenamiento sustituido se restaura en `try/finally`.
+- **Control positivo:** `const todoBien = okRows && okOps;` → **rc=1**, «AC-6 con SÓLO la lista de
+  carteras rota, el guardado dice que no».
+- **Estado:** **CERRADA**.
+- **Qué la reabre:** que el veredicto del guardado vuelva a tener sumandos sin fila propia.
+
+### D-27 · `persistOps` cantaba «Guardado ✓» antes de saber si el libro entró — CERRADA 2026-09-01
+- **Qué era:** `persistOps` —borrar una operación y confirmar una importación— tiraba el booleano
+  de `saveOpsAll` y `saveRows()` pintaba «Guardado ✓» en VERDE por su cuenta.
+- **Cómo se cerró, por la CLASE:** el mismo reparto que `guardarTodo` (los activos se guardan sin
+  anunciar y el aviso se decide al final), **y además** `persistOps` devuelve su veredicto, porque
+  el panel de importación tenía su PROPIO anuncio de éxito —mucho más grande que el indicador— que
+  se pintaba en verde pasara lo que pasara, después de haber vaciado la importación pendiente: el
+  operador no podía reintentar y al recargar las operaciones ya no estaban. Cerrar sólo el
+  indicador habría sido el caso disfrazado de clase (§5.10). Lo destapó la revisión del diff.
+- **Controles positivos:** dar por bueno el guardado del libro → **rc=1**, «AC-7 un libro que no se
+  guarda NO se anuncia en verde»; devolver `true` fijo → **rc=1**, «AC-7 y devuelve false para que
+  el panel de importación no mienta». Con control de VACUIDAD: sin fallo sembrado, sigue verde.
+- **Estado:** **CERRADA**.
+- **Qué la reabre:** que aparezca un tercer anuncio de éxito en ese camino. Lo vigila
+  `tools/sumideros.py`.
+
+### D-29 · La invariante «si el guardado local falló, no se sube» sólo la respetaba `guardarTodo` — CERRADA 2026-09-01
+- **Qué era:** `onUseTargetsToggle` hacía `saveMeta(); schedulePush();` seguido: con `saveMeta`
+  fallido, subía igualmente y machacaba la copia buena de la nube.
+- **Cómo se cerró, por la CLASE:** la subida está condicionada al resultado, y el conjunto de
+  salidas queda **sellado** en `.paul/baseline-sumideros.json`: hoy hay exactamente dos llamantes
+  de producción del lanzador de subidas, los dos gobernados, más la referencia del arranque,
+  nombrada. Un sumidero nuevo pone la puerta en rojo.
+- **Control positivo:** `if (saveMeta() || true)` → **rc=1**, «AC-7 el interruptor NO sube si la
+  lista de carteras no se guardó».
+- **Estado:** **CERRADA en su daño**: no queda ningún camino que suba tras un guardado local
+  fallido. Los **cinco** llamantes de `saveMeta` que siguen ignorando su booleano **no suben ni
+  anuncian**, así que su daño es otro y tiene ficha propia: **D-48**. Se dice aquí para que nadie
+  lea esta ficha como «ya no queda nada».
+- **Qué la reabre:** un sumidero de subida nuevo sin gobernar. Lo vigila `tools/sumideros.py`.
+
+### D-30 · `applySyncPayload` escribía META sin `savedAt` — CERRADA 2026-09-01
+- **Qué era:** tras aplicar un documento de la nube, META se reescribía **sin el campo `savedAt`**.
+  La siguiente lectura calculaba `localSaved = 0` y cualquier documento posterior se consideraba
+  más nuevo.
+- **Cómo se cerró, y por qué CRUZANDO un boundary:** su ficha decía «va con la Fase 3», y los
+  boundaries del plan dicen que la resolución por `savedAt` es Fase 3. **Se cruza y se dice en voz
+  alta**: sin esto, el cierre de D-45 habría sido ficticio —pasaría su control con el daño vivo—.
+  Lo que NO se toca es la **semántica de fusión** (unir operaciones por `id`, marca por sección),
+  que sigue entera en la Fase 3. Se conserva la marca del documento APLICADO; poner la hora actual
+  marcaría lo local como más nuevo y bloquearía sincronizaciones legítimas.
+- **Controles positivos:** quitar el `savedAt` → **rc=1**, «AC-3 la marca de tiempo del documento
+  SOBREVIVE al aplicar»; usar `|| Date.now()` en vez de `|| 0` → **rc=1**, «AC-3 un documento SIN
+  marca deja el reloj local en cero».
+- **Estado:** **CERRADA**. Su consecuencia sobre dispositivos ya sincronizados está en **D-50**, y
+  el sesgo de relojes entre dispositivos en **D-51**.
+- **Qué la reabre:** que la Fase 3 cambie quién escribe META al aplicar.
 
 ---
 
