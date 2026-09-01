@@ -10,67 +10,57 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 Milestone: v0.1 Datos fiables (v0.1.0)
-Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. Su tercera transición no la cerró, y la
-cuarta **aún no se ha hecho**.
-Planes: 01-01 a 01-06 **CERRADOS**, el 01-06 con su loop completo (PLAN ✓ APPLY ✓ UNIFY ✓) y su
-verificación en el navegador hecha. Falta la CUARTA transición, que es quien decide si la fase
-cierra.
-Status: los TRES objetivos del ALCANCE siguen en PASS. La META —«sin que se entere nadie»— ya
-tiene oráculo: **D-38 CERRADA** por el ciclo 01-06. Abiertas D-42, D-43 y la nueva **D-44**
-(ceguera declarada del censo de avisos); D-15 y D-03 siguen marcadas A RE-MEDIR.
-Last activity: 2026-08-31 — **APPLY del ciclo 01-06**, la capa de aviso. Los pintores
-(`showSaveIndicator` y `setSyncUI`) **se ejecutan de verdad** por primera vez, sobre un DOM
-observable con reloj falso y una ventana que se retira en un `finally` idempotente; se lee su
-efecto: texto, color **por su valor**, visibilidad y duración. El campo `aviso` del juez de subida
-entra en las 84 filas de la matriz. Instrumento nuevo `tools/avisos.py`, cableado a la puerta, con
-dos redes disjuntas: por RECEPTOR y por CANAL (34 avisos sellados con su nivel y su prefijo
-literal, cada uno con su motivo).
+Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. Su CUARTA transición (2026-09-01) tampoco la
+cerró: abre el ciclo **01-07**.
+Planes: 01-01 a 01-06 **CERRADOS**, todos con su loop completo y su verificación en el navegador.
+Status: los TRES objetivos del ALCANCE siguen en PASS. La META —«sin que se entere nadie»— sigue
+sin cumplirse, por DOS defectos nuevos medidos hoy: **D-45** (al arrancar, una nube más vieja
+empobrece el libro y la pantalla queda en VERDE) y **D-46** (quitar la lista de carteras del
+veredicto de guardado deja la puerta en `rc=0`). **D-15 CERRADA** re-midiéndola. Abiertas además
+D-42, D-43, D-44 (cegueras declaradas, acotadas y re-medidas hoy) y la nueva **D-47**. **D-03**
+sigue marcada A RE-MEDIR.
+Last activity: 2026-09-01 — **CUARTA TRANSICIÓN de la Fase 1**. Cuatro brazos adversarios
+disjuntos, cada uno con su frase que demoler. Dos novedades respecto a las tres transiciones
+anteriores:
 
-**Lo importante de este ciclo: se dio por hecho una vez y estaba mal.** La puerta salió verde, el
-banco verde con 68 controles y las dos variantes idénticas — y los **TRES brazos adversarios del
-diff lo demolieron**, cada uno viendo algo que los otros dos no. Diez hallazgos, todos atendidos
-dentro del ciclo, ninguno diferido. El peor, re-verificado a mano sobre copia aislada:
+1. **Por primera vez un brazo NO demolió su frase.** El del aparato de medición intentó cinco
+   roturas concretas —que una deriva de semántica imprimiera el comando de resellado, que un delta
+   mixto dirigiera la mano al sellado, colar `VERIFY_INNER` por el enganche, que un `rc=2` tapara un
+   hallazgo `rc=1`, encontrar un script huérfano— y **ninguna cedió**. El fallo cerrado se reprodujo
+   uno a uno en los ocho instrumentos: rc=2 con nombre y remedio.
+2. **Por primera vez ninguna cifra publicada es falsa.** Las cuatro re-derivadas en fresco —74
+   controles del banco, 34 avisos censados, diez pasos de la puerta y la huella de lo desplegado—
+   dieron exactamente lo que dicen los documentos. En la tercera transición había tres falsas.
 
-> el aserto exigía que los colores de éxito y de fallo fueran **DISTINTOS**, nunca **CUÁLES**, así
-> que **intercambiarlos —el fallo de guardado pintado en VERDE— salía `rc=0` y «✅ Autopruebas
-> OK»**. El daño que da nombre a D-38, vivo dentro del ciclo escrito para matarlo (§5.8).
-
-Otros: el error de sync en naranja pasaba; un aviso de **2 ms** pasaba; el detector de cesión de
-control pasaba con el mecanismo **borrado** (§5.1); mi propia cabecera afirmaba una ficha de
-DEUDAS que no existía (§5.1 otra vez); **nueve avisos reales** del guardado por sync y del arranque
-escapaban al censo; el banco restauraba `verify.sh` en otro inodo y el intérprete seguía leyendo
-los bytes mutados mientras el hash decía «árbol limpio»; y el banco suponía `.git/hooks`, la misma
-suposición que el 01-05 ya había quitado de las otras dos herramientas (§5.16).
-Acta: `01-06-SUMMARY.md`.
-Actividad anterior: 2026-08-31 — **PLAN del ciclo 01-06**, escrito, atacado por dos brazos
-disjuntos y reescrito. El enfoque lo decidió una **dialéctica adversaria de dos posturas y dos
-rondas**, no un solo modelo: ejecutar los pintores REALES sobre un DOM observable con reloj falso,
-sin extraer funciones puras.
-Actividad anterior: 2026-08-31 — **UNIFY del ciclo 01-05**, la vara de medir (`4e81e6c`). Siete AC
-en PASS, re-medidos, puerta verde por sus dos variantes con salida idéntica. Abrió D-43.
-Actividad anterior: 2026-08-31 — **TERCERA TRANSICIÓN de la Fase 1**: cuatro brazos adversarios
-disjuntos, los cuatro demolieron su frase, y la fase NO se cerró. Acta: `01-TRANSICION-3.md`.
-Actividad anterior: 2026-08-31 — despliegue y verificación en el navegador del 01-04 (`e2e8f86`).
+Y aun así **la fase no cierra**, porque la meta se mide contra el CÓDIGO y no contra el aparato:
+`hasRealLocalData()` mira sólo los activos y nunca el libro, así que al arrancar sin activos
+cualquier nube gana por vieja que sea; y el cruce «sólo falla el guardado de la lista de carteras»
+no lo mide nadie, así que quitarlo del veredicto sale VERDE. Los dos re-verificados a mano sobre
+copia aislada.
+Acta: `01-TRANSICION-4.md`.
+Actividad anterior: 2026-08-31 — **ciclo 01-06 CERRADO**, la capa de aviso, con su loop completo y
+el navegador hecho. Cerró D-38.
+Actividad anterior: 2026-08-31 — **UNIFY del ciclo 01-05**, la vara de medir (`4e81e6c`).
+Actividad anterior: 2026-08-31 — **TERCERA TRANSICIÓN**: cuatro brazos, los cuatro demolieron su
+frase, la fase NO se cerró. Acta: `01-TRANSICION-3.md`.
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [██████████] 100% de los ciclos (6 de 6 cerrados, loops completos y navegador hecho).
-  La FASE sigue abierta: falta la CUARTA transición, que es quien decide si cierra
+- Phase: [█████████░] 6 ciclos cerrados; la CUARTA transición abre el 01-07, que es el séptimo
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ✓     [01-06 CERRADO el 2026-08-31: navegador hecho, acta cerrada, puerta
-                            re-corrida fresca en el UNIFY. Siguiente: CUARTA TRANSICIÓN de la fase]
+  ○        ○        ○     [ciclo 01-07 por planificar: lo abre la CUARTA transición del
+                            2026-09-01. Siguiente: /paul:plan 01-07]
 ```
 
-Ciclos 01-01 a 01-06: cerrados, cada uno con su acta. La
-fase NO está cerrada. Su TERCERA transición (2026-08-31) midió la meta contra el código y **volvió
-a cambiar el resultado, por tercera vez consecutiva**: la primera abrió el 01-03, la segunda
-destapó D-33 y abrió el 01-04, y ésta abre el 01-05. `PLAN == SUMMARY` habría cerrado la fase las
-tres veces.
+Ciclos 01-01 a 01-06: cerrados, cada uno con su acta. La fase NO está cerrada. Sus CUATRO
+transiciones midieron la meta contra el código y **las cuatro cambiaron el resultado**: la primera
+abrió el 01-03, la segunda destapó D-33 y abrió el 01-04, la tercera abrió el 01-05 y el 01-06, y
+la cuarta abre el 01-07. `PLAN == SUMMARY` habría cerrado la fase las cuatro veces.
 
 ## Performance Metrics
 
@@ -150,6 +140,11 @@ tres veces.
 | Los colores se afirman por su VALOR, no por «que sean distintos» | 01-06 | «Distintos» lo satisface INTERCAMBIARLOS, o sea pintar el fallo en verde: `rc=0` y «✅ Autopruebas OK». Mi oráculo heredó mi punto ciego dentro del ciclo escrito para cerrar ese agujero (§5.8) |
 | El censo entra más ancho que el alcance del plan, y se dice | 01-06 | El plan excluía los avisos que no son de guardado ni de arranque. Con ámbito plano sí entran, y se sellan con su motivo uno a uno. Recortar el ámbito para que cuadrara con el plan habría sido meterle juicio al instrumento, y un instrumento con juicio dentro se dobla |
 | Los diez hallazgos de los brazos se arreglan DENTRO del ciclo, ninguno se difiere | 01-06 | Seis eran huecos del propio aparato de medición y cuatro correctness en las herramientas. Pasar a UNIFY con uno sin atender lo habría blanqueado como «hecho» (§3.4) |
+| La CUARTA transición tampoco cierra la FASE 1: abre el ciclo 01-07 | Fase 1 transición 4 | Los tres objetivos del alcance están en PASS y el aparato de medición resistió entero, pero la META no: al arrancar sin activos, una nube más vieja empobrece el libro con la pantalla en VERDE. Ficharlo como deuda lo blanquearía como «fase hecha» (§5.10) — misma decisión que en las tres transiciones anteriores |
+| T4-1 es Fase 1 aunque el ROADMAP lo listara en la Fase 3 | Fase 1 transición 4 | El ROADMAP pone «`hasRealLocalData()` debe mirar `ops`» en el alcance de la Fase 3, pero el daño es pérdida de libro en el ARRANQUE con estado tranquilizador —la meta literal de la Fase 1— y **no exige fusionar**: basta que el predicado cuente el libro. Es la misma asimetría que el 01-04 cerró en el otro lado (§5.16). La fusión por `id` sí se queda en la Fase 3 |
+| D-15 se CIERRA re-midiéndola, no heredando el acta del 01-04 | Fase 1 transición 4 | Su ficha se contradecía a sí misma desde la tercera transición. Se volvió a mutar `subirALaNube` para ignorar el veredicto del juez: `rc=1`. El 01-04 la había cerrado sin que nadie lo anotara. Una medición commiteada no se hereda (§7) |
+| D-27, D-29 y D-46 van JUNTAS al 01-07: son la misma familia | Fase 1 transición 4 | La invariante «un fallo de guardado no se anuncia como éxito y no se sincroniza» existe dentro de `guardarTodo` y no en los demás caminos. Arreglar sólo el cruce de META repetiría el defecto por los otros seis llamantes: se cierra la CLASE (§5.15) |
+| La prohibición a los brazos se escribe por lo que EJECUTAN, no por lo que editan | Fase 1 transición 4 | Un brazo corrió el banco de sabotaje sobre el árbol real para re-derivar una cifra; el banco muta `index.html` en vivo, y al detenerlo lo dejó sucio. No desobedeció ni una palabra. Regla nueva en `CLAUDE.md` §3.4: todo brazo trabaja sobre COPIA y sobre el árbol real sólo LEE |
 | Los hallazgos de los brazos se re-verifican a mano antes de aceptarlos | Fase 1 transición 3 | Un brazo puede inventar agujeros (§5.4). Los cuatro decisivos se reprodujeron con comando propio sobre copias aisladas; el resto se marca explícitamente como no re-verificado |
 
 ### Deferred Issues
@@ -172,9 +167,10 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 | ~~**D-38 · la capa de AVISO no tiene oráculo**~~ | **RESUELTA** en el ciclo 01-06 (2026-08-31) | Cerrada por la CLASE: los dos pintores se EJECUTAN, color por su valor, visibilidad y duración; el `aviso` del juez en las 84 filas; `tools/avisos.py` cableado a la puerta con dos redes disjuntas. Acta: `01-06-SUMMARY.md` |
 | **D-44 · el censo de avisos es ESTÁTICO y exime `runSelfTests` a mano** | Ceguera **declarada**, no un falso verde: presencia ≠ precedencia, la red por receptor sólo ve literales, y hay un corte escrito a mano | Ficha completa en `.paul/DEUDAS.md`. Se reabre si aparece un `getElementById` calculado sobre un elemento de aviso, un canal de aviso nuevo, o **un segundo corte** |
 | ~~**El ciclo 01-06 no se ha visto en un NAVEGADOR**~~ | **RESUELTO** el 2026-08-31: desplegado (`7b6115a..685b44b`) y mirado en la app real | Acta: `01-06-VERIFICACION-NAVEGADOR.md`. Cuatro puntos en PASS, incluido **que guardar sigue funcionando después de las autopruebas**. Queda sin reportar el estado del indicador de sync |
-| **D-39 · los trinquetes fallan ABIERTO con traceback** | Un instrumento roto sale rotulado como «el código ha engordado» y manda a mirar el sitio equivocado (§4.3) | Ciclo 01-05: validar tipos en `cargar_baseline` y envolver la comparación para dar rc=2 con nombre |
-| **D-40 · `VERIFY_INNER=1` deja la puerta en rc=0 sin banco** | El enganche hereda el entorno: esa variable exportada deja pasar todos los push con el banco apagado | Ciclo 01-05: rc≠0 en esa variante, o el enganche limpia la variable |
-| **D-41 · nada vigila el enganche `pre-push`** | En una máquina nueva la variante automática no existe y nada se pone rojo | Ciclo 01-05: un paso que compare el instalado con su instalador |
+| **D-45 · al arrancar, una nube MÁS VIEJA empobrece el libro y la pantalla queda en VERDE** | **Abre el ciclo 01-07.** Es la meta literal de la fase, viva: pérdida de libro en el arranque con estado tranquilizador. La puerta entera sale `rc=0` sobre el código con el defecto | Ciclo 01-07: un solo juez para las dos direcciones de «¿hay datos locales que proteger?», con oráculo que ejerza el desempate de `pullFromFirestore` |
+| **D-46 · el cruce «sólo falla el guardado de la lista de carteras» no tiene oráculo** | **Abre el ciclo 01-07.** Quitar `okMeta` del veredicto deja la puerta en `rc=0` y VERDE; con la cuota llena, «Guardado ✓» en verde Y subida a la nube | Ciclo 01-07: un control que falle **sólo** `saveMeta` y exija `false`, rojo y cero subidas. Junto con D-27 y D-29, que son la misma familia |
+| **D-47 · sin volcado al cerrar la pestaña: ventana de 600 ms** | Pérdida sin fallo declarado; **no abre ciclo por sí sola** | Se decide aparte. El arreglo natural es volcar en `pagehide` |
+| ~~**D-15 · la guarda de subida comprobada por presencia, no por precedencia**~~ | **CERRADA** el 2026-09-01, re-midiéndola | Ignorar el veredicto del juez en `subirALaNube` da `rc=1`. La cerró el 01-04 sin anotarlo |
 | G7 (radio de impacto) no ve `index.html` | La transición de fase no tiene instrumento propio; hoy se hace a mano | D-22. Se cierra cuando el grafo indexe el `<script>`, o cuando el sustituto sea un script del repo cableado a la puerta |
 
 ## Verificación manual de la Fase 1 — app desplegada, 2026-08-30
@@ -283,23 +279,30 @@ Permanentes del proyecto:
 
 ## Session Continuity
 
-Last session: 2026-08-31
-Stopped at: **CICLO 01-06 CERRADO — loop completo.** Verificado en el navegador y UNIFY hecho, con
-la puerta re-corrida FRESCA sobre el árbol commiteado
-(`2b3d9973de899e7f014e0e9d1e1050b451343d86`): `rc=0`, diez pasos, `git status` limpio. Puerta
-VERDE por sus dos variantes con salida idéntica (`rc=0`, diez pasos); banco `rc=0` con **74
-controles mordiendo** (eran 52) más 10 guardas, árbol idéntico antes y después. Desplegado
-(`685b44b`) y comprobado en la app real: 90 operaciones y 5 carteras intactas, y **guardar sigue
-funcionando después de las autopruebas**.
+Last session: 2026-09-01
+Stopped at: **CUARTA TRANSICIÓN de la Fase 1 hecha. La fase NO cierra: abre el ciclo 01-07.**
+Medida sobre `571659c`, árbol `23c169f1…`, `index.html` con huella
+`66e6dd20e9ec76163a332a06f5ef2598` — la misma que sirve Pages, comprobado con `curl`. Puerta fresca
+al empezar: `rc=0`, diez pasos, VERDE.
 
-Lo que hay que recordar de este ciclo: **la puerta ya estaba verde cuando el ciclo estaba mal**.
-Tres brazos adversarios disjuntos sobre el diff encontraron diez cosas, y ninguno vio lo del otro.
-Sin ellos se habría cerrado D-38 dejando vivo su mutante titular —el fallo de guardado pintado en
-VERDE—, con acta y todo.
+Lo que hay que recordar de esta transición:
 
-Next action: la **CUARTA TRANSICIÓN de la Fase 1** — que es quien decide si la fase cierra, midiendo
-contra el código y no contando actas. Las tres anteriores cambiaron el resultado al hacerlas.
-Resume file: .paul/phases/01-guardado-fiable/01-06-SUMMARY.md
+- **El aparato de medición ya no es el eslabón débil.** Por primera vez el brazo de instrumentos no
+  demolió su frase, y por primera vez ninguna cifra publicada era falsa. Lo que impide cerrar ya no
+  son huecos del instrumental: son **dos defectos del producto**, medidos.
+- **Los dos son de la misma forma que los que pararon las transiciones 2 y 3: una ASIMETRÍA.** El
+  juez de subida mira el libro Y los activos; el de bajada mira sólo los activos. `guardarTodo`
+  exige las tres escrituras; los otros seis llamantes no exigen ninguna. Cerrar el caso en vez de
+  la clase repetiría el defecto por el otro lado (§5.15).
+- **Se rompió la exclusividad del árbol** durante la revisión: un brazo corrió el banco de sabotaje
+  sobre el repositorio real y lo dejó mutado. Detectado por el control de huella de otro brazo,
+  restaurado y verificado byte a byte contra HEAD; nada se perdió. La regla nueva está en
+  `CLAUDE.md` §3.4: los brazos trabajan sobre COPIA y sobre el árbol real sólo LEEN.
+
+Next action: **`/paul:plan 01-07`** — el ciclo que cierra la asimetría de los dos jueces (D-45) y la
+de la invariante de guardado (D-46, con D-27 y D-29). Es diseño con más de una solución plausible:
+toca convocar la dialéctica adversaria antes de fijar el enfoque.
+Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION-4.md
 
 ---
 *STATE.md — Updated after every significant action*

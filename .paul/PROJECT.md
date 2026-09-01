@@ -71,10 +71,27 @@ ellas vista por más de una. La peor: los asertos pedían que los colores de éx
 *distintos*, nunca *cuáles*, así que **intercambiarlos —el fallo de guardado pintado en verde—
 pasaba la puerta entera**. Era exactamente el daño que el ciclo existía para impedir.
 
-**La fase sigue abierta**, pero ya no por falta de trabajo: falta **abrir la app en el navegador**
-y comprobarlo con los ojos, porque las pruebas fuera del navegador no resuelven colores ni aplican
-estilos; y falta la **cuarta medición de la fase contra el código**, que es quien decide si cierra.
-Las tres anteriores cambiaron el resultado al hacerlas.
+El 01-06 se desplegó y **se miró en el navegador** el 2026-08-31: 90 operaciones y 5 carteras
+idénticas antes y después de las autopruebas, y guardar siguió funcionando después de ejecutarlas.
+
+**La CUARTA medición de la fase contra el código se hizo el 2026-09-01, y la fase sigue abierta.**
+Por primera vez el aparato de medición aguantó entero —el brazo que lo atacó no consiguió romperlo
+por ninguno de los cinco caminos que intentó— y por primera vez ninguna cifra publicada era falsa.
+Lo que impide cerrar ya no son huecos del instrumental, sino **dos defectos del producto**, los dos
+con la misma forma: una **asimetría** entre dos caminos que deberían juzgar igual.
+
+El primero: cuando la app arranca y decide si los datos de la nube ganan a los locales, mira **sólo
+los activos** y nunca el libro de operaciones. Un operador que lo tenga todo vendido —sin activos,
+pero con el libro fiscal entero— hace que **cualquier copia de la nube gane, por vieja que sea**, y
+la pantalla se queda en verde. El mismo juicio, en la dirección contraria (al subir), ya mira las
+dos cosas desde el 01-04.
+
+El segundo: el guardado exige que las tres escrituras vayan bien, pero **nadie comprueba el caso en
+que falle sólo la lista de carteras**. Quitar esa condición del veredicto pasa la puerta entera en
+verde. Con el almacenamiento lleno, el operador vería «Guardado ✓» y además se subiría a la nube.
+
+Los dos abren el ciclo **01-07**. Las cuatro mediciones de esta fase han cambiado el resultado al
+hacerlas; contar actas la habría cerrado las cuatro veces.
 
 ### Planned (Next)
 

@@ -61,7 +61,8 @@ Phases: 1 of 7 complete (Fase 0)
   cuando no puede mirar la nube; cero verdes escritos a mano; dos instrumentos nuevos cableados a
   la puerta (`cloudwrites.py`, `emptycatch.py`); 14 sabotajes nuevos mordiendo
 
-**La fase SIGUE abierta tras su TERCERA transición (2026-08-31) — abre el ciclo 01-05.**
+**La fase SIGUE abierta tras su CUARTA transición (2026-09-01) — abre el ciclo 01-07.**
+El detalle de la cuarta está al final de este bloque; lo que sigue es el registro de la tercera.
 
 El defecto que paró la fase en la segunda transición (D-33) está cerrado y con control positivo, y
 el ciclo 01-04 está desplegado y visto en el navegador. Lo que impide cerrar la fase ahora es otra
@@ -138,6 +139,62 @@ tal cual **mataba el banco de sabotaje**, porque el banco ejecuta la puerta con 
 Los dos hallazgos se verificaron con comando propio antes de aceptarlos.
 
 Actas: `01-04-SUMMARY.md`, `01-TRANSICION-3.md` y `01-05-SUMMARY.md`.
+
+
+---
+
+#### CUARTA transición (2026-09-01) — la fase tampoco cierra: abre el ciclo 01-07
+
+Medida sobre `571659c`, árbol limpio, con la huella de `index.html` confirmada idéntica a la que
+sirve Pages. Puerta fresca: `rc=0`, diez pasos, VERDE.
+
+**Dos cosas cambiaron respecto a las tres transiciones anteriores, y las dos son buenas:**
+
+1. **Por primera vez un brazo NO demolió su frase.** El de instrumentos y cableado intentó cinco
+   roturas concretas del aparato de medición y ninguna cedió; el fallo cerrado se reprodujo uno a
+   uno en los ocho instrumentos (rc=2 con nombre y remedio), las dos variantes de la puerta ejercen
+   lo mismo, y no hay un solo script huérfano.
+2. **Por primera vez ninguna cifra publicada es falsa.** Las cuatro re-derivadas en fresco —74
+   controles del banco, 34 avisos censados, diez pasos, y la huella de lo desplegado— dieron
+   exactamente lo que dicen los documentos. En la tercera transición había tres falsas.
+
+**Y aun así la META no se cumple**, por dos defectos del PRODUCTO, los dos re-verificados a mano
+sobre copia aislada, y los dos con la misma forma —una **ASIMETRÍA**— que ya paró las transiciones
+2 y 3:
+
+- **D-45**: `hasRealLocalData()` mira sólo los activos y **nunca el libro de operaciones**. Un
+  operador con todo vendido —activos vacíos, libro fiscal rico— cae en la rama donde la comparación
+  de fechas se desactiva, y **cualquier** documento de la nube gana por viejo que sea: un libro de
+  tres operaciones sustituido por uno de una, con el punto de sync **en VERDE**. La puerta entera
+  sale `rc=0` sobre ese código. El juez de SUBIDA ya mira las dos cosas desde el 01-04; el de
+  BAJADA se quedó con el predicado viejo.
+- **D-46**: quitar la lista de carteras del veredicto de `guardarTodo` deja la puerta en `rc=0` y
+  VERDE. Las autopruebas ejercen el «fallo parcial» rompiendo siempre el guardado del libro, nunca
+  el de META a solas: el cruce no lo mide nadie (§5.5). Con la cuota llena, el operador ve
+  «Guardado ✓» en verde **y** se sube a la nube.
+
+**Es la CUARTA vez consecutiva que medir cambia el resultado.** `PLAN == SUMMARY` habría cerrado la
+fase las cuatro veces.
+
+**Deudas re-medidas, no heredadas:** **D-15 se CIERRA** —ignorar el veredicto del juez en
+`subirALaNube` da hoy `rc=1`; la cerró el 01-04 sin que nadie lo anotara—. D-42, D-43 y D-44 siguen
+siendo cegueras acotadas y declaradas. D-27 y D-29 siguen vivas y van al 01-07 con D-46, porque son
+la misma familia. Nueva **D-47** (sin volcado al cerrar la pestaña), que no abre ciclo por sí sola.
+
+**Nota de proceso:** se rompió la exclusividad del árbol. Un brazo corrió el banco de sabotaje sobre
+el repositorio real —el banco muta `index.html` en vivo— y al detenerlo lo dejó sucio. Lo destapó el
+control de huella de otro brazo; restaurado y verificado byte a byte contra HEAD, sin pérdida. Regla
+nueva en `CLAUDE.md` §3.4: **los brazos trabajan sobre COPIA y sobre el árbol real sólo LEEN** — la
+prohibición se escribe por lo que EJECUTAN, no sólo por lo que editan.
+
+**Planes:**
+- [ ] **01-07: Un solo juez en las dos direcciones** — cierra **D-45** (el predicado de «hay datos
+  locales que proteger» tiene que contar el libro, en bajada igual que en subida) y **D-46** junto
+  con **D-27** y **D-29** (la invariante «un fallo de guardado no se anuncia como éxito y no se
+  sincroniza» tiene que valer en todos los caminos). **Fuera de alcance:** la fusión de `ops` por
+  `id` y el `savedAt` por sección, que siguen siendo Fase 3.
+
+Acta: `01-TRANSICION-4.md`.
 
 ### Phase 2: Backup y restauración
 
@@ -229,4 +286,4 @@ Actas: `01-04-SUMMARY.md`, `01-TRANSICION-3.md` y `01-05-SUMMARY.md`.
 
 ---
 *Roadmap created: 2026-08-29*
-*Last updated: 2026-08-31*
+*Last updated: 2026-09-01*

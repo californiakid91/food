@@ -140,6 +140,15 @@ Nunca una revisión que pueda fallar en silencio: confirma que completó, o decl
 - **Los brazos de revisión LEEN. Prohíbeles mutar EXPLÍCITAMENTE Y POR NOMBRE en el prompt**
   (nada de `checkout`/`restore`/`stash`/`reset`/escrituras). Medido: un revisor destruyó
   cableado sin commitear e invalidó cifras ya comunicadas.
+- **Aquí MEDIR MUTA: prohibir «no edites» NO basta.** `tools/sabotage.py` —y por tanto
+  `tools/verify.sh`, que lo incluye— reescribe `index.html` en vivo para demostrar que los
+  controles muerden. Medido en la cuarta transición: un brazo que sólo quería **re-derivar una
+  cifra publicada** corrió el banco sobre el árbol real, lo dejó mutado mientras otro brazo medía,
+  y al detenerlo murió a mitad de un sabotaje dejando el fichero sucio. **No desobedeció ni una
+  palabra de su prohibición.**
+  👉 Regla: **todo brazo trabaja sobre una COPIA; sobre el árbol real sólo LEE.** La prohibición se
+  escribe por lo que el brazo EJECUTA, no sólo por lo que edita. Y se le exige comparar la huella
+  del original al empezar y al terminar: ese control es el que lo destapó.
 - Brazos **disjuntos**, uno por dimensión: correctness · falsos verdes · calidad del oráculo ·
   cableado · documentos-contra-evidencia.
 

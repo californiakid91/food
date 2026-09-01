@@ -6,6 +6,13 @@
 >
 > Cada ficha dice: **qué es · cómo se midió · estado · qué la reabre.**
 
+**CUARTA TRANSICIÓN de la Fase 1 (2026-09-01): la fase NO cierra, abre el ciclo 01-07.** Cuatro
+brazos adversarios disjuntos; por primera vez uno —el del aparato de medición— **no demolió su
+frase**, y por primera vez **ninguna cifra publicada era falsa**. Pero la META sigue sin cumplirse:
+al arrancar, una nube más vieja empobrece el libro con la pantalla en verde (**D-45**), y quitar la
+lista de carteras del veredicto de guardado deja la puerta en `rc=0` (**D-46**). Se cerró **D-15**
+re-midiéndola en vez de heredarla. Acta: `.paul/phases/01-guardado-fiable/01-TRANSICION-4.md`.
+
 Último ciclo cerrado: **01-06** (2026-08-31), la capa de aviso. **Cerró D-38** por la clase y
 abrió **D-44**. Los TRES brazos adversarios del diff demolieron el ciclo ya escrito, cada uno
 viendo algo que los otros dos no: diez hallazgos, el peor de ellos **un fallo de guardado pintado
@@ -48,6 +55,57 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 
 ## Abiertas — riesgo de pérdida de datos
 
+### D-45 · Al arrancar, una nube MÁS VIEJA empobrece el libro y la pantalla queda en VERDE
+- **Qué es:** `pullFromFirestore` decide si el documento de la nube gana con
+  `if (!hasRealLocalData() || (data.savedAt || 0) >= localSaved)`. `hasRealLocalData()` mira **sólo
+  los activos** (`rows`) de cada cartera; **nunca el libro de operaciones**. Un operador que lo
+  tenga todo vendido —activos vacíos, libro fiscal rico, que es cuando el libro más importa— cae en
+  la primera rama, la comparación de fechas se desactiva y **cualquier** documento de la nube gana,
+  por viejo que sea. `vaciariaElLibro` sólo bloquea el caso vacío, así que una nube rancia con una
+  operación sustituye a un libro local de tres. Y al terminar, el punto de sync se pinta en VERDE.
+- **Cómo se midió:** brazo de caminos de pérdida de la CUARTA transición (2026-09-01), reproducido
+  sobre copia aislada: `ANTES ops 3 / DESPUÉS ops 1`, con la nube declarando un `savedAt` de 1000
+  frente a un local de 2000000000000. La puerta entera sobre esa copia: **`rc=0`, VERDE**.
+- **Por qué es Fase 1 y no Fase 3:** el ROADMAP lista este arreglo en el alcance de la Fase 3, pero
+  el daño es **pérdida de libro en el ARRANQUE con estado tranquilizador**, que es la meta literal
+  de la Fase 1, y **no exige fusionar**: basta que el predicado cuente el libro. Es además la misma
+  asimetría que el 01-04 cerró en el otro lado (§5.16): el juez de subida `decidirSubida` ya mira
+  las dos cosas —`tieneOperaciones` **y** `hayActivosLocales`—; el camino de bajada se quedó con el
+  predicado viejo. **La asimetría ES el defecto.** Fusionar `ops` por `id` sigue siendo Fase 3.
+- **Estado:** abierta. **Abre el ciclo 01-07.**
+- **Qué la reabre:** nada la cierra sola. Se cierra cuando las dos direcciones usen el MISMO juez
+  para «¿hay datos locales que proteger?», con un control que ejerza el desempate de
+  `pullFromFirestore` y muerda si vuelve a mirar sólo los activos.
+
+### D-46 · El cruce «sólo falla el guardado de la lista de carteras» no tiene oráculo
+- **Qué es:** `guardarTodo` sólo canta victoria si las tres escrituras van bien
+  (`todoBien = okRows && okOps && okMeta`). Quitar `okMeta` de esa conjunción —o sea, dejar de
+  mirar si la lista de carteras se guardó— **deja la puerta entera en `rc=0` y VERDE**. Si
+  `localStorage.setItem(META_KEY, …)` falla por cuota, el operador ve «Guardado ✓» en verde y
+  además se sube a la nube.
+- **Cómo se midió:** brazo del oráculo de la CUARTA transición (2026-09-01), **re-verificado a
+  mano** sobre copia aislada con unicidad de ancla afirmada antes de mutar y estímulo demostrado en
+  el fichero: `bash tools/verify.sh` → `rc=0`, diez pasos, «VERDE — todo ejercido y en verde».
+  Escapa porque `pruebasFalloDeEscritura` inyecta su fallo parcial siempre en `saveOpsAll`, nunca
+  en `saveMeta` a solas: los tres sumandos tienen control por separado y **el CRUCE no lo mide
+  nadie** (`CLAUDE.md` §5.5).
+- **Estado:** abierta. **Abre el ciclo 01-07**, junto con **D-27** y **D-29**, que son la misma
+  familia: la invariante «un fallo de guardado no se anuncia como éxito y no se sincroniza» existe
+  en un sitio y no en los demás.
+- **Qué la reabre:** nada la cierra sola. Se cierra con un control que haga fallar **únicamente**
+  `saveMeta` y exija `guardarTodo() === false`, aviso en rojo y cero subidas.
+
+### D-47 · No hay volcado al cerrar la pestaña: una ventana de 600 ms sin guardar
+- **Qué es:** apuntar una operación llama a `schedSave()`, que aplaza el guardado 600 ms. **No
+  existe ningún manejador `beforeunload`, `pagehide` ni `visibilitychange` en todo `index.html`**
+  (grep: cero resultados). Cerrar la pestaña dentro de esa ventana pierde la operación que el
+  operador ya ha visto en pantalla.
+- **Cómo se midió:** brazo de caminos de pérdida de la CUARTA transición (2026-09-01): tras
+  `schedSave()`, memoria = 1 operación, disco = 0.
+- **Estado:** abierta. **No abre ciclo por sí sola:** es pérdida sin fallo declarado —el guardado no
+  llegó a intentarse, así que no hay nada que avisar— y su arreglo es independiente del resto.
+- **Qué la reabre:** nada; se decide aparte. El arreglo natural es volcar en `pagehide`.
+
 ### D-35 · Un paquete incompleto bloquea TODAS las subidas y no hay salida en pantalla
 - **Qué es:** desde el ciclo 01-04, si una sola clave del almacenamiento no se puede leer o
   parsear, `buildSyncPayload` marca el paquete como incompleto y **la subida se rechaza entera**,
@@ -89,56 +147,6 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   estaba dicho en ningún sitio, y porque el juez de subida no puede protegerla — el problema es
   que las claves de almacenamiento no llevan el identificador de la cuenta.
 - **Qué la reabre:** que se use la app con más de una cuenta, o que se comparta el dispositivo.
-
-### D-38 · La capa de AVISO no tiene oráculo: nueve mutantes sobreviven a la puerta entera
-- **Qué es:** el aparato de medición cubre el MECANISMO de las guardas pero no su AVISO. Sustituir
-  en `showSaveIndicator` el color condicional por un verde fijo —o sea, **pintar en VERDE un
-  guardado que ha fallado**— deja `tools/verify.sh` en `rc=0` y «VERDE — todo ejercido y en
-  verde», con el banco de sabotaje ejecutado y en OK. Otras ocho mutaciones de la misma capa
-  sobreviven igual: la duración del aviso de error, el `aviso` que devuelve `decidirSubida` en sus
-  ramas de rechazo, y tres mensajes de consola degradables a informativos. Es **§5.6**: el
-  mecanismo tiene control, su aviso no.
-- **Por qué es invisible hoy:** `tools/dom_stub.js` devuelve `null` en `getElementById`, así que el
-  CUERPO de `showSaveIndicator` es código muerto en node; las autopruebas lo sustituyen por un
-  espía, o sea que miden que los llamantes pasan `ok=false`, nunca qué hace la función con ese
-  `false`. La matriz de 84 filas comprueba `clave` y `subir`, **nunca `aviso`**. Y
-  `cloudwrites.py` prohíbe el literal `setSyncUI('ok')`, no un `estadoSync('ok')` alimentado por
-  el juez — D-31 cerró el caso literal, no esta clase.
-- **Cómo se midió:** TERCERA transición de la Fase 1 (2026-08-31), brazo adversario del oráculo
-  sobre una copia aislada; el mutante representativo **re-verificado a mano** por el orquestador:
-  `bash tools/verify.sh` → `rc=0`. Control positivo del arnés hecho: invertir `vaciariaElLibro`
-  SÍ muere (rc=2), o sea que el estímulo llega y el oráculo muerde cuando puede.
-- **Segundo pintor que DECIDE, destapado por la revisión adversaria del PLAN 01-05 (2026-08-31):**
-  `setSyncUI` lleva dentro toda la cascada de estados con sus colores. Mutar su rama de error para
-  pintar el verde `#27ae60` es literalmente «un fallo de sincronización pintado en verde» —el daño
-  que da nombre al ciclo— y **hoy no lo mide nada**: la matriz comprueba el `aviso` que DEVUELVE el
-  juez, no lo que el pintor HACE con él, y `cloudwrites.py` sólo prohíbe el literal
-  `setSyncUI('ok')`. El arreglo tiene que cortar por el mismo sitio en los DOS pintores.
-- **La duración no vive en el elemento:** vive en el `setTimeout` del aviso. Un espía que registre
-  lo escrito en el elemento **no puede leerla**, así que ese mutante exige un reloj falso (§5.12),
-  no un espía de pantalla.
-- **Estado:** **CERRADA** en el ciclo **01-06** (2026-08-31), por la CLASE y no por los casos.
-  Lo que la cierra, cada pieza con su mutante en `tools/sabotage.py`:
-  - **Los dos pintores se EJECUTAN de verdad** sobre un DOM observable con reloj falso, dentro de
-    una ventana que se retira en un `finally` idempotente. Ya no se les sustituye por espías, que
-    era el agujero. Se afirma el color **por su valor**, la **visibilidad** y la **duración**.
-  - **El `aviso` del juez de subida** entra en las 84 filas de la matriz, con oráculo escrito
-    aparte: ninguna rama de rechazo puede devolver el aviso de éxito.
-  - **`tools/avisos.py`**, cableado a la puerta, con dos redes disjuntas: por RECEPTOR (nadie toca
-    los elementos del aviso fuera de los pintores) y por CANAL (los **34** avisos al operador
-    sellados con su nivel y su prefijo literal, cada uno con su motivo escrito).
-- **Lo que costó cerrarla de verdad:** el ciclo se dio por hecho una vez y **los tres brazos
-  adversarios lo demolieron**, cada uno viendo algo que los otros dos no. El peor hallazgo:
-  los asertos exigían que los colores de éxito y de fallo fueran **DISTINTOS**, nunca **CUÁLES**,
-  así que **intercambiarlos —el fallo pintado en VERDE— salía `rc=0` y «✅ Autopruebas OK»**. Es
-  literalmente el daño que nombra esta ficha, vivo dentro del ciclo escrito para matarlo: mi
-  oráculo heredó mi punto ciego (§5.8). Otros tres del mismo grupo: el error de sincronización en
-  naranja, un aviso de **2 milisegundos**, y el detector de cesión de control pasando con el
-  mecanismo **borrado** (§5.1).
-- **Qué la reabre:** que aparezca cualquier aviso al operador sin entrada sellada en
-  `.paul/baseline-avisos.json`, o cualquier propiedad del aviso que el operador MIRA —color,
-  texto, visibilidad, duración, nivel— sin un mutante que la mate. **No basta con que exista un
-  aserto: tiene que haberse visto rojo.**
 
 ### D-39 · Los trinquetes revientan con `rc=1` y traceback en vez de fallar CERRADO
 - **Qué es:** `cargar_baseline()` de `tools/funcsize.py` valida que la clave `excede` exista, pero
@@ -494,29 +502,6 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   quita el `if (opsIlegible)` de `saveOpsAll` para «desatascarlo», el sabotaje «saveOpsAll deja de
   consultar el cerrojo» se pone rojo: esta deuda se paga con interfaz, no aflojando el cerrojo.
 
-### D-15 · La guarda de subida está comprobada por presencia, no por precedencia
-
-> **⚠️ A RE-MEDIR (2026-08-31, tercera transición).** Tres afirmaciones centrales de esta ficha
-> son falsas hoy: la guarda ya no vive en `schedulePush`, el doble de Firestore SÍ existe
-> (`arnesDeSubida`) y las autopruebas asíncronas también. Su propio disparador de reapertura se
-> cumplió en el 01-04 sin que nadie la revisara. **No se cierra a ciegas**: se re-mide y se
-> reescribe. Detalle: `01-TRANSICION-3.md`, hallazgo T3-7.
-- **Qué es:** la guarda que impide subir un libro vacío vive dentro de `schedulePush`, que es
-  asíncrona, va detrás de un temporizador y habla con Firestore. Las autopruebas corren en node sin
-  Firestore, así que lo único que comprueban de ese lado es que `schedulePush` **llama** al juez
-  `vaciariaElLibro`. El juez sí está ejercido de verdad, y la guarda hermana —la de aplicar— está
-  ejercida extremo a extremo.
-- **Cómo se midió:** ciclo 01-02. El sabotaje «se quita la guarda de no-vaciado al subir» muerde
-  (rc=1, `AC-4`), lo que demuestra que la llamada existe. No demuestra ni el ORDEN ni el EFECTO:
-  comprobado por la revisión del diff, poner `if (false && vaciariaElLibro(...))` deja la puerta en
-  verde, mientras que la misma mutación en la guarda hermana —la de aplicar— la pone roja con dos
-  fallos. El juez y su lectura del documento (`opsDelDocumento`) sí están ejercidos de verdad; lo
-  que no lo está es que la guarda corra, y corra ANTES del `set()`.
-- **Estado:** abierta, aceptada a propósito. Cerrarla pide un doble de Firestore en el arnés y
-  autopruebas asíncronas, que hoy no existen.
-- **Qué la reabre:** el primer doble de Firestore que entre en `tools/`, o la Fase 3, que reescribe
-  esta zona entera y tendrá que traerse su arnés.
-
 ### D-27 · `persistOps` canta «Guardado ✓» antes de saber si el libro entró
 - **Qué es:** `persistOps` —el camino de borrar una operación y el de confirmar una importación—
   llama a `saveOpsAll(ops)` **ignorando su booleano**, luego a `saveRows()`, que pinta «Guardado ✓»
@@ -630,7 +615,7 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   puede unirse a la lista.
 - **Cómo se midió:** `tools/funcsize.py`, re-medido el 2026-08-29 tras el plan 01-01. La cifra de
   funciones vistas vive sólo en `.paul/baseline-funcs.json`, porque copiarla aquí la desactualiza
-  al siguiente ciclo — ya pasó dos veces el mismo día. Los doce tamaños de abajo sí se citan porque están congelados:
+  al siguiente ciclo — ya pasó dos veces el mismo día. Los trece tamaños de abajo sí se citan porque están congelados:
   si cambiaran, el trinquete se pondría rojo. Exenciones nombradas una a una:
 
   | Función | Líneas | Motivo de la exención |
@@ -744,6 +729,81 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Cómo se midió:** confirmado en la auditoría del 2026-08-29.
 - **Estado:** Fase 6, plan 06-04. Incluye borrar también el Worker en el panel de Cloudflare.
 - **Qué la reabre:** nada; está en cola.
+
+---
+
+## Cerradas en la CUARTA transición (2026-09-01)
+
+### D-15 · La guarda de subida está comprobada por presencia, no por precedencia — CERRADA 2026-09-01
+- **Qué era:** la guarda que impide subir un libro vacío se comprobaba sólo por PRESENCIA: los
+  sabotajes demostraban que `schedulePush` **llamaba** al juez, no que su veredicto se respetara ni
+  que corriera ANTES del `set()`. Medido en el 01-02: `if (false && vaciariaElLibro(...))` dejaba
+  la puerta verde.
+- **Cómo se cerró:** el ciclo **01-04** reescribió la zona entera —una sola puerta de subida,
+  `subirALaNube`, gobernada por el juez puro `decidirSubida`— y cerró la deuda **sin que nadie lo
+  anotara**. La cuarta transición (2026-09-01) lo re-midió en vez de heredarlo, sobre copia
+  aislada y con el ancla afirmada única antes de mutar:
+  `if (!decision.subir)` → `if (false && !decision.subir)` en `subirALaNube` da
+  **`rc=1`, «FALLO autopruebas (runSelfTests)», «HALLAZGOS (rc=1)»**.
+  Ignorar el veredicto del juez MUERDE. Presencia **y** precedencia están ejercidas.
+- **Estado:** **CERRADA**. La ficha se cierra citando la medición de hoy, no el acta del 01-04:
+  una medición commiteada no se hereda (`CLAUDE.md` §7).
+- **Qué la reabre:** que el camino de subida vuelva a tener más de una salida, o que la Fase 3
+  reescriba la zona sin traerse su arnés.
+
+---
+
+## Cerradas en el ciclo 01-06 (2026-08-31)
+
+### D-38 · La capa de AVISO no tiene oráculo: nueve mutantes sobreviven a la puerta entera
+- **Qué es:** el aparato de medición cubre el MECANISMO de las guardas pero no su AVISO. Sustituir
+  en `showSaveIndicator` el color condicional por un verde fijo —o sea, **pintar en VERDE un
+  guardado que ha fallado**— deja `tools/verify.sh` en `rc=0` y «VERDE — todo ejercido y en
+  verde», con el banco de sabotaje ejecutado y en OK. Otras ocho mutaciones de la misma capa
+  sobreviven igual: la duración del aviso de error, el `aviso` que devuelve `decidirSubida` en sus
+  ramas de rechazo, y tres mensajes de consola degradables a informativos. Es **§5.6**: el
+  mecanismo tiene control, su aviso no.
+- **Por qué es invisible hoy:** `tools/dom_stub.js` devuelve `null` en `getElementById`, así que el
+  CUERPO de `showSaveIndicator` es código muerto en node; las autopruebas lo sustituyen por un
+  espía, o sea que miden que los llamantes pasan `ok=false`, nunca qué hace la función con ese
+  `false`. La matriz de 84 filas comprueba `clave` y `subir`, **nunca `aviso`**. Y
+  `cloudwrites.py` prohíbe el literal `setSyncUI('ok')`, no un `estadoSync('ok')` alimentado por
+  el juez — D-31 cerró el caso literal, no esta clase.
+- **Cómo se midió:** TERCERA transición de la Fase 1 (2026-08-31), brazo adversario del oráculo
+  sobre una copia aislada; el mutante representativo **re-verificado a mano** por el orquestador:
+  `bash tools/verify.sh` → `rc=0`. Control positivo del arnés hecho: invertir `vaciariaElLibro`
+  SÍ muere (rc=2), o sea que el estímulo llega y el oráculo muerde cuando puede.
+- **Segundo pintor que DECIDE, destapado por la revisión adversaria del PLAN 01-05 (2026-08-31):**
+  `setSyncUI` lleva dentro toda la cascada de estados con sus colores. Mutar su rama de error para
+  pintar el verde `#27ae60` es literalmente «un fallo de sincronización pintado en verde» —el daño
+  que da nombre al ciclo— y **hoy no lo mide nada**: la matriz comprueba el `aviso` que DEVUELVE el
+  juez, no lo que el pintor HACE con él, y `cloudwrites.py` sólo prohíbe el literal
+  `setSyncUI('ok')`. El arreglo tiene que cortar por el mismo sitio en los DOS pintores.
+- **La duración no vive en el elemento:** vive en el `setTimeout` del aviso. Un espía que registre
+  lo escrito en el elemento **no puede leerla**, así que ese mutante exige un reloj falso (§5.12),
+  no un espía de pantalla.
+- **Estado:** **CERRADA** en el ciclo **01-06** (2026-08-31), por la CLASE y no por los casos.
+  Lo que la cierra, cada pieza con su mutante en `tools/sabotage.py`:
+  - **Los dos pintores se EJECUTAN de verdad** sobre un DOM observable con reloj falso, dentro de
+    una ventana que se retira en un `finally` idempotente. Ya no se les sustituye por espías, que
+    era el agujero. Se afirma el color **por su valor**, la **visibilidad** y la **duración**.
+  - **El `aviso` del juez de subida** entra en las 84 filas de la matriz, con oráculo escrito
+    aparte: ninguna rama de rechazo puede devolver el aviso de éxito.
+  - **`tools/avisos.py`**, cableado a la puerta, con dos redes disjuntas: por RECEPTOR (nadie toca
+    los elementos del aviso fuera de los pintores) y por CANAL (los **34** avisos al operador
+    sellados con su nivel y su prefijo literal, cada uno con su motivo escrito).
+- **Lo que costó cerrarla de verdad:** el ciclo se dio por hecho una vez y **los tres brazos
+  adversarios lo demolieron**, cada uno viendo algo que los otros dos no. El peor hallazgo:
+  los asertos exigían que los colores de éxito y de fallo fueran **DISTINTOS**, nunca **CUÁLES**,
+  así que **intercambiarlos —el fallo pintado en VERDE— salía `rc=0` y «✅ Autopruebas OK»**. Es
+  literalmente el daño que nombra esta ficha, vivo dentro del ciclo escrito para matarlo: mi
+  oráculo heredó mi punto ciego (§5.8). Otros tres del mismo grupo: el error de sincronización en
+  naranja, un aviso de **2 milisegundos**, y el detector de cesión de control pasando con el
+  mecanismo **borrado** (§5.1).
+- **Qué la reabre:** que aparezca cualquier aviso al operador sin entrada sellada en
+  `.paul/baseline-avisos.json`, o cualquier propiedad del aviso que el operador MIRA —color,
+  texto, visibilidad, duración, nivel— sin un mutante que la mate. **No basta con que exista un
+  aserto: tiene que haberse visto rojo.**
 
 ---
 
