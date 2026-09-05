@@ -10,50 +10,53 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 Milestone: v0.1 Datos fiables (v0.1.0)
-Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. El ciclo **01-07 está CERRADO**; la fase no se
-ha vuelto a medir contra el código desde entonces.
-Plan: 01-07 **ejecutado, verificado en navegador y cerrado** (2026-09-05).
-Status: **UNIFY hecho.** Acta en `01-07-SUMMARY.md`. Cierra D-45, D-46, D-27, D-29, D-30 y D-54.
-Abre D-48 a D-53, D-55, D-56 y D-57. Siguen abiertas D-42, D-43, D-44, D-47 y D-03 (a re-medir).
-Last activity: 2026-09-05 — **cierre del 01-07**. El APPLY estaba commiteado desde el 2026-09-01 sin
-acta y con este documento diciendo todavía «plan esperando aprobación»: **el estado mentía sobre el
-propio proceso**, y se descubrió al retomar comparando con `git log`.
+Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. Medida contra el código el 2026-09-05 en su
+**QUINTA transición**: acta `01-TRANSICION-5.md`.
+Plan: **01-08 por planificar.** El 01-07 está cerrado, desplegado y verificado en navegador.
+Status: **QUINTA transición hecha. La fase NO cierra.** Abre D-58 a D-69; reclasifica D-48; corrige
+D-49, D-18, D-56, D-50, D-53, D-01; cierra la ubicación de D-54.
+Last activity: 2026-09-05 — **quinta transición**. Cinco brazos adversarios disjuntos, cada uno
+sobre su **propia copia** del proyecto, y **los cinco demolieron su frase**. Puerta al empezar y al
+terminar: `rc=0`, once pasos, `index.html` en `9459b0fc3b40a50a38d0c506fec2b862` sin un byte de
+diferencia.
 
-**Lo que hay que recordar de este ciclo:**
+**Lo que hay que recordar de esta medición:**
 
-1. **El checkpoint humano NO fue un trámite.** Encontró un defecto de correctness **antes** del
-   primer punto de la lista: el operador abrió la app con 90 operaciones y leyó «este dispositivo
-   **no tiene operaciones**». El comportamiento era el previsto (D-50); el TEXTO mentía (D-54).
-2. **El ciclo había agravado ese texto sin verlo.** El naranja lo alcanzaban cuatro veredictos y
-   pasó a ocho; una de las claves nuevas es la que ve **todo dispositivo ya sincronizado** el día
-   del despliegue. Un texto raramente falso se volvió universal el día del estreno.
-3. **Cubrir el mecanismo no cubre su cable (§5.6), medido otra vez.** Las pruebas del pintor de
-   D-54 estaban completas en apariencia; revertidos los dos llamantes con el pintor intacto, la
-   suite entera seguía en **rc=0**. El arreglo podía desconectarse sin que nada se pusiera rojo.
-4. **La puerta cazó tres sabotajes suyos que dejaron de morder** porque el cambio movió sus anclas:
-   `rc=1` con «CONTROLES QUE NO MUERDEN (3)», no un verde.
-5. **La comprobación final la hizo la app sola y salió mejor que la pedida:** se pidió inyectar un
-   motivo y el arranque repintó el REAL, con «89 operaciones locales que proteger» — la cifra
-   exacta del libro tras el borrado de la propia verificación.
+1. **Lo que impide cerrar la fase es pérdida en la NUBE, no en el disco.** Un libro entrante que no
+   cabe en el almacenamiento **no aterriza pero adelanta el reloj**; el dispositivo se cree al día
+   y en el primer guardado **exporta su libro pobre encima del rico**: 42 operaciones → 2, con
+   «Guardado ✓» y el punto verde. La puerta entera sale `rc=0` sobre ese código.
+2. **El aviso del camino de nube no tiene oráculo.** Pintar VERDE tras una escritura que falla, o
+   tras una subida que el juez omite, deja la puerta en `rc=0`. Los controles existentes miran el
+   **valor devuelto**; el operador mira la **pantalla**. Son dos cosas distintas y sólo una estaba
+   medida.
+3. **Un brazo puede inventar agujeros, y esta vez lo hizo.** Reportó como vivo un mutante que
+   **muere** (`rc=1`). Se re-verificaron a mano los decisivos, con ancla única afirmada antes de
+   mutar; uno de mis propios intentos falló por ancla no única, y el defecto era **mío**, no del
+   código.
+4. **El instrumento escrito para impedir el silencio lo amnistía.** `avisos.py --check` caza que
+   una alarma desaparezca e imprime «no se resella de trámite»; `--update` la sella igual, sin
+   nombrarla y con `rc=0`. Cerrado por un lado y abierto por el otro.
+5. **Las cinco deudas que cerró el 01-07 están BIEN cerradas**, re-medidas revirtiendo su arreglo
+   una a una. Medir también sirve para confirmar.
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [██████████] 7 ciclos cerrados. **Falta la QUINTA transición**: medir la fase contra el
-  código. Las cuatro anteriores cambiaron el resultado las cuatro veces.
+- Phase: [██████████] 7 ciclos cerrados y **cinco transiciones**. Las cinco midieron la meta contra
+  el código y **las cinco cambiaron el resultado**.
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ✓        ✓     [01-07 cerrado el 2026-09-05.
-                            Siguiente: QUINTA transición de fase — medir la Fase 1
-                            contra el código, antes de preguntar nada]
+  ○        ○        ○     [ciclo 01-08 por planificar.
+                            Lo abren D-58, D-59, D-48 y D-61]
 ```
 
-Ciclos 01-01 a 01-07: cerrados, cada uno con su acta. Sus CUATRO transiciones midieron la meta
-contra el código y **las cuatro cambiaron el resultado**. `PLAN == SUMMARY` habría cerrado la fase
-las cuatro veces.
+Ciclos 01-01 a 01-07: cerrados, cada uno con su acta. Sus CINCO transiciones midieron la meta
+contra el código y **las cinco cambiaron el resultado**. `PLAN == SUMMARY` habría cerrado la fase
+las cinco veces.
 
 ## Performance Metrics
 
@@ -145,6 +148,11 @@ las cuatro veces.
 | El instrumento sella una HUELLA y promete menos, en vez de prometer lo indecidible | 01-07 PLAN | «¿Está esta llamada gobernada por un veredicto?» no se decide estáticamente sobre JS: o se atribuye por función contenedora —presencia, no precedencia (§5.11)— o se sella la huella. Se sella, y el criterio se rebaja a «ningún sumidero nuevo nace sin que alguien lo mire». Un instrumento con juicio dentro se dobla (§9) |
 | Un criterio que no puede MORIR no es criterio | 01-07 PLAN | El borrador marcaba el predicado único con un `grep` de nombres, que es una aserción de nombre satisfecha por accidente (§5.8) y que revertir el arreglo no mata. Se sustituye por controles de comportamiento sobre los dos caminos, y el plan exige nombrar por escrito todo arreglo que no pueda tener control positivo |
 | Los hallazgos de los brazos se re-verifican a mano antes de aceptarlos | Fase 1 transición 3 | Un brazo puede inventar agujeros (§5.4). Los cuatro decisivos se reprodujeron con comando propio sobre copias aisladas; el resto se marca explícitamente como no re-verificado |
+| La QUINTA transición tampoco cierra la FASE 1: abre el ciclo 01-08 | Fase 1 transición 5 | Los tres objetivos del alcance están en PASS, pero la META no: un libro entrante que no cabe adelanta el reloj y el siguiente guardado lo exporta encima de la nube, en verde. Ficharlo como deuda lo blanquearía como «fase hecha» (§5.10) — misma decisión que en las cuatro transiciones anteriores |
+| El daño de esta transición se mide en la NUBE, no en el disco local | Fase 1 transición 5 | Las cuatro anteriores buscaron pérdida en `localStorage`. Aquí el libro local nunca se pierde: lo que se destruye es la copia de la nube, que es de donde sale la declaración. La meta habla del libro, no del soporte |
+| Un mutante reportado VIVO por un brazo se re-verifica antes de ficharlo, y uno murió | Fase 1 transición 5 | El brazo de mutación dio por vivo el que devuelve `subido: true`; al medirlo da rc=1. La distinción que quedaba en pie era otra —PINTAR, no devolver— y es la que define D-59. Aceptarlo sin medir habría fichado un defecto inexistente y descrito mal el real (§5.4) |
+| Cada brazo trabaja sobre SU PROPIA COPIA, y aun así hubo escritura en el árbol real | Fase 1 transición 5 | La regla de la cuarta transición funcionó para lo grave (`index.html` intacto las seis veces que se comprobó), pero un proceso en segundo plano arrancó con el directorio de trabajo reseteado al repo y dejó dos ficheros. La prohibición no basta: los scripts de un brazo deben FIJAR su directorio de forma absoluta y afirmarlo |
+| `avisos.py` se arregla DENTRO del 01-08 en vez de diferirse | Fase 1 transición 5 | Es un hueco del propio aparato de medición y de la clase que la fase persigue: un instrumento que amnistía el silencio dirige la mano del operador a blanquearlo (§4.4). Diferirlo mientras se cierra D-59 dejaría el nuevo control sellable en silencio |
 
 ### Deferred Issues
 
@@ -170,6 +178,11 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 | **D-46 · el cruce «sólo falla el guardado de la lista de carteras» no tiene oráculo** | **Abre el ciclo 01-07.** Quitar `okMeta` del veredicto deja la puerta en `rc=0` y VERDE; con la cuota llena, «Guardado ✓» en verde Y subida a la nube | Ciclo 01-07: un control que falle **sólo** `saveMeta` y exija `false`, rojo y cero subidas. Junto con D-27 y D-29, que son la misma familia |
 | **D-47 · sin volcado al cerrar la pestaña: ventana de 600 ms** | Pérdida sin fallo declarado; **no abre ciclo por sí sola** | Se decide aparte. El arreglo natural es volcar en `pagehide` |
 | ~~**D-15 · la guarda de subida comprobada por presencia, no por precedencia**~~ | **CERRADA** el 2026-09-01, re-midiéndola | Ignorar el veredicto del juez en `subirALaNube` da `rc=1`. La cerró el 01-04 sin anotarlo |
+| **D-58 · un libro de la nube que NO CABE adelanta el reloj y el siguiente guardado lo exporta encima** | **Abre el ciclo 01-08.** Pérdida real en la nube (42 ops → 2) con la pantalla en verde. La puerta entera sale `rc=0` | Ciclo 01-08: que una escritura fallida al aplicar no pueda adelantar la marca de tiempo, y que se vea |
+| **D-59 · la capa de aviso del camino de nube no tiene oráculo (8 mutantes vivos)** | **Abre el ciclo 01-08.** Pintar verde sobre una subida fallida u omitida sale `rc=0` | Ciclo 01-08: espía del pintor sobre `subirALaNube` y sobre el callback de error de la escucha; color Y texto por su valor, cerrado por receptor |
+| **D-48 · cambiar o crear cartera pinta «Guardado ✓» con la escritura fallida** | **Entra en el ciclo 01-08.** Misma clase que D-27, cerrada para el libro y viva aquí. Sin oráculo | Ciclo 01-08: el anuncio depende del resultado de la escritura, en los cinco llamantes |
+| **D-61 · `avisos.py --update` amnistía en silencio una alarma que desaparece** | **Entra en el ciclo 01-08.** Hueco del aparato de medición: `--check` la caza, `--update` la sella con `rc=0` y queda verde para siempre | Ciclo 01-08: tratar la desaparición como empeoramiento, igual que `sumideros.py`, con sabotaje propio |
+| **D-65 · carrera arranque/sesión** | Mecanismo reproducido, **orden real en el navegador SIN medir** | Primero medir el orden en la app desplegada; sólo entonces decidir si es ciclo |
 | G7 (radio de impacto) no ve `index.html` | La transición de fase no tiene instrumento propio; hoy se hace a mano | D-22. Se cierra cuando el grafo indexe el `<script>`, o cuando el sustituto sea un script del repo cableado a la puerta |
 
 ## Verificación manual de la Fase 1 — app desplegada, 2026-08-30
@@ -279,19 +292,21 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-09-05
-Stopped at: **ciclo 01-07 CERRADO**, desplegado y verificado dos veces en el navegador real. Árbol
-limpio; `index.html` en `9459b0fc3b40a50a38d0c506fec2b862`; puerta en **rc=0** por las dos variantes.
+Stopped at: **QUINTA transición cerrada**. Acta `01-TRANSICION-5.md`, libro de deudas y los cuatro
+sitios del estado actualizados en el mismo commit. Árbol limpio; `index.html` en
+`9459b0fc3b40a50a38d0c506fec2b862`; puerta en **rc=0**, once pasos; **118 sabotajes** muerden,
+cifra re-derivada en fresco (un brazo publicó 119: es falsa).
 
-**Aviso para quien retome:** al empezar esta sesión, este documento decía «PLAN 01-07 esperando
-aprobación, sin ejecutar» cuando el APPLY llevaba cuatro días commiteado. **El estado mintió sobre
-el proceso mismo**, y sólo se vio comparando con `git log`. Antes de creerse este documento, mírense
-los commits.
+**Aviso para quien retome:** los hallazgos de los brazos NO se heredan. Los cuatro decisivos de
+esta transición se re-verificaron a mano ejecutando, y uno de ellos **resultó falso**. Antes de
+planificar el 01-08, volver a medir D-58 y D-59 en fresco: el plan se escribe sobre lo medido, no
+sobre esta acta.
 
-Next action: **QUINTA transición de fase** — medir los objetivos de la Fase 1 **contra el código**,
-con brazos disjuntos que trabajen sobre COPIA y sobre el árbol real sólo LEAN. No cerrar por conteo
-de actas: `PLAN == SUMMARY` ha disparado en falso las cuatro veces anteriores, y las cuatro
-mediciones cambiaron el resultado.
-Resume file: .paul/phases/01-guardado-fiable/01-07-SUMMARY.md
+Next action: **`/paul:plan` del ciclo 01-08** — que el camino de la nube no pueda pintar verde
+sobre un fallo, y que un libro entrante que no aterriza no adelante el reloj ni se exporte encima.
+Entran D-58, D-59, D-48 y D-61. Fuera: D-65 (falta medir el orden en el navegador), D-60, D-62 a
+D-64, D-66 a D-69, y todo lo de Fase 3.
+Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION-5.md
 
 ---
 *STATE.md — Updated after every significant action*

@@ -149,6 +149,19 @@ Nunca una revisión que pueda fallar en silencio: confirma que completó, o decl
   👉 Regla: **todo brazo trabaja sobre una COPIA; sobre el árbol real sólo LEE.** La prohibición se
   escribe por lo que el brazo EJECUTA, no sólo por lo que edita. Y se le exige comparar la huella
   del original al empezar y al terminar: ese control es el que lo destapó.
+- **Y la copia tampoco basta: el DIRECTORIO DE TRABAJO también se escribe.** Medido en la quinta
+  transición: los cinco brazos trabajaron sobre copia y `index.html` no se tocó, pero un proceso
+  lanzado en segundo plano arrancó con el directorio reseteado al repositorio real y dejó dos
+  ficheros suyos dentro. **Nadie desobedeció.**
+  👉 Regla: todo script de un brazo **fija su directorio de trabajo de forma absoluta y lo afirma
+  antes de escribir nada**. Y el control que lo destapó vuelve a ser el mismo: comparar el estado
+  del árbol al empezar y al terminar.
+- **Un brazo puede reportar VIVO un mutante que muere.** Medido en la quinta transición: uno de los
+  hallazgos principales resultó falso al re-verificarlo, y la distinción que quedaba en pie era
+  otra —el defecto estaba en lo que se PINTA, no en lo que se DEVUELVE—. Aceptarlo sin medir habría
+  fichado un defecto inexistente y descrito mal el real.
+  👉 Regla: **todo hallazgo decisivo se re-verifica a mano antes de ficharlo**, con la unicidad del
+  ancla afirmada. Si el ancla no es única, el defecto es del banco (§5.4), no del código.
 - Brazos **disjuntos**, uno por dimensión: correctness · falsos verdes · calidad del oráculo ·
   cableado · documentos-contra-evidencia.
 
@@ -177,8 +190,18 @@ Nunca una revisión que pueda fallar en silencio: confirma que completó, o decl
 2. sintaxis del `<script>` inline (`tools/check_syntax.py`)
 3. autopruebas del propio código, ejecutadas de verdad en node (`tools/run_selftests.py`)
 4. trinquete de tamaño de funciones (`tools/funcsize.py --check`)
-5. banco de sabotaje: demuestra que 1-4 muerden (`tools/sabotage.py`)
-6. higiene de `tools/` (ruff)
+5. puerta única de escritura a la nube (`tools/cloudwrites.py`)
+6. censo de `catch` vacíos (`tools/emptycatch.py`)
+7. capa de aviso: censo y receptores (`tools/avisos.py`)
+8. sumideros del daño —subir y anunciar— (`tools/sumideros.py`)
+9. banco de sabotaje: demuestra que los anteriores muerden (`tools/sabotage.py`)
+10. enganche `pre-push` instalado y al día (`tools/hookcheck.py`)
+11. higiene de `tools/` (ruff)
+
+> **Esta lista se desactualizó sola.** Decía seis pasos cuando la puerta ejercía once, y lo
+> descubrió la quinta transición. Es la trampa de §9 aplicada a un documento: una lista copiada a
+> mano envejece al siguiente commit. **Lo que manda es la salida de `verify.sh`**; si esta lista y
+> ella no coinciden, la equivocada es ésta.
 
 Reglas:
 

@@ -18,6 +18,15 @@ porque todos los dispositivos ya sincronizados tienen META sin marca de tiempo (
 desconocido vale cero» hace ganar a cualquier documento — control en verde y daño vivo (§5.10).
 Acta: `.paul/phases/01-guardado-fiable/01-07-SUMMARY.md`.
 
+**QUINTA transición de fase (2026-09-05): la fase NO cierra, abre el ciclo 01-08.** Cinco brazos
+adversarios disjuntos, **cada uno sobre su propia copia del proyecto**, y **los cinco demolieron su
+frase**. Abre **D-58 a D-69**. Lo decisivo: un libro de la nube que **no cabe** en el almacenamiento
+adelanta el reloj y el siguiente guardado lo **exporta encima** (42 operaciones → 2, en verde), y la
+capa de aviso del camino de NUBE deja pintar **verde sobre un fallo de sincronización** con la
+puerta entera en `rc=0`. Las cinco deudas que cerró el 01-07 se re-midieron revirtiendo su arreglo:
+**las cinco están bien cerradas**. Acta:
+`.paul/phases/01-guardado-fiable/01-TRANSICION-5.md`.
+
 **CUARTA TRANSICIÓN de la Fase 1 (2026-09-01): la fase NO cierra, abre el ciclo 01-07.** Cuatro
 brazos adversarios disjuntos; por primera vez uno —el del aparato de medición— **no demolió su
 frase**, y por primera vez **ninguna cifra publicada era falsa**. Pero la META sigue sin cumplirse:
@@ -67,25 +76,81 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 
 ## Abiertas — riesgo de pérdida de datos
 
-### D-48 · Cinco llamantes de `saveMeta` siguen ignorando su booleano
-- **Qué es:** el ciclo 01-07 cerró **D-29** por el sumidero del daño —subir a la nube tras un
-  guardado local fallido— y por el anuncio en verde. Quedan **cinco** llamantes que ignoran el
-  booleano de `saveMeta` y que **ni suben ni anuncian**: `createDefaultPortfolios`,
-  `switchPortfolio`, `addPortfolio`, `deletePortfolio` y `renamePortfolio`. Su daño es OTRO y por
-  eso tienen ficha propia en vez de dejar D-29 medio abierta: **un cambio de la lista de carteras
-  que no se pudo escribir se ve en pantalla y no está en el disco**, sin una palabra.
-  **El peor con diferencia es `deletePortfolio`**: hace `localStorage.removeItem(rowsKey(id))`
-  ANTES de `saveMeta()`, así que si la escritura falla los activos ya están borrados y la cartera
-  sigue listada — apuntando a datos que ya no existen.
-- **Cómo se midió:** brazo de alcance del 01-07 (2026-09-01), `grep -n "saveMeta("` sobre el árbol
-  del ciclo: siete llamantes de producción, dos comprueban el booleano (`guardarTodo`,
-  `onUseTargetsToggle`) y cinco no. Ninguno de los cinco llama a `schedulePush`, verificado por el
-  censo de `tools/sumideros.py`.
-- **Estado:** abierta. **El plan del 01-07 la declaró fuera de alcance por escrito**; esta ficha es
-  el cumplimiento de esa promesa, en el mismo commit.
-- **Qué la reabre:** nada la cierra sola. Se cierra cuando los cinco decidan qué anunciar con el
-  resultado, y `deletePortfolio` además invierta el orden (guardar la lista ANTES de borrar los
-  activos) o repare si falla.
+### D-58 · Un libro de la nube que NO CABE adelanta el reloj, y el siguiente guardado lo exporta encima
+- **Qué es:** en `applySyncPayload`, si `saveOpsAll(entrante)` falla —almacenamiento lleno; el
+  libro de la nube es más grande que el local— la función **lo cuenta sólo por `console.error` y
+  sigue**: escribe META con el `savedAt` del documento, recarga el libro VIEJO del disco y devuelve
+  `true`. El dispositivo queda **con el reloj de la nube y el libro pobre**, o sea creyéndose al
+  día sin estarlo. En el primer guardado, `decidirSubida` no ve motivo para frenar (el libro local
+  no está vacío) y **sube el libro pobre encima del rico**: la pérdida ocurre en la NUBE, que es de
+  donde sale la declaración de la renta. Y el otro dispositivo, al arrancar, verá ese documento
+  como más nuevo y adoptará el libro pobre.
+- **Cómo se midió:** brazo A de la quinta transición (2026-09-05), reproducido ejecutando en copia
+  aislada y **re-verificado por el orquestador**: nube con 42 operaciones y cuota simulada →
+  `disco=["o1","o2"] META.savedAt=9000`, `guardarTodo=true save="Guardado ✓" var(--green)`,
+  `subida={"subido":true} nube ahora tiene 2 ops (tenía 42)`, `dotTitle:"Sincronizado"`.
+- **Estado:** **abierta y GRAVE. Abre el ciclo 01-08.** Es la meta literal de la Fase 1 viva: fallo
+  de arranque que empobrece el libro con estado tranquilizador. La puerta entera sale `rc=0` sobre
+  el código con el defecto; lo único vigilado es el TEXTO de la consola, no el mecanismo.
+- **Qué la reabre:** se cierra cuando una escritura fallida durante la aplicación impida adelantar
+  la marca de tiempo y se vea en pantalla, con oráculo que ejerza ese cruce.
+
+### D-59 · La capa de aviso del camino de NUBE no tiene oráculo: ocho mutantes vivos
+- **Qué es:** `subirALaNube` es la única función que escribe a la nube y **nada mide lo que
+  PINTA**. Sobreviven a la puerta entera: pintar **verde** tras una escritura que falla (U8);
+  pintar **verde** una subida omitida por el juez (U3); el aviso naranja sin su motivo en la subida
+  y en la escucha (U2, E2 — es **D-56** medida, no heredada); la escucha de Firestore que **muere**
+  pintada en verde (E7); el texto del estado de error diciendo «Sincronizado con tu cuenta.» con el
+  punto rojo (T5); y un documento con `portfolios: []` declarado sincronizado sin aplicar nada
+  (B5). Se suman los cuatro que la puerta sólo caza **por accidente del banco** («BANCO ROTO:
+  ancla no única»), entre ellos perder `okRows` del veredicto de `guardarTodo`, que no tiene
+  autoprueba propia. Causa común: las pruebas del camino de subida **cuentan escrituras, no
+  pintadas**; el espía del pintor se montó para el arranque y la escucha, nunca para la subida.
+- **Cómo se midió:** brazo B de la quinta transición (2026-09-05), 79 mutantes semánticos con
+  ancla única afirmada; 67 mueren con mensaje nominal y 12 no. **Re-verificados por el orquestador
+  U8 y U3 (`rc=0`, «VERDE — todo ejercido y en verde») y U9**, que el brazo daba por vivo y **no lo
+  está** (`rc=1`, «AC-3 una escritura que lanza no acaba en verde: esperaba error, obtuve ok»): lo
+  que sobrevive es PINTAR, no devolver. El control existente mira el valor devuelto; el operador
+  mira la pantalla.
+- **Estado:** **abierta y GRAVE. Abre el ciclo 01-08.** Un fallo pintado en verde ES, para el
+  operador, el silencio que esta fase existe para impedir — la misma lectura que abrió el 01-06.
+- **Qué la reabre:** se cierra por RECEPTOR, no enumerando los casos conocidos (§5.15): todo
+  pintado del camino de nube afirmado por su color Y su texto, en todas las ramas de fallo.
+
+### D-60 · El cable del guardado a la subida puede cortarse en VERDE
+- **Qué es:** `schedulePush` puede dejar de llamar a `subirALaNube` sin que nada se ponga rojo: las
+  pruebas **reasignan** `schedulePush` para contar llamadas, así que su cuerpo nunca se ejerce. Es
+  §5.6 —cubrir el mecanismo no cubre su cable—, el mismo hallazgo que el cierre del 01-07 encontró
+  para el pintor del motivo, aquí en el eslabón que sincroniza. Daño: la app deja de subir a la
+  nube en silencio, con el punto verde tras cada guardado.
+- **Cómo se midió:** brazo B de la quinta transición (2026-09-05), mutante T7: `rc=0`, «VERDE —
+  todo ejercido y en verde». `tools/sumideros.py` tampoco lo ve: el sumidero que desaparece se
+  atribuye a la flecha y por dominación pasa como «menos superficie de daño».
+- **Estado:** abierta. Fuera del alcance del 01-08 salvo que el cierre de D-59 lo arrastre.
+- **Qué la reabre:** nada la cierra sola. Se cierra cuando el cuerpo de `schedulePush` se ejerza de
+  verdad, con reloj falso, en vez de reasignarse.
+
+### D-48 · Cambiar o crear una cartera pinta «Guardado ✓» en VERDE con la escritura fallida
+- **Qué es:** cinco llamantes ignoran el booleano de `saveMeta`: `createDefaultPortfolios`,
+  `switchPortfolio`, `addPortfolio`, `deletePortfolio` y `renamePortfolio`. **Su ficha original
+  decía que «ni suben ni anuncian», y eso es falso**: `switchPortfolio` y `addPortfolio` llaman
+  antes a `saveRows()` con anuncio, así que **pintan «Guardado ✓» en VERDE** con la lista de
+  carteras sin escribir. Es la categoría exacta de **D-27**, que el 01-07 cerró para el libro y
+  quedó viva aquí. Ninguno de los cinco sube a la nube, así que el libro de operaciones no se
+  pierde por este camino: el daño es **pantalla que miente**, no pérdida.
+  **El peor sigue siendo `deletePortfolio`**: borra los activos ANTES de guardar la lista, así que
+  si la escritura falla los activos ya no están y la cartera sigue listada, apuntando a datos que
+  no existen. Medido: `rows-B` borrado del disco y META en disco todavía listando B.
+- **Cómo se midió:** brazo E de la quinta transición (2026-09-05), reproducido ejecutando y
+  **re-verificado por el orquestador**: con `saveMeta` lanzando, `switchPortfolio` →
+  `pintado: [{"t":"Guardado ✓","ok":true}] | subidas: 0`, memoria B / disco A; `addPortfolio` →
+  ídem. `renamePortfolio`, `deletePortfolio` y `createDefaultPortfolios` no pintan nada.
+  **Sin oráculo**: quitar el `saveMeta()` de `switchPortfolio` deja la puerta en `rc=0`.
+- **Estado:** abierta, **RECLASIFICADA de «cambio silencioso» a VERDE FALSO** el 2026-09-05.
+  **Entra en el ciclo 01-08** por ser la misma clase que D-27 y D-46.
+- **Qué la reabre:** se cierra cuando el anuncio de éxito de los cinco dependa del resultado de su
+  escritura, y `deletePortfolio` además invierta el orden o repare si falla. Con oráculo propio:
+  hoy no lo tiene ninguno.
 
 ### D-49 · El censo de sumideros y el de escrituras a la nube son ESTÁTICOS y por NOMBRE
 - **Qué es:** `tools/sumideros.py` cuenta llamadas (`f(`, `f?.(`) y referencias por nombre. Una
@@ -95,7 +160,13 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   no tiene.
 - **Cómo se midió:** brazo del aparato de medición del 01-07 (2026-09-01), reproducido ejecutando:
   `schedulePush?.()` sembrado en `isMobile` daba `rc=0` antes del arreglo de este ciclo (ahora
-  muerde, con caso propio en el banco); `schedulePush.call(null)` sigue dando `rc=0`.
+  muerde, con caso propio en el banco); `schedulePush.call(null)` **daba** `rc=0`.
+  **CORREGIDO el 2026-09-05 (quinta transición, brazo C, reproducido):** hoy `.call`, `.apply`,
+  `window['schedulePush']` y la desestructuración `{ ref }` SÍ muerden (`rc=1`). La ceguera real es
+  otra: **el nombre partido o calculado** (`window['schedule'+'Push']()`), un pintor por
+  `document.querySelector` o con la id en una variable, `innerHTML +=` con el marcado del aviso, y
+  una subida por REST (`fetch` a la API de Firestore) — todos pasan los tres censos con `rc=0`. El
+  alias de la referencia (`const r = d.ref; r.update()`) sigue invisible, como decía la ficha.
 - **Estado:** abierta como **ceguera declarada**, no como falso verde: está escrita en la cabecera
   de los dos instrumentos. Lo que este ciclo SÍ cerró es la llamada opcional y la referencia como
   valor, que no estaban declaradas y por las que se escapaba el sumidero real del arranque.
@@ -103,6 +174,10 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   la referencia de Firestore. Entonces el censo mide una ficción.
 
 ### D-50 · Tras desplegar el 01-07, un dispositivo ya sincronizado no acepta la nube hasta guardar una vez
+> **RE-MEDIDA el 2026-09-05 (quinta transición, brazo E): la ficha está incompleta en «qué la
+> cierra».** Decía que se cierra sola al guardar una vez. No: tras guardar, el mismo documento pasa
+> a `nube-no-mas-nueva` y **gana lo local, que sube encima**. Sólo entra una nube escrita DESPUÉS.
+> El texto que se pinta, en cambio, ya dice la verdad (D-54 cerrada).
 - **Qué es:** el juez de bajada se niega a aplicar cuando **no hay marca de tiempo** en alguno de
   los dos lados y hay datos locales que proteger (rama `reloj-desconocido`). Es lo que impide que
   el arreglo de D-45 sea ficticio. Pero **todos los dispositivos ya sincronizados llegan al
@@ -331,7 +406,119 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   `console.error`, `console.warn`, `alert` ni `confirm`; o que haga falta un segundo CORTE — el
   segundo corte es la señal de que el criterio está empezando a doblarse.
 
+### D-61 · El censo de avisos AMNISTÍA en silencio una alarma que desaparece
+- **Qué es:** `tools/avisos.py --check` caza que una boca se cierre (`rc=1`, «han DESAPARECIDO
+  avisos») y hasta imprime «No se resella de trámite». Pero **`--update`, SIN `--amnesty`, la sella
+  igualmente, en silencio, sin nombrarla y con `rc=0`** — y a partir de ahí queda verde para
+  siempre. La causa es una asimetría (§5.16): `comparar()` clasifica la desaparición como `mejor`,
+  `--check` la trata como hallazgo y `sellar` sólo se niega ante `peor`. El ciclo 01-06 decidió por
+  escrito que «un aviso que DESAPARECE es un HALLAZGO, no una mejora» y lo cerró **sólo por el lado
+  de `--check`**. `tools/sumideros.py` NO tiene el defecto: allí la boca cerrada va a `peor`.
+- **Cómo se midió:** brazo C de la quinta transición (2026-09-05) y **re-verificado por el
+  orquestador** con ancla única afirmada, cerrando `console.error('No se sincroniza: el guardado
+  local falló.')`: `--check` → `rc=1` nombrando la clave; `--update` → `rc=0` «Foto sellada: 39
+  aviso(s)»; `--check` después → `rc=0` verde.
+- **Estado:** abierta y grave: es un hueco del aparato de medición que **dirige la mano del
+  operador a amnistiar el silencio**. **Entra en el ciclo 01-08.**
+- **Qué la reabre:** se cierra cuando `avisos.py` trate la desaparición como empeoramiento, igual
+  que `sumideros.py`, con sabotaje propio que lo demuestre.
+
+### D-62 · Un `index.html` que no decodifica sale como `rc=1` «hallazgo del código», no `rc=2`
+- **Qué es:** los **siete** instrumentos Python que leen `index.html` (`check_syntax`,
+  `run_selftests`, `funcsize`, `cloudwrites`, `emptycatch`, `avisos`, `sumideros`) mueren con
+  `UnicodeDecodeError` sin capturar: traceback y **`rc=1`**. Es §4.3 literal: instrumento roto
+  disfrazado de hallazgo, que manda a mirar el código en vez de las herramientas. Las fotos
+  selladas sí fallan cerrado ante el mismo byte (`rc=2` con nombre).
+- **Cómo se midió:** brazo C de la quinta transición (2026-09-05), con `printf '\xff\xfe<html>'`.
+  No re-verificado por el orquestador.
+- **Estado:** abierta. Fuera del alcance del 01-08.
+- **Qué la reabre:** se cierra cuando los siete lean dentro de un `try` y devuelvan `rc=2` con
+  nombre, con sabotaje propio.
+
+### D-63 · Reglas de medida que viven FUERA de la semántica sellada cambian sin deriva ni sabotaje
+- **Qué es:** quitar `'delete'` de los mutadores de `cloudwrites.py`, o dejar que el patrón de
+  `emptycatch.py` no vea un `catch {}` desnudo, deja pasar el daño correspondiente con **`rc=0`**:
+  no hay foto que lo selle, no salta la deriva (`rc=3`) y el banco no siembra ese caso. La regla de
+  medida es parte de la vara, y una vara que se puede acortar sin decirlo no es un trinquete.
+- **Cómo se midió:** brazo C de la quinta transición (2026-09-05), sembrando `r.delete()` y
+  `catch {}` tras mutar cada instrumento. No re-verificado por el orquestador.
+- **Estado:** abierta. Fuera del alcance del 01-08.
+- **Qué la reabre:** se cierra cuando esas listas entren en la semántica sellada, o cuando el banco
+  siembre un caso por cada entrada.
+
+### D-64 · `hookcheck` da verde a un enganche con CRLF que git no puede ejecutar
+- **Qué es:** `hookcheck.py` compara con `read_text()`, que normaliza los saltos de línea. Un
+  `pre-push` guardado con CRLF sale «idéntico» y `git push` falla con
+  `/usr/bin/env: 'bash\r': No such file`. El push queda bloqueado —falla cerrado, que es lo
+  bueno— pero **el instrumento certifica lo contrario de lo que ocurre**.
+- **Cómo se midió:** brazo C de la quinta transición (2026-09-05). No re-verificado por el
+  orquestador.
+- **Estado:** abierta, menor. Fuera del alcance del 01-08.
+- **Qué la reabre:** se cierra comparando bytes en vez de texto.
+
+### D-65 · Carrera de arranque: si la sesión gana al evento `load`, una nube más vieja pisa el libro
+- **Qué es:** `auth.onAuthStateChanged` se registra al evaluar el script, pero `initPortfolios`
+  —que carga `ops` y las carteras— corre en el evento `load`. Si el callback de sesión llega
+  primero, el juez de bajada ve el libro vacío, concluye `sin-datos-locales` y **aplica cualquier
+  documento**, por viejo que sea. Es D-45 por una puerta que su arreglo no cubre.
+- **Cómo se midió:** brazo A de la quinta transición (2026-09-05): el MECANISMO está reproducido
+  ejecutando (invirtiendo el orden se pierde una operación; con el orden normal resiste). **El
+  orden REAL en el navegador NO está medido**, y el reproductor se colgó al re-verificarlo.
+- **Estado:** abierta, **pendiente de medir antes de decidir**. Fuera del alcance del 01-08 hasta
+  que se sepa si la carrera ocurre de verdad.
+- **Qué la reabre / qué la cierra:** primero, medir el orden en la app desplegada (una marca de
+  tiempo al entrar en el manejador de sesión y otra en el de `load`, recargando dos veces). Si la
+  sesión puede ganar, es un ciclo; si no, se documenta como imposible y se cierra.
+
+### D-66 · Los activos ilegibles se leen como VACÍOS, sin rescate, y el primer guardado los sobrescribe
+- **Qué es:** `loadRows` se traga el error y devuelve `[]` sin consola ni copia de rescate, al
+  revés que `loadOpsAll`, que sí rescata y pone cerrojo. El primer guardado escribe `[]` encima del
+  blob ilegible. No es el libro de operaciones —títulos y coste se rederivan del FIFO— pero sí se
+  pierden objetivo, precio manual y moneda. **La asimetría entre los dos lectores ES el defecto**
+  (§5.16), la misma forma que el 01-04 cerró en el otro lado.
+- **Cómo se midió:** brazo A de la quinta transición (2026-09-05), reproducido ejecutando: el blob
+  pasa de contener activos a `{"rows":[],"nextId":1}`, claves de rescate: ninguna, pantalla en
+  verde. No re-verificado por el orquestador.
+- **Estado:** abierta. Fuera del alcance del 01-08.
+- **Qué la reabre:** nada la cierra sola.
+
+### D-67 · El naranja de empate sale tras CADA sincronización correcta
+- **Qué es:** al aplicar, META adopta el `savedAt` del documento; la escucha en vivo recibe ese
+  mismo documento (Firestore siempre entrega el estado inicial) y el empate cae en `pendiente` →
+  «Cambios sin subir», sin que haya ninguno. **Es el mismo texto con el que D-58 disfraza una
+  pérdida real.** Un aviso que salta en cada sincronización correcta enseña a ignorar el único
+  aviso que hay.
+- **Cómo se midió:** brazo A de la quinta transición (2026-09-05), reproducido ejecutando. No
+  re-verificado por el orquestador.
+- **Estado:** abierta. Fuera del alcance del 01-08, pero conviene atacarla junto a D-59: es la
+  máscara que hace invisibles a las otras.
+- **Qué la reabre:** nada la cierra sola.
+
+### D-68 · Dos pestañas del mismo navegador sin sesión se pisan el libro
+- **Qué es:** no hay manejador `storage`, así que la última pestaña en guardar escribe su `ops` de
+  memoria sobre el disco, con «Guardado ✓» en las dos. **Con sesión y red resiste**, porque el eco
+  de la subida repara a la otra pestaña: la pérdida queda confinada al modo sólo-local y a los
+  estados con la subida bloqueada (cerrojo, paquete incompleto, sin red).
+- **Cómo se midió:** brazo A de la quinta transición (2026-09-05), reproducido ejecutando, con su
+  control (con sesión y red) que resiste. No re-verificado por el orquestador.
+- **Estado:** abierta. Fuera del alcance del 01-08.
+- **Qué la reabre:** nada la cierra sola.
+
+### D-69 · El punto de sincronía sigue en VERDE tras un guardado local fallido
+- **Qué es:** `guardarTodo` pinta «No se pudo guardar» en rojo durante 5 segundos y **no toca el
+  indicador durable**, que sigue diciendo «Sincronizado con tu cuenta.» con memoria y disco ya
+  divergentes. El aviso existió cinco segundos; el estado que queda en pantalla miente.
+- **Cómo se midió:** brazo A de la quinta transición (2026-09-05), reproducido ejecutando. No
+  re-verificado por el orquestador.
+- **Estado:** abierta. Adyacente a D-18 y D-23. Fuera del alcance del 01-08.
+- **Qué la reabre:** nada la cierra sola.
+
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
+> **RE-MEDIDA el 2026-09-05 (quinta transición, brazo A): pasa de «no reproducida en vivo» a
+> REPRODUCIDA.** Un documento más nuevo con 1 operación sobre 4 locales deja el disco en `["o1"]`
+> con el punto en **verde «Sincronizado»**. Y tiene **dos puertas de entrada nuevas**, D-58 y D-65,
+> que la cota parcial de `vaciariaElLibro` no cubre. Sigue siendo Fase 3 por su arreglo (fusionar
+> por `id`), pero su daño ya no es hipotético.
 - **Qué es:** `applySyncPayload` sustituye `ops` entero por lo que venga de la nube, con
   last-write-wins por un único `savedAt` de documento. Importar operaciones en el móvil sin red y
   abrir luego el portátil puede borrarlas sin aviso.
@@ -379,6 +566,11 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   tenga que volver a correr.
 
 ### D-18 · Que el aviso de guardado se PINTE de rojo no lo ejerce nadie
+> **RE-MEDIDA el 2026-09-05 (quinta transición, brazo E): el mecanismo que describe YA NO EXISTE.**
+> Desde el 01-06, `pruebasPintorDelGuardado` ejecuta el cuerpo del pintor y afirma `var(--red)`
+> **por su valor**, y el banco tiene el sabotaje «colores INTERCAMBIADOS», que muerde con `rc=1`.
+> Lo único que queda vivo de esta ficha es **que nunca se ha visto en un navegador real**. No
+> confundir las dos cosas: el oráculo existe, la prueba humana no.
 - **Qué es:** cuando el guardado falla, la app debe avisar en rojo en vez de decir «Guardado ✓».
   La DECISIÓN de avisar como error está cubierta: los invariantes sustituyen `showSaveIndicator`
   y comprueban que recibe `ok === false`, incluido el camino de éxito PARCIAL (los activos se
@@ -700,6 +892,10 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   del propio código de medida (por ejemplo, de las expresiones regulares).
 
 ### D-53 · El veredicto de `verify.sh` deja que un rc=2 posterior pise un rc=1 anterior
+> **RE-MEDIDA el 2026-09-05 (quinta transición, brazo C): CONFIRMADA, y en las dos direcciones.**
+> `rc=1` seguido de `rc=2`, `rc=2` seguido de `rc=1` y `rc=1` seguido de `rc=3` acaban todos con el
+> veredicto del último. Matiz que la ficha no decía: **el FALLO y su mensaje sí aparecen** en la
+> lista de pasos; lo que se pierde es el veredicto final y el código de salida.
 - **Qué es:** el bloque de veredicto imprime DERIVA, luego ROTO, luego HALLAZGOS. Si un paso da un
   hallazgo real (rc=1) y **otro posterior** da instrumento roto (rc=2) —por ejemplo `hookcheck` en
   una máquina sin el enganche, o `ruff` ausente—, el veredicto sale «DEGRADADO (rc=2)» **sin
@@ -712,54 +908,6 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué la reabre:** nada la cierra sola. Se cierra decidiendo el orden a propósito: el mensaje del
   hallazgo tiene que aparecer aunque el rc final sea 2.
 
-
-### D-54 · El naranja afirma UNA causa y hoy se alcanza por OCHO
-- **Qué es:** `setSyncUI('pendiente')` pinta un texto fijo —«Cambios sin subir: este dispositivo no
-  tiene operaciones y no se pisa el libro de la nube»— que **afirma un motivo concreto**. Pero el
-  aviso `pendiente` lo devuelven hoy **ocho** veredictos distintos del producto (`activos`,
-  `libro-ilegible`, `nube-ilegible`, `nube-no-mas-nueva`, `reloj-desconocido`, `sin-carteras`,
-  `sin-documento`, `vaciaria`), y el texto sólo describe uno de ellos. El veredicto **ya lleva su
-  `clave` y su `motivo` en lenguaje llano**: la información existe y **se tira antes de llegar a la
-  pantalla**. Dos líneas más abajo, el estado `error` documenta en un comentario que no reutiliza el
-  mensaje de `auth` «porque su mensaje mentiría sobre la causa». Aquí miente.
-- **El 01-07 la agrava sin introducirla.** Antes del ciclo llegaban **cuatro** claves al mismo
-  naranja (derivado de `685b44b`), así que el texto ya era falso en tres de ellas. El ciclo añadió
-  cuatro más, y una —`reloj-desconocido`— es la que ve **todo dispositivo ya sincronizado** en su
-  primer arranque tras el despliegue (D-50). Pasó de texto raramente falso a texto que ve todo el
-  mundo el día del estreno.
-- **Cómo se midió:** **en producción, el 2026-09-05**, no en laboratorio. Fue lo primero que el
-  operador vio al abrir la app desplegada, con 90 operaciones en el dispositivo, y preguntó si era
-  normal. Las claves se **derivan del código**, no se enumeran a mano:
-  `re.findall(r"aviso: 'pendiente',\s*(?:aplicado: \w+,\s*)?clave: '([a-z-]+)'", index.html)`
-  da 9 sobre el fichero entero, de las cuales `nube-mas-vieja` es un fixture de
-  `pruebasArranqueTrasRechazo` y no del producto ⇒ **8**.
-- **Por qué importa aquí y no es cosmética:** la meta de la Fase 1 es que la pantalla no mienta. Un
-  naranja que atribuye mal la causa manda al operador a mirar donde no es, y en el caso medido le
-  dice que **no tiene operaciones** a alguien que tiene noventa. Es el gemelo exacto del defecto que
-  el 01-06 cerró para el verde.
-- **Estado: CERRADA** el 2026-09-05, dentro del propio 01-07 (el ciclo la agravó y §3.4 prohíbe
-  entrar en UNIFY con correctness sin atender).
-- **Cómo se cerró:** por la CLASE. `textoPendiente(motivo)` compone el texto **a partir del motivo
-  del veredicto**, que ya venía escrito en lenguaje llano y se tiraba una línea antes de la pantalla;
-  y sin motivo **no se inventa causa** — fallar cerrado también en la pantalla. No hay tabla de
-  textos por clave que mantener, así que un veredicto nuevo llega solo.
-- **Controles, con su control positivo transcrito:** revertido el pintor, `rc=1` y mueren cuatro
-  asertos («D-54 el PINTOR usa el motivo del veredicto: esperaba true, obtuve false»). **Y el CABLE
-  aparte**: revertidos los dos llamantes con el pintor intacto, la primera versión de las pruebas
-  daba **rc=0** —cubrir el mecanismo no cubre su cable (§5.6)—, así que `pruebasCableDelMotivo`
-  ejerce la bajada y el arranque enteros y espía el segundo argumento. Revertida la bajada: `rc=1`,
-  «esperaba documento NO más nuevo (…), obtuve undefined». Revertido el arranque: `rc=1`, «esperaba
-  sin marca de tiempo en lo local…, obtuve undefined». **Cuatro sabotajes permanentes** en el banco,
-  uno por eslabón más el del motivo ausente: un control positivo de hoy es una anécdota fechada.
-- **Lo que este cierre destapó:** tres sabotajes ya existentes **dejaron de morder** porque el
-  cambio movió sus anclas; la puerta lo cantó con `rc=1` y el mensaje «CONTROLES QUE NO MUERDEN (3)»
-  en vez de pasar en verde. Reanclados los tres.
-- **Cómo NO se arregla:** enumerando a mano las ocho claves. Una lista blanca sólo protege de lo que
-  ya conoce (§5.15) y la novena nace mintiendo. Se cierra la **clase**: o el texto sale del veredicto,
-  o —si la clave no se reconoce— el aviso **no afirma ninguna causa**. Fallar cerrado también en la
-  pantalla.
-- **Qué la reabre:** que aparezca una clave de `pendiente` cuyo texto en pantalla no proceda de su
-  veredicto. Necesita control propio, derivado del código y con su mutante: sin él sería §5.1.
 
 ### D-55 · Cambiar el interruptor de objetivos guarda EN SILENCIO, mientras el resto confirma
 - **Qué es:** `onUseTargetsToggle` modifica los datos del operador, los guarda y programa la subida,
@@ -780,6 +928,12 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   necesita control propio: el 01-06 midió que un aviso puede degradarse sin poner nada en rojo.
 
 ### D-56 · Dos de los cuatro llamantes pasan el motivo SIN control que lo mate
+> **RE-MEDIDA el 2026-09-05 (quinta transición, brazos B y E): la ficha mide una cosa por otra.**
+> No son «dos sin control» sin más: el llamante de `subirALaNube` sin motivo **sobrevive a la
+> puerta entera** (`rc=0`), mientras que el de la escucha en vivo pone la puerta roja **por un
+> accidente del banco** («BANCO ROTO: ancla no única»), no porque ningún aserto lo cace — las
+> autopruebas dan OK. Uno es invisible; el otro está tapado por un instrumento roto, y su mensaje
+> **dirige la mano al sitio equivocado**. Los dos entran en **D-59**, que los cierra por receptor.
 - **Qué es:** el motivo del veredicto llega hoy a la pantalla desde cuatro sitios —la bajada, el
   arranque, la subida (`subirALaNube`) y la escucha en vivo (`listenFirestore`)—. **Sólo los dos
   primeros tienen control positivo**: quitarles el motivo pone la puerta en `rc=1`. En los otros dos
@@ -860,6 +1014,59 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 ---
 
 ## Cerradas en el ciclo 01-07 (2026-09-01)
+
+### D-54 · El naranja afirmaba UNA causa y se alcanza por OCHO — CERRADA 2026-09-05
+> **Ubicación corregida el 2026-09-05 (quinta transición, brazo D):** esta ficha vivía bajo
+> «Abiertas — limpieza» con el campo `Estado: CERRADA`. Es el mismo defecto de forma que ya se
+> corrigió para D-38 en la cuarta transición: escribir la lección no la evita (§5.17).
+
+- **Qué es:** `setSyncUI('pendiente')` pinta un texto fijo —«Cambios sin subir: este dispositivo no
+  tiene operaciones y no se pisa el libro de la nube»— que **afirma un motivo concreto**. Pero el
+  aviso `pendiente` lo devuelven hoy **ocho** veredictos distintos del producto (`activos`,
+  `libro-ilegible`, `nube-ilegible`, `nube-no-mas-nueva`, `reloj-desconocido`, `sin-carteras`,
+  `sin-documento`, `vaciaria`), y el texto sólo describe uno de ellos. El veredicto **ya lleva su
+  `clave` y su `motivo` en lenguaje llano**: la información existe y **se tira antes de llegar a la
+  pantalla**. Dos líneas más abajo, el estado `error` documenta en un comentario que no reutiliza el
+  mensaje de `auth` «porque su mensaje mentiría sobre la causa». Aquí miente.
+- **El 01-07 la agrava sin introducirla.** Antes del ciclo llegaban **cuatro** claves al mismo
+  naranja (derivado de `685b44b`), así que el texto ya era falso en tres de ellas. El ciclo añadió
+  cuatro más, y una —`reloj-desconocido`— es la que ve **todo dispositivo ya sincronizado** en su
+  primer arranque tras el despliegue (D-50). Pasó de texto raramente falso a texto que ve todo el
+  mundo el día del estreno.
+- **Cómo se midió:** **en producción, el 2026-09-05**, no en laboratorio. Fue lo primero que el
+  operador vio al abrir la app desplegada, con 90 operaciones en el dispositivo, y preguntó si era
+  normal. Las claves se **derivan del código**, no se enumeran a mano:
+  `re.findall(r"aviso: 'pendiente',\s*(?:aplicado: \w+,\s*)?clave: '([a-z-]+)'", index.html)`
+  da 9 sobre el fichero entero, de las cuales `nube-mas-vieja` es un fixture de
+  `pruebasArranqueTrasRechazo` y no del producto ⇒ **8**.
+- **Por qué importa aquí y no es cosmética:** la meta de la Fase 1 es que la pantalla no mienta. Un
+  naranja que atribuye mal la causa manda al operador a mirar donde no es, y en el caso medido le
+  dice que **no tiene operaciones** a alguien que tiene noventa. Es el gemelo exacto del defecto que
+  el 01-06 cerró para el verde.
+- **Estado: CERRADA** el 2026-09-05, dentro del propio 01-07 (el ciclo la agravó y §3.4 prohíbe
+  entrar en UNIFY con correctness sin atender).
+- **Cómo se cerró:** por la CLASE. `textoPendiente(motivo)` compone el texto **a partir del motivo
+  del veredicto**, que ya venía escrito en lenguaje llano y se tiraba una línea antes de la pantalla;
+  y sin motivo **no se inventa causa** — fallar cerrado también en la pantalla. No hay tabla de
+  textos por clave que mantener, así que un veredicto nuevo llega solo.
+- **Controles, con su control positivo transcrito:** revertido el pintor, `rc=1` y mueren cuatro
+  asertos («D-54 el PINTOR usa el motivo del veredicto: esperaba true, obtuve false»). **Y el CABLE
+  aparte**: revertidos los dos llamantes con el pintor intacto, la primera versión de las pruebas
+  daba **rc=0** —cubrir el mecanismo no cubre su cable (§5.6)—, así que `pruebasCableDelMotivo`
+  ejerce la bajada y el arranque enteros y espía el segundo argumento. Revertida la bajada: `rc=1`,
+  «esperaba documento NO más nuevo (…), obtuve undefined». Revertido el arranque: `rc=1`, «esperaba
+  sin marca de tiempo en lo local…, obtuve undefined». **Cuatro sabotajes permanentes** en el banco,
+  uno por eslabón más el del motivo ausente: un control positivo de hoy es una anécdota fechada.
+- **Lo que este cierre destapó:** tres sabotajes ya existentes **dejaron de morder** porque el
+  cambio movió sus anclas; la puerta lo cantó con `rc=1` y el mensaje «CONTROLES QUE NO MUERDEN (3)»
+  en vez de pasar en verde. Reanclados los tres.
+- **Cómo NO se arregla:** enumerando a mano las ocho claves. Una lista blanca sólo protege de lo que
+  ya conoce (§5.15) y la novena nace mintiendo. Se cierra la **clase**: o el texto sale del veredicto,
+  o —si la clave no se reconoce— el aviso **no afirma ninguna causa**. Fallar cerrado también en la
+  pantalla.
+- **Qué la reabre:** que aparezca una clave de `pendiente` cuyo texto en pantalla no proceda de su
+  veredicto. Necesita control propio, derivado del código y con su mutante: sin él sería §5.1.
+
 
 > Las cinco se cerraron **midiendo contra el código**, y cada arreglo tiene su control positivo en
 > `tools/sabotage.py`: revertirlo pone la puerta en rojo con un mensaje propio. Las transcripciones

@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 7 | In progress (**7 de 7 ciclos cerrados con su loop completo**; el 01-07 cerrado, desplegado y visto DOS veces en el navegador. Falta la QUINTA transición, que es quien decide si la fase cierra) | - |
+| 1 | Guardado que no miente | 7 (+1 por planificar) | In progress (**7 ciclos cerrados y CINCO transiciones**; la quinta, del 2026-09-05, midió la fase contra el código y **la fase NO cierra**: abre el ciclo **01-08**) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -189,7 +189,25 @@ control de huella de otro brazo; restaurado y verificado byte a byte contra HEAD
 nueva en `CLAUDE.md` §3.4: **los brazos trabajan sobre COPIA y sobre el árbol real sólo LEEN** — la
 prohibición se escribe por lo que EJECUTAN, no sólo por lo que editan.
 
+**La QUINTA transición (2026-09-05) tampoco cierra la fase: abre el ciclo 01-08.** Acta:
+`01-TRANSICION-5.md`. Cinco brazos adversarios disjuntos, cada uno sobre **su propia copia**, y los
+cinco demolieron su frase. Los tres objetivos del ALCANCE siguen en PASS; la META no. Lo decisivo,
+reproducido y **re-verificado a mano**: un libro de la nube que **no cabe** en el almacenamiento no
+aterriza pero **adelanta el reloj**, y el siguiente guardado lo **exporta encima** —42 operaciones
+→ 2— con «Guardado ✓» y el punto verde; y la capa de aviso del camino de nube deja **pintar verde
+sobre un fallo de sincronización** con la puerta en `rc=0`. Las cinco deudas que cerró el 01-07 se
+re-midieron revirtiendo su arreglo: **las cinco están bien cerradas**. Un brazo reportó como vivo
+un mutante que **muere**: se corrigió al re-verificar.
+
+**Es la QUINTA vez consecutiva que medir cambia el resultado.** `PLAN == SUMMARY` habría cerrado la
+fase las cinco veces.
+
 **Planes:**
+- [ ] **01-08: El aviso de la nube y el libro que no aterriza** — por planificar. Entran **D-58**
+  (una escritura fallida al aplicar no puede adelantar el reloj), **D-59** (todo pintado del camino
+  de nube afirmado por color Y texto, cerrado por receptor), **D-48** (el anuncio de la lista de
+  carteras depende de su escritura) y **D-61** (`avisos.py` deja de amnistiar el silencio).
+  **Fuera:** D-65 (falta medir el orden en el navegador), D-60, D-62 a D-64, D-66 a D-69 y Fase 3.
 - [x] **01-07: Un solo juez en las dos direcciones** — **CERRADO el 2026-09-05**, acta `01-07-SUMMARY.md`, desplegado y verificado dos veces en el navegador real. Cierra además **D-30** y **D-54**, ésta última encontrada por el propio checkpoint humano: el naranja afirmaba una causa y lo alcanzaban ocho veredictos. Abre D-48 a D-53, D-55, D-56 y D-57.
 
   Detalle original del plan: — cierra **D-45** (el predicado de «hay datos
@@ -290,4 +308,4 @@ Acta: `01-TRANSICION-4.md`.
 
 ---
 *Roadmap created: 2026-08-29*
-*Last updated: 2026-09-01*
+*Last updated: 2026-09-05*

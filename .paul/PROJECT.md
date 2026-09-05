@@ -93,6 +93,32 @@ verde. Con el almacenamiento lleno, el operador vería «Guardado ✓» y ademá
 Los dos abren el ciclo **01-07**. Las cuatro mediciones de esta fase han cambiado el resultado al
 hacerlas; contar actas la habría cerrado las cuatro veces.
 
+**El ciclo 01-07 cerró los dos el 2026-09-05**, y se vio dos veces en el navegador real. Un solo
+juez gobierna ahora las dos direcciones por las que entra la nube, y «hay datos que proteger» suma
+el libro además de los activos. El checkpoint humano no fue un trámite: nada más abrir la app, el
+operador leyó «este dispositivo **no tiene operaciones**» con noventa delante. El comportamiento
+era el correcto; el TEXTO mentía, y el propio ciclo lo había agravado. Se arregló dentro del mismo
+ciclo: el aviso compone su causa a partir del veredicto, y sin motivo no se inventa ninguna.
+
+**La QUINTA medición se hizo el 2026-09-05, y la fase SIGUE abierta.** Cinco brazos adversarios,
+cada uno sobre su propia copia del proyecto, y los cinco encontraron algo que ninguno de los otros
+vio. Lo que impide cerrar es, otra vez, un defecto del producto, y esta vez el daño no está en el
+dispositivo sino **en la nube**:
+
+Cuando la app arranca y la nube trae un libro **más grande de lo que cabe** en el almacenamiento
+del navegador, el libro **no se guarda** —eso ya se sabía y se avisa por consola— pero el reloj
+interno **sí se adelanta**, como si hubiera llegado. A partir de ahí el dispositivo se cree al día.
+En cuanto el operador toca cualquier cosa, sube su libro pequeño **encima del grande**: en la
+prueba, la nube pasó de 42 operaciones a 2, con «Guardado ✓» y el punto en verde. Como de la nube
+sale la declaración de la renta, la pérdida es la que más importa.
+
+Y junto a eso, un hueco de medición del mismo tamaño: **nadie comprueba lo que la app PINTA cuando
+la sincronización falla**. Las pruebas cuentan si se escribió o no en la nube; el operador, en
+cambio, mira la pantalla. Pintar verde sobre una subida fallida pasa la verificación entera.
+
+Los dos abren el ciclo **01-08**. **Las cinco mediciones de esta fase han cambiado el resultado al
+hacerlas**; contar actas la habría cerrado las cinco veces.
+
 ### Planned (Next)
 
 - [ ] Fase 2 — Backup/restore JSON
@@ -179,4 +205,4 @@ hacerlas; contar actas la habría cerrado las cuatro veces.
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-08-31*
+*Last updated: 2026-09-05*
