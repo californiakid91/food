@@ -118,6 +118,9 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   y no se pisa el libro de la nube», que en este caso **no describe bien la causa**.
 - **Qué la reabre:** nada; se cierra sola en cuanto el operador guarde algo. Lo que sí queda
   pendiente es el TEXTO del aviso, que miente sobre el motivo.
+- **VISTA EN PRODUCCIÓN el 2026-09-05**, no en laboratorio: es lo PRIMERO que el operador se
+  encontró al abrir la app desplegada, y preguntó si era normal. La parte de comportamiento es la
+  prevista; la del texto se separa a **D-54**, que ya no es un apunte al pie de esta ficha.
 
 ### D-51 · El desempate es «gana el último reloj», y los relojes de dos dispositivos no coinciden
 - **Qué es:** al conservar la marca del documento aplicado (D-30 cerrada), un dispositivo adopta el
@@ -709,6 +712,39 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué la reabre:** nada la cierra sola. Se cierra decidiendo el orden a propósito: el mensaje del
   hallazgo tiene que aparecer aunque el rc final sea 2.
 
+
+### D-54 · El naranja afirma UNA causa y hoy se alcanza por OCHO
+- **Qué es:** `setSyncUI('pendiente')` pinta un texto fijo —«Cambios sin subir: este dispositivo no
+  tiene operaciones y no se pisa el libro de la nube»— que **afirma un motivo concreto**. Pero el
+  aviso `pendiente` lo devuelven hoy **ocho** veredictos distintos del producto (`activos`,
+  `libro-ilegible`, `nube-ilegible`, `nube-no-mas-nueva`, `reloj-desconocido`, `sin-carteras`,
+  `sin-documento`, `vaciaria`), y el texto sólo describe uno de ellos. El veredicto **ya lleva su
+  `clave` y su `motivo` en lenguaje llano**: la información existe y **se tira antes de llegar a la
+  pantalla**. Dos líneas más abajo, el estado `error` documenta en un comentario que no reutiliza el
+  mensaje de `auth` «porque su mensaje mentiría sobre la causa». Aquí miente.
+- **El 01-07 la agrava sin introducirla.** Antes del ciclo llegaban **cuatro** claves al mismo
+  naranja (derivado de `685b44b`), así que el texto ya era falso en tres de ellas. El ciclo añadió
+  cuatro más, y una —`reloj-desconocido`— es la que ve **todo dispositivo ya sincronizado** en su
+  primer arranque tras el despliegue (D-50). Pasó de texto raramente falso a texto que ve todo el
+  mundo el día del estreno.
+- **Cómo se midió:** **en producción, el 2026-09-05**, no en laboratorio. Fue lo primero que el
+  operador vio al abrir la app desplegada, con 90 operaciones en el dispositivo, y preguntó si era
+  normal. Las claves se **derivan del código**, no se enumeran a mano:
+  `re.findall(r"aviso: 'pendiente',\s*(?:aplicado: \w+,\s*)?clave: '([a-z-]+)'", index.html)`
+  da 9 sobre el fichero entero, de las cuales `nube-mas-vieja` es un fixture de
+  `pruebasArranqueTrasRechazo` y no del producto ⇒ **8**.
+- **Por qué importa aquí y no es cosmética:** la meta de la Fase 1 es que la pantalla no mienta. Un
+  naranja que atribuye mal la causa manda al operador a mirar donde no es, y en el caso medido le
+  dice que **no tiene operaciones** a alguien que tiene noventa. Es el gemelo exacto del defecto que
+  el 01-06 cerró para el verde.
+- **Estado:** abierta, **de correctness**, y se arregla DENTRO del 01-07: el ciclo la agravó y §3.4
+  prohíbe pasar a UNIFY con un hallazgo de correctness sin atender.
+- **Cómo NO se arregla:** enumerando a mano las ocho claves. Una lista blanca sólo protege de lo que
+  ya conoce (§5.15) y la novena nace mintiendo. Se cierra la **clase**: o el texto sale del veredicto,
+  o —si la clave no se reconoce— el aviso **no afirma ninguna causa**. Fallar cerrado también en la
+  pantalla.
+- **Qué la reabre:** que aparezca una clave de `pendiente` cuyo texto en pantalla no proceda de su
+  veredicto. Necesita control propio, derivado del código y con su mutante: sin él sería §5.1.
 
 ### D-22 · El instrumento de radio de impacto no ve el producto
 - **Qué es:** el brazo G7 de la transición de fase es `code-review-graph`, que construye un grafo

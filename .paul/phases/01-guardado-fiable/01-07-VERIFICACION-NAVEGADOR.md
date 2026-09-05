@@ -37,3 +37,32 @@ no se hereda de que el resto fuera bien.
 
 - El aviso ROJO del **guardado local** fallido: sigue siendo **D-18**. Exige agotar el
   almacenamiento del navegador con el libro real delante.
+
+
+## Hallazgo en el punto 0 — antes de empezar la lista
+
+Al abrir la app desplegada, **lo primero** que apareció fue el naranja «Cambios sin subir: este
+dispositivo **no tiene operaciones** y no se pisa el libro de la nube», en un dispositivo con **90
+operaciones**. El operador preguntó si era normal.
+
+**Causa DEMOSTRADA, no supuesta.** En la consola del dispositivo del operador:
+
+```
+JSON.parse(localStorage.getItem('balance-meta-v2')||'{}').savedAt   →   undefined
+```
+
+Sin marca de tiempo local, `decidirBajada` entra por la rama `reloj-desconocido`: hay datos que
+proteger y no hay desempate posible, así que **no aplica** el documento y avisa. Es **D-50**, el
+coste declarado del ciclo, y es el comportamiento QUERIDO: quedarse quieto y decirlo, antes que
+dejar ganar a la nube y empobrecer el libro en verde.
+
+| Parte | Veredicto |
+|---|---|
+| **Comportamiento** (no aplicar, avisar en naranja, no perder nada) | **CORRECTO y previsto** — D-50 |
+| **Texto del aviso** | **DEFECTO** — atribuye una causa falsa: **D-54** |
+
+El texto es un hallazgo de correctness y se arregla dentro de este ciclo. El comportamiento no se
+toca.
+
+**El despliegue no pierde datos**, y el estado se deshace solo en cuanto el operador guarde algo una
+vez: eso vuelve a poner el reloj local en hora.
