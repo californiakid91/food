@@ -101,3 +101,36 @@ del navegador no demostraban:
 
 Lo que NO demuestra, y se dice: el aviso **rojo del guardado local fallido** sigue sin verse nunca
 en un navegador (**D-18**), porque exige agotar el almacenamiento con el libro real delante.
+
+
+## Segunda pasada — el arreglo de D-54, `892d936`, 2026-09-05
+
+Confirmado ANTES de mirar nada que Pages servía la versión nueva (huella
+`9459b0fc3b40a50a38d0c506fec2b862`, idéntica a la local; **los dos primeros intentos devolvieron
+todavía la anterior**, `5b3807dd…` — el mismo retraso que en las cinco pasadas previas).
+
+Se pidió pintar el naranja con un motivo **inyectado**, y ocurrió algo mejor: el arranque terminó
+justo después y **repintó el suyo, el REAL**. Lo leído en la pantalla del operador:
+
+> Cambios sin subir (documento NO más nuevo (1788612341197 <= 1788612344603) con **89 operaciones
+> locales que proteger**). Tus datos siguen guardados en este dispositivo.
+
+| Punto | Resultado | Evidencia |
+|---|---|---|
+| El naranja dice su causa REAL, no una fija | **PASS** | texto compuesto por la app sola, con su veredicto y sus dos marcas de tiempo |
+| La cifra del motivo es la del libro de verdad | **PASS** | **89**, exactamente las que quedaron tras el borrado del punto 7. Antes de hoy el mismo aviso decía «este dispositivo no tiene operaciones» |
+| El cable llega de punta a punta en producción | **PASS** | no es la inyección de la prueba: es el camino real del arranque |
+
+**Vale MÁS que la comprobación pedida:** la inyección habría demostrado que el pintor sabe usar un
+motivo; esto demuestra que el motivo REAL del veredicto llega hasta la pantalla en la app desplegada.
+
+## O-2 · Al arrancar con datos MÁS NUEVOS que la nube, no se suben
+
+**Lo que muestra la evidencia de arriba:** lo local es ~3,4 segundos más nuevo que el documento
+(`1788612344603` vs `1788612341197`). La bajada rechaza —correctamente, hay que proteger el libro—
+y el arranque **no sube** encima: se queda en naranja hasta que el operador guarde algo, que es lo
+que dispara la subida.
+
+**No es pérdida y el aviso no miente**: dice literalmente «cambios sin subir», y es verdad que los
+hay. Pero un dispositivo con lo más reciente puede quedarse indefinidamente sin publicarlo si nadie
+toca nada. Se ficha como **D-57**; no se arregla aquí.

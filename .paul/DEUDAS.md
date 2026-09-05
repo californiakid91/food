@@ -798,6 +798,25 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   Mientras tanto, cualquier `setSyncUI(estadoSync(decision.aviso))` **sin segundo argumento** en esos
   dos sitios es una regresión que hoy nadie caza.
 
+### D-57 · Al arrancar con lo local MÁS NUEVO que la nube, no se sube: se queda naranja
+- **Qué es:** en `alIniciarSesion`, si la bajada devuelve un veredicto de rechazo, el arranque
+  **no intenta subir** —sólo sube cuando la lectura NO está sincronizada— y deja el indicador en
+  naranja. Un dispositivo que tiene lo más reciente puede quedarse **indefinidamente sin publicarlo**
+  si el operador no guarda nada: la subida sólo la dispara un guardado posterior.
+- **Cómo se midió:** **en producción**, 2026-09-05, durante la verificación del 01-07. El texto que
+  la app pintó sola dice: `documento NO más nuevo (1788612341197 <= 1788612344603) con 89
+  operaciones locales que proteger`. Lo local es ~3,4 s más nuevo que el documento.
+- **Estado:** abierta, **menor**. No hay pérdida —los datos están en local y la nube conserva los
+  suyos— y el aviso **no miente**: dice «cambios sin subir», y los hay. Lo que falla es que nada los
+  empuja solo.
+- **Por qué no se arregla aquí:** subir tras un rechazo de bajada es una decisión de política de
+  sincronización, no un fallo de aviso; toca el mismo terreno que D-51 (el desempate por reloj de
+  pared) y **la meta declarada de la Fase 3**. Meterlo en un ciclo que iba de la capa de aviso sería
+  mover la vara a mitad de partido.
+- **Qué la reabre / cierra:** se cierra decidiendo en la Fase 3 quién gana y quién publica. Ojo al
+  cruzarlo con D-51: subir automáticamente cuando lo local parece más nuevo **por un reloj
+  adelantado** es exactamente cómo se machaca la copia buena de otro dispositivo.
+
 ### D-22 · El instrumento de radio de impacto no ve el producto
 - **Qué es:** el brazo G7 de la transición de fase es `code-review-graph`, que construye un grafo
   del código y calcula el alcance de un cambio. **No parsea el JavaScript inline de un `.html`**,
