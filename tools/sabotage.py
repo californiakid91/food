@@ -394,7 +394,7 @@ CASOS = [
     # 14. El manejador deja de PINTAR el indicador. El valor de retorno seguia
     #     siendo correcto, asi que sin el espia esto sobrevivia (5.6).
     Caso("el manejador deja de pintar el indicador", INDEX,
-         "  const aviso = estadoSync(resultado);\n  setSyncUI(aviso);",
+         "  const aviso = estadoSync(resultado);\n  setSyncUI(aviso, motivoFinal);",
          "  const aviso = estadoSync(resultado);",
          1, "AC-3 y además PINTA el indicador"),
     # 15. EL CABLEADO ASINCRONO. Sin el `await`, la suite del manejador deja de
@@ -583,8 +583,8 @@ CASOS = [
     # rechazaba, y el arranque lo traducia a VERDE. Cerrar solo la bajada habria
     # dejado la pantalla mintiendo en el escenario exacto de la ficha (5.5).
     Caso("el arranque vuelve a repintar VERDE encima del rechazo", INDEX,
-         "      ? lectura.aviso",
-         "      ? 'ok'",
+         "      ? lectura\n      : await d.subir('inicio de sesión');",
+         "      ? { aviso: 'ok', motivo: 'ok' }\n      : await d.subir('inicio de sesión');",
          1, "AC-4 un rechazo de la bajada NO acaba en verde"),
     # El SEGUNDO camino de bajada. Cerrar solo el del arranque habria sido el
     # caso disfrazado de clase: la escucha en vivo tenia su desempate aparte.
@@ -703,9 +703,35 @@ CASOS = [
     # Los dos caminos tienen que coincidir tambien en lo que el operador MIRA.
     Caso("la escucha en vivo rechaza sin pintar nada", INDEX,
          "      console.warn('[SYNC] cambio de la nube NO aplicado:', decision.motivo);\n"
-         "      setSyncUI(estadoSync(decision.aviso));",
+         "      setSyncUI(estadoSync(decision.aviso), decision.motivo);",
          "      console.warn('[SYNC] cambio de la nube NO aplicado:', decision.motivo);",
          1, "AC-4 un rechazo en vivo también pinta el aviso del veredicto"),
+    # D-54. El naranja afirmaba UNA causa y lo alcanzan OCHO veredictos. Visto en
+    # PRODUCCION el 2026-09-05: el operador, con 90 operaciones, leyo «este
+    # dispositivo no tiene operaciones». Los TRES eslabones llevan mutante propio
+    # porque revertir uno solo dejaba los otros verdes: medido, revertir los dos
+    # llamantes con el pintor intacto daba rc=0 (5.6, el cable no es el mecanismo).
+    Caso("el naranja vuelve a afirmar una causa fija", INDEX,
+         "    status.textContent = textoPendiente(motivo);",
+         "    status.textContent = 'Cambios sin subir: este dispositivo no tiene "
+         "operaciones y no se pisa el libro de la nube.';",
+         1, "D-54 el PINTOR usa el motivo del veredicto"),
+    Caso("la bajada se come el motivo de su veredicto", INDEX,
+         "  d.pintar(estadoSync(decision.aviso), decision.motivo);",
+         "  d.pintar(estadoSync(decision.aviso));",
+         1, "D-54 y le pasa al pintor el MOTIVO de su veredicto"),
+    Caso("el arranque se come el motivo antes de pintar", INDEX,
+         "  setSyncUI(aviso, motivoFinal);",
+         "  setSyncUI(aviso);",
+         1, "D-54 y el arranque NO se come el motivo"),
+    # Y el caso del motivo AUSENTE: sin esto, «fallar cerrado en la pantalla»
+    # seria un comentario. Inventarse una causa cuando no la hay es el mismo
+    # defecto en su otra mitad.
+    Caso("sin motivo, el texto se inventa una causa", INDEX,
+         "  return m ? 'Cambios sin subir (' + m + '). ' + base\n"
+         "           : 'Cambios sin subir. ' + base;",
+         "  return 'Cambios sin subir (este dispositivo no tiene operaciones). ' + base;",
+         1, "D-54 sin motivo"),
     Caso("un cambio de la nube entra al disco y la pantalla no se entera", INDEX,
          "    applySyncPayload(data);\n    repintarTrasSync();",
          "    applySyncPayload(data);",

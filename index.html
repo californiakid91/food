@@ -2909,7 +2909,31 @@ let currentUser = null;
 let pushTimer;
 let unsubFirestore = null;
 
-function setSyncUI(state) {
+// D-54. El naranja afirmaba UNA causa —«este dispositivo no tiene operaciones»—
+// y hoy lo alcanzan OCHO veredictos distintos del producto. El operador lo vio
+// en PRODUCCIÓN, con 90 operaciones en el dispositivo, nada más abrir la app: el
+// texto le decía justo lo contrario de su realidad y le mandaba a mirar donde no
+// era. Dos estados más abajo, `error` documenta en un comentario que NO reutiliza
+// el mensaje de `auth` «porque su mensaje mentiría sobre la causa». Aquí mentía.
+//
+// El veredicto YA trae su `motivo` en lenguaje llano: la información existía y se
+// tiraba una línea antes de llegar a la pantalla. Se cierra la CLASE, no las ocho
+// claves: el texto SALE del veredicto, así que un motivo nuevo llega solo y sin
+// tocar esto. Una tabla de textos por clave sería la lista blanca de §5.15 —sólo
+// protege de lo que ya conoce— y el noveno caso nacería mintiendo otra vez.
+//
+// Sin motivo NO se inventa ninguno: fallar CERRADO también en la pantalla. Decir
+// «cambios sin subir» y callar la causa es honesto; atribuirla mal, no.
+function textoPendiente(motivo) {
+  const base = 'Tus datos siguen guardados en este dispositivo.';
+  const m = typeof motivo === 'string' ? motivo.trim() : '';
+  return m ? 'Cambios sin subir (' + m + '). ' + base
+           : 'Cambios sin subir. ' + base;
+}
+
+// El segundo parámetro es el MOTIVO del veredicto, no un texto de pantalla: quien
+// llama pasa `decision.motivo` tal cual y no compone frases por su cuenta.
+function setSyncUI(state, motivo) {
   const dot    = document.getElementById('sync-dot');
   const status = document.getElementById('sync-status');
   const btn    = document.getElementById('auth-btn');
@@ -2933,7 +2957,7 @@ function setSyncUI(state) {
     // El silencio nunca es "limpio": si se omite un push, se ve.
     dot.style.background = '#e67e22';
     dot.title = 'Cambios sin subir';
-    status.textContent = 'Cambios sin subir: este dispositivo no tiene operaciones y no se pisa el libro de la nube.';
+    status.textContent = textoPendiente(motivo);
     status.style.display = 'block';
   } else if (state === 'error') {
     // Rojo propio: NO se reutiliza 'auth' porque su mensaje mentiría sobre la
@@ -3238,7 +3262,7 @@ async function pullFromFirestore(deps) {
   let aplicado = false;
   if (decision.aplicar) aplicado = d.aplicar(data);
   else console.warn('[SYNC] documento de la nube NO aplicado:', decision.motivo);
-  d.pintar(estadoSync(decision.aviso));
+  d.pintar(estadoSync(decision.aviso), decision.motivo);
   return { sincronizado: true, aplicado: aplicado, aviso: decision.aviso,
            clave: decision.clave, motivo: decision.motivo };
 }
@@ -3350,7 +3374,7 @@ async function subirALaNube(motivo, deps) {
   });
   if (!decision.subir) {
     console.warn('[SYNC] subida omitida (' + motivo + '):', decision.motivo);
-    setSyncUI(estadoSync(decision.aviso));
+    setSyncUI(estadoSync(decision.aviso), decision.motivo);
     return { subido: false, aviso: decision.aviso, motivo: decision.motivo };
   }
   try {
@@ -3404,7 +3428,7 @@ function listenFirestore(deps) {
       // pintaba nada: un rechazo repetido dejaba el punto verde para siempre
       // mientras los dispositivos divergían en silencio.
       console.warn('[SYNC] cambio de la nube NO aplicado:', decision.motivo);
-      setSyncUI(estadoSync(decision.aviso));
+      setSyncUI(estadoSync(decision.aviso), decision.motivo);
       return;
     }
     applySyncPayload(data);
@@ -3452,6 +3476,7 @@ async function alIniciarSesion(user, deps) {
     return 'offline';
   }
   let resultado;
+  let motivoFinal;
   try {
     // El VEREDICTO de la bajada, no un booleano. Antes esto era
     // `sincronizado ? 'ok' : ...`: la bajada devolvía el mismo `true` tanto si
@@ -3460,17 +3485,23 @@ async function alIniciarSesion(user, deps) {
     // la pantalla acababa diciendo «Sincronizado» (§5.5: dos piezas con control
     // por separado y el CRUCE sin medir).
     const lectura = await d.leerNube();
-    resultado = (lectura && lectura.sincronizado)
-      ? lectura.aviso
-      : (await d.subir('inicio de sesión')).aviso;
+    // El MOTIVO viaja junto al aviso desde el mismo sitio. Antes se quedaba aquí
+    // y el arranque —el sitio donde el operador se encuentra el naranja de D-50—
+    // era precisamente el que pintaba sin causa (D-54).
+    const fuente = (lectura && lectura.sincronizado)
+      ? lectura
+      : await d.subir('inicio de sesión');
+    resultado = fuente && fuente.aviso;
+    motivoFinal = fuente && fuente.motivo;
     d.escuchar();
     d.pintar();
   } catch (e) {
     console.error('alIniciarSesion:', e);
     resultado = 'error';
+    motivoFinal = undefined;
   }
   const aviso = estadoSync(resultado);
-  setSyncUI(aviso);
+  setSyncUI(aviso, motivoFinal);
   return aviso;
 }
 
@@ -5865,12 +5896,56 @@ function pruebasPintorDeSincronizacion(check) {
   });
 }
 
+// D-54. El naranja no puede volver a afirmar una causa que no es la suya.
+//
+// Mide las DOS mitades por separado, porque son fallos distintos: que la función
+// pura componga bien, y que el PINTOR la use de verdad. Con sólo la primera, el
+// arreglo entero podría estar desconectado y las pruebas seguirían verdes (§5.6);
+// con sólo la segunda no se vería el caso del motivo ausente.
+//
+// CONTROL POSITIVO: devolver el texto fijo a `setSyncUI` mata «el pintor usa el
+// motivo del veredicto» y «el texto viejo no vuelve». No es un aserto de nombre:
+// mide lo que se lee en pantalla.
+function pruebasTextoPendiente(check) {
+  const causaFalsa = 'no tiene operaciones';
+  const m = 'sin marca de tiempo en lo local: no se puede desempatar';
+  check('D-54 el motivo del veredicto aparece en el texto',
+        textoPendiente(m).indexOf(m) >= 0, true);
+  check('D-54 y el texto NO afirma la causa vieja',
+        textoPendiente(m).indexOf(causaFalsa) < 0, true);
+  // Sin motivo se calla la causa, no se inventa: fallar cerrado en la pantalla.
+  [undefined, null, '', '   ', 0, {}].forEach(v => {
+    const t = textoPendiente(v);
+    check('D-54 sin motivo (' + JSON.stringify(v) + ') no se afirma causa',
+          t.indexOf(causaFalsa) < 0 && t.indexOf('(') < 0, true);
+    check('D-54 sin motivo (' + JSON.stringify(v) + ') sigue avisando',
+          t.indexOf('Cambios sin subir') === 0, true);
+  });
+  // EL CABLE. Sin esto, todo lo de arriba pasaría con el pintor intacto.
+  conVentanaDePintura(v => {
+    const status = v.el('sync-status');
+    setSyncUI('pendiente', m);
+    check('D-54 el PINTOR usa el motivo del veredicto',
+          status.textContent.indexOf(m) >= 0, true);
+    check('D-54 y el pintor no reintroduce la causa vieja',
+          status.textContent.indexOf(causaFalsa) < 0, true);
+    check('D-54 el pintor compone por textoPendiente, no a mano',
+          status.textContent, textoPendiente(m));
+    setSyncUI('pendiente');
+    check('D-54 el pintor sin motivo tampoco afirma causa',
+          status.textContent.indexOf(causaFalsa) < 0, true);
+    check('D-54 y sigue en naranja, visible', status.style.display, 'block');
+  });
+}
+
 // Agrupa la capa de aviso. Todas corren igual en node y en el navegador.
 async function pruebasCapaDeAviso(check) {
   await pruebasArnesDePintura(check);
   pruebasPintorDelGuardado(check);
   pruebasDuracionDelAviso(check);
   pruebasPintorDeSincronizacion(check);
+  pruebasTextoPendiente(check);
+  await pruebasCableDelMotivo(check);
 }
 
 // AC-5. Espia de consola por PREFIJO LITERAL COMPLETO y por NIVEL.
@@ -6401,6 +6476,56 @@ async function pruebasArranqueTrasRechazo(check) {
     check('AC-4 y no se sube nada encima de la nube', subidas, 0);
     check('AC-4 y en ningún instante se pintó el verde',
           pintado.indexOf('ok') >= 0, false);
+  } finally {
+    setSyncUI = pintadoReal;
+    currentUser = previo.user; unsubFirestore = previo.unsub;
+  }
+}
+
+// D-54, SEGUNDO ESLABÓN: que el pintor sepa usar el motivo no sirve de nada si
+// quien llama no se lo pasa. Medido: revertidos los dos llamantes y dejado el
+// pintor intacto, las pruebas del pintor seguían TODAS en verde (§5.6 — cubrir el
+// mecanismo no cubre su cable). Estas dos ejercen los caminos completos y espían
+// el SEGUNDO argumento, que es justo el que se perdía.
+//
+// Se eligen los dos caminos por los que el operador llega al naranja de verdad:
+// el arranque —donde vio el texto falso— y la bajada, que es quien emite el
+// veredicto. CONTROL POSITIVO: quitar `decision.motivo` o `motivoFinal` de
+// cualquiera de los dos mata su aserto.
+async function pruebasCableDelMotivo(check) {
+  const previo = { user: currentUser, unsub: unsubFirestore };
+  const pintadoReal = setSyncUI;
+  try {
+    // (a) La BAJADA: el veredicto emitido y el motivo pintado son el MISMO.
+    const pintadoBajada = [];
+    const doc = { portfolios: [{ id: 'p1' }], savedAt: 500 };
+    const veredicto = await pullFromFirestore({
+      ref: { get: async () => ({ exists: true, data: () => doc }) },
+      leerMeta: () => JSON.stringify({ savedAt: 9000 }),
+      aplicar: () => true, ops: () => [{ id: 'o1' }], activos: () => false,
+      pintar: (estado, motivo) => { pintadoBajada.push({ estado: estado, motivo: motivo }); },
+    });
+    const ultimo = pintadoBajada[pintadoBajada.length - 1];
+    check('D-54 la bajada rechaza y pinta naranja', ultimo && ultimo.estado, 'pendiente');
+    check('D-54 y le pasa al pintor el MOTIVO de su veredicto',
+          ultimo && ultimo.motivo, veredicto.motivo);
+    check('D-54 y ese motivo no está vacío',
+          !!(ultimo && ultimo.motivo && ultimo.motivo.length > 0), true);
+
+    // (b) El ARRANQUE: es donde el operador se encontró el texto falso.
+    unsubFirestore = null;
+    const pintadoArranque = [];
+    setSyncUI = (estado, motivo) => { pintadoArranque.push({ estado: estado, motivo: motivo }); };
+    const motivoEsperado = 'sin marca de tiempo en lo local: no se puede desempatar';
+    await alIniciarSesion({ uid: 'u9' }, {
+      leerNube: async () => ({ sincronizado: true, aviso: 'pendiente',
+                               clave: 'reloj-desconocido', motivo: motivoEsperado }),
+      subir: async () => ({ aviso: 'ok', motivo: 'ok' }),
+      escuchar: () => {}, pintar: () => {},
+    });
+    const fin = pintadoArranque[pintadoArranque.length - 1];
+    check('D-54 el arranque pinta naranja tras el rechazo', fin && fin.estado, 'pendiente');
+    check('D-54 y el arranque NO se come el motivo', fin && fin.motivo, motivoEsperado);
   } finally {
     setSyncUI = pintadoReal;
     currentUser = previo.user; unsubFirestore = previo.unsub;

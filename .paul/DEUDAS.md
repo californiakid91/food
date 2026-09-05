@@ -737,8 +737,23 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   naranja que atribuye mal la causa manda al operador a mirar donde no es, y en el caso medido le
   dice que **no tiene operaciones** a alguien que tiene noventa. Es el gemelo exacto del defecto que
   el 01-06 cerró para el verde.
-- **Estado:** abierta, **de correctness**, y se arregla DENTRO del 01-07: el ciclo la agravó y §3.4
-  prohíbe pasar a UNIFY con un hallazgo de correctness sin atender.
+- **Estado: CERRADA** el 2026-09-05, dentro del propio 01-07 (el ciclo la agravó y §3.4 prohíbe
+  entrar en UNIFY con correctness sin atender).
+- **Cómo se cerró:** por la CLASE. `textoPendiente(motivo)` compone el texto **a partir del motivo
+  del veredicto**, que ya venía escrito en lenguaje llano y se tiraba una línea antes de la pantalla;
+  y sin motivo **no se inventa causa** — fallar cerrado también en la pantalla. No hay tabla de
+  textos por clave que mantener, así que un veredicto nuevo llega solo.
+- **Controles, con su control positivo transcrito:** revertido el pintor, `rc=1` y mueren cuatro
+  asertos («D-54 el PINTOR usa el motivo del veredicto: esperaba true, obtuve false»). **Y el CABLE
+  aparte**: revertidos los dos llamantes con el pintor intacto, la primera versión de las pruebas
+  daba **rc=0** —cubrir el mecanismo no cubre su cable (§5.6)—, así que `pruebasCableDelMotivo`
+  ejerce la bajada y el arranque enteros y espía el segundo argumento. Revertida la bajada: `rc=1`,
+  «esperaba documento NO más nuevo (…), obtuve undefined». Revertido el arranque: `rc=1`, «esperaba
+  sin marca de tiempo en lo local…, obtuve undefined». **Cuatro sabotajes permanentes** en el banco,
+  uno por eslabón más el del motivo ausente: un control positivo de hoy es una anécdota fechada.
+- **Lo que este cierre destapó:** tres sabotajes ya existentes **dejaron de morder** porque el
+  cambio movió sus anclas; la puerta lo cantó con `rc=1` y el mensaje «CONTROLES QUE NO MUERDEN (3)»
+  en vez de pasar en verde. Reanclados los tres.
 - **Cómo NO se arregla:** enumerando a mano las ocho claves. Una lista blanca sólo protege de lo que
   ya conoce (§5.15) y la novena nace mintiendo. Se cierra la **clase**: o el texto sale del veredicto,
   o —si la clave no se reconoce— el aviso **no afirma ninguna causa**. Fallar cerrado también en la
@@ -763,6 +778,25 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   el operador realmente lee. Es la contrapartida del defecto que el 01-06 cerró para el verde falso.
 - **Qué la reabre / cierra:** se cierra igualando el camino de éxito al de `guardarTodo`. Si se hace,
   necesita control propio: el 01-06 midió que un aviso puede degradarse sin poner nada en rojo.
+
+### D-56 · Dos de los cuatro llamantes pasan el motivo SIN control que lo mate
+- **Qué es:** el motivo del veredicto llega hoy a la pantalla desde cuatro sitios —la bajada, el
+  arranque, la subida (`subirALaNube`) y la escucha en vivo (`listenFirestore`)—. **Sólo los dos
+  primeros tienen control positivo**: quitarles el motivo pone la puerta en `rc=1`. En los otros dos
+  se puede borrar el segundo argumento y **todo sigue en verde**, con lo que su naranja volvería a
+  salir sin causa.
+- **Cómo se midió:** al cerrar D-54, el 2026-09-05. No es una sospecha: el mismo hueco se **midió
+  ejecutando** en los otros dos eslabones —revertirlos daba `rc=0`— y por eso se les escribió
+  oráculo. Los dos que quedan no se midieron uno a uno; se sabe que **ningún aserto nombra su
+  motivo**, que es la condición que hace pasar el mutante.
+- **Estado:** abierta, **ceguera declarada**, no falso verde. La pantalla hoy dice la verdad en los
+  cuatro caminos; lo que falta es el guardián que lo mantenga mañana.
+- **Por qué no se cierra ahora:** los dos caminos que faltan piden arnés propio (la subida ya lo
+  tiene para otras cosas; la escucha en vivo no se ejerce entera fuera del navegador). Hacerlo
+  dentro de un ciclo que iba de otra cosa sería mover la vara a mitad de partido.
+- **Qué la reabre / cierra:** se cierra con un aserto por camino que nombre su motivo, y su mutante.
+  Mientras tanto, cualquier `setSyncUI(estadoSync(decision.aviso))` **sin segundo argumento** en esos
+  dos sitios es una regresión que hoy nadie caza.
 
 ### D-22 · El instrumento de radio de impacto no ve el producto
 - **Qué es:** el brazo G7 de la transición de fase es `code-review-graph`, que construye un grafo
