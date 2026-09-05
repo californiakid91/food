@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 6 | In progress (**6 de 6 ciclos cerrados con su loop completo**; D-38 cerrada y el 01-06 visto en el navegador. Falta la CUARTA transición, que es quien decide si la fase cierra) | - |
+| 1 | Guardado que no miente | 7 | In progress (**7 de 7 ciclos cerrados con su loop completo**; el 01-07 cerrado, desplegado y visto DOS veces en el navegador. Falta la QUINTA transición, que es quien decide si la fase cierra) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -61,7 +61,9 @@ Phases: 1 of 7 complete (Fase 0)
   cuando no puede mirar la nube; cero verdes escritos a mano; dos instrumentos nuevos cableados a
   la puerta (`cloudwrites.py`, `emptycatch.py`); 14 sabotajes nuevos mordiendo
 
-**La fase SIGUE abierta tras su CUARTA transición (2026-09-01) — abre el ciclo 01-07.**
+**La fase SIGUE abierta tras su CUARTA transición (2026-09-01) — abrió el ciclo 01-07, ya cerrado.**
+**Pendiente la QUINTA transición**, que es quien puede cerrar la fase. Las cuatro anteriores midieron
+la meta contra el código y **las cuatro cambiaron el resultado**.
 El detalle de la cuarta está al final de este bloque; lo que sigue es el registro de la tercera.
 
 El defecto que paró la fase en la segunda transición (D-33) está cerrado y con control positivo, y
@@ -188,7 +190,9 @@ nueva en `CLAUDE.md` §3.4: **los brazos trabajan sobre COPIA y sobre el árbol 
 prohibición se escribe por lo que EJECUTAN, no sólo por lo que editan.
 
 **Planes:**
-- [ ] **01-07: Un solo juez en las dos direcciones** — cierra **D-45** (el predicado de «hay datos
+- [x] **01-07: Un solo juez en las dos direcciones** — **CERRADO el 2026-09-05**, acta `01-07-SUMMARY.md`, desplegado y verificado dos veces en el navegador real. Cierra además **D-30** y **D-54**, ésta última encontrada por el propio checkpoint humano: el naranja afirmaba una causa y lo alcanzaban ocho veredictos. Abre D-48 a D-53, D-55, D-56 y D-57.
+
+  Detalle original del plan: — cierra **D-45** (el predicado de «hay datos
   locales que proteger» tiene que contar el libro, en bajada igual que en subida) y **D-46** junto
   con **D-27** y **D-29** (la invariante «un fallo de guardado no se anuncia como éxito y no se
   sincroniza» tiene que valer en todos los caminos). **Fuera de alcance:** la fusión de `ops` por

@@ -10,48 +10,48 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 Milestone: v0.1 Datos fiables (v0.1.0)
-Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. La CUARTA transición abrió el ciclo **01-07**.
-Plan: **01-07 CREADO** (2026-09-01), esperando aprobación para APPLY.
-Status: PLAN escrito, decidido por dialéctica adversaria y **demolido y reescrito** tras dos brazos
-disjuntos. Cierra **D-45**, **D-46**, **D-27** y **D-29**; deja fichadas por escrito las que no
-cierra. Abiertas D-42, D-43, D-44, D-47 y D-03 (a re-medir).
-Last activity: 2026-09-01 — **PLAN del ciclo 01-07**. El enfoque lo decidió una **dialéctica
-adversaria** que rechazó las DOS posturas del debate y propuso una tercera: vigilar los **sumideros**
-del daño (quién sube y quién anuncia éxito) en vez de los llamantes que ignoran un booleano — el
-censo de llamantes habría nacido con diez exenciones por nombre, que es la lista blanca prohibida.
+Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. El ciclo **01-07 está CERRADO**; la fase no se
+ha vuelto a medir contra el código desde entonces.
+Plan: 01-07 **ejecutado, verificado en navegador y cerrado** (2026-09-05).
+Status: **UNIFY hecho.** Acta en `01-07-SUMMARY.md`. Cierra D-45, D-46, D-27, D-29, D-30 y D-54.
+Abre D-48 a D-53, D-55, D-56 y D-57. Siguen abiertas D-42, D-43, D-44, D-47 y D-03 (a re-medir).
+Last activity: 2026-09-05 — **cierre del 01-07**. El APPLY estaba commiteado desde el 2026-09-01 sin
+acta y con este documento diciendo todavía «plan esperando aprobación»: **el estado mentía sobre el
+propio proceso**, y se descubrió al retomar comparando con `git log`.
 
-**Y entonces el borrador fue demolido por dos brazos disjuntos: diez hallazgos, ninguno visto por
-los dos.** Los cinco decisivos, re-verificados a mano:
+**Lo que hay que recordar de este ciclo:**
 
-1. **El arranque repinta VERDE encima.** La bajada devuelve el mismo valor tanto si aplica como si
-   rechaza, y el arranque lo traduce a verde. El borrador habría cerrado D-45 **con la pantalla
-   mintiendo en el escenario exacto de la ficha**.
-2. **La protección por fecha está VACÍA en producción.** Al aplicar, la marca de tiempo local se
-   pierde, así que tras el primer sync todo documento parece más nuevo y la rama que cierra D-45
-   **no dispararía nunca**. El control habría pasado y el daño seguiría vivo (§5.10).
-3. **Unificar el predicado habría causado una REGRESIÓN**: `hasRealLocalData` alimenta hoy dos
-   preguntas distintas, y una es la guarda de activos del 01-04, que se habría apagado.
-4. **Nada era ejecutable fuera del navegador**: la bajada pide la referencia a Firebase por su
-   cuenta y se rinde en la primera línea. Sin inyección, la matriz mediría el mecanismo y nunca el
-   cable a la pantalla (§5.6).
-5. **El instrumento prometía algo indecidible**: «¿esta llamada está gobernada por un veredicto?» no
-   se decide estáticamente sobre JS. Se rebaja la promesa a lo que la huella sostiene, en vez de
-   meterle juicio al instrumento.
+1. **El checkpoint humano NO fue un trámite.** Encontró un defecto de correctness **antes** del
+   primer punto de la lista: el operador abrió la app con 90 operaciones y leyó «este dispositivo
+   **no tiene operaciones**». El comportamiento era el previsto (D-50); el TEXTO mentía (D-54).
+2. **El ciclo había agravado ese texto sin verlo.** El naranja lo alcanzaban cuatro veredictos y
+   pasó a ocho; una de las claves nuevas es la que ve **todo dispositivo ya sincronizado** el día
+   del despliegue. Un texto raramente falso se volvió universal el día del estreno.
+3. **Cubrir el mecanismo no cubre su cable (§5.6), medido otra vez.** Las pruebas del pintor de
+   D-54 estaban completas en apariencia; revertidos los dos llamantes con el pintor intacto, la
+   suite entera seguía en **rc=0**. El arreglo podía desconectarse sin que nada se pusiera rojo.
+4. **La puerta cazó tres sabotajes suyos que dejaron de morder** porque el cambio movió sus anclas:
+   `rc=1` con «CONTROLES QUE NO MUERDEN (3)», no un verde.
+5. **La comprobación final la hizo la app sola y salió mejor que la pedida:** se pidió inyectar un
+   motivo y el arranque repintó el REAL, con «89 operaciones locales que proteger» — la cifra
+   exacta del libro tras el borrado de la propia verificación.
 
 Progress:
 - Milestone: [█░░░░░░░░░] 14% (1 de 7 fases, contando la 0)
-- Phase: [█████████░] 6 ciclos cerrados; el 01-07 planificado y sin ejecutar
+- Phase: [██████████] 7 ciclos cerrados. **Falta la QUINTA transición**: medir la fase contra el
+  código. Las cuatro anteriores cambiaron el resultado las cuatro veces.
 
 ## Loop Position
 
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ○        ○     [01-07 creado el 2026-09-01, esperando aprobación.
-                            Siguiente: /paul:apply .paul/phases/01-guardado-fiable/01-07-PLAN.md]
+  ✓        ✓        ✓     [01-07 cerrado el 2026-09-05.
+                            Siguiente: QUINTA transición de fase — medir la Fase 1
+                            contra el código, antes de preguntar nada]
 ```
 
-Ciclos 01-01 a 01-06: cerrados, cada uno con su acta. Sus CUATRO transiciones midieron la meta
+Ciclos 01-01 a 01-07: cerrados, cada uno con su acta. Sus CUATRO transiciones midieron la meta
 contra el código y **las cuatro cambiaron el resultado**. `PLAN == SUMMARY` habría cerrado la fase
 las cuatro veces.
 
@@ -278,25 +278,20 @@ Permanentes del proyecto:
 
 ## Session Continuity
 
-Last session: 2026-09-01
-Stopped at: **PLAN 01-07 escrito, atacado por dos brazos disjuntos y REESCRITO.** Sin ejecutar
-todavía. Árbol limpio; `index.html` intacto (`66e6dd20e9ec76163a332a06f5ef2598`).
+Last session: 2026-09-05
+Stopped at: **ciclo 01-07 CERRADO**, desplegado y verificado dos veces en el navegador real. Árbol
+limpio; `index.html` en `9459b0fc3b40a50a38d0c506fec2b862`; puerta en **rc=0** por las dos variantes.
 
-Lo que hay que recordar de este PLAN:
+**Aviso para quien retome:** al empezar esta sesión, este documento decía «PLAN 01-07 esperando
+aprobación, sin ejecutar» cuando el APPLY llevaba cuatro días commiteado. **El estado mintió sobre
+el proceso mismo**, y sólo se vio comparando con `git log`. Antes de creerse este documento, mírense
+los commits.
 
-- **La dialéctica rechazó las dos posturas que se le dieron** y propuso una tercera. Vigilar los
-  SUMIDEROS del daño en vez de los llamantes reduce la cirugía de doce sitios a dos y evita la
-  lista blanca prohibida.
-- **El borrador ya estaba escrito y era coherente cuando dos brazos lo demolieron con diez
-  hallazgos**, ninguno visto por los dos. Dos de ellos habrían producido un **cierre ficticio de
-  D-45**: la pantalla del arranque repintando verde encima, y la protección por fecha vacía en
-  producción, que habría dejado el control en verde con el daño vivo.
-- **El plan declara un cruce de boundary** (el reloj del sync es Fase 3) porque sin él el cierre no
-  es real. Dicho en voz alta, es una decisión; callado, sería deriva.
-
-Next action: **`/paul:apply .paul/phases/01-guardado-fiable/01-07-PLAN.md`** — seis tareas y un
-punto de verificación en el navegador antes de UNIFY.
-Resume file: .paul/phases/01-guardado-fiable/01-07-PLAN.md
+Next action: **QUINTA transición de fase** — medir los objetivos de la Fase 1 **contra el código**,
+con brazos disjuntos que trabajen sobre COPIA y sobre el árbol real sólo LEAN. No cerrar por conteo
+de actas: `PLAN == SUMMARY` ha disparado en falso las cuatro veces anteriores, y las cuatro
+mediciones cambiaron el resultado.
+Resume file: .paul/phases/01-guardado-fiable/01-07-SUMMARY.md
 
 ---
 *STATE.md — Updated after every significant action*
