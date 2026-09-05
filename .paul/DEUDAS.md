@@ -746,6 +746,24 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué la reabre:** que aparezca una clave de `pendiente` cuyo texto en pantalla no proceda de su
   veredicto. Necesita control propio, derivado del código y con su mutante: sin él sería §5.1.
 
+### D-55 · Cambiar el interruptor de objetivos guarda EN SILENCIO, mientras el resto confirma
+- **Qué es:** `onUseTargetsToggle` modifica los datos del operador, los guarda y programa la subida,
+  y en el camino de ÉXITO **no pinta nada**. Sólo avisa cuando `saveMeta()` FALLA. `guardarTodo`, en
+  cambio, confirma con «Guardado ✓». Dos acciones que cambian los mismos datos, una confirma y la
+  otra calla.
+- **Cómo se midió:** **observación del operador en producción**, 2026-09-05, durante la verificación
+  del 01-07: «marco y desmarco y no pasa nada con el puntito». Contrastado contra el código y
+  **comprobado que sí persiste**, en vez de suponerlo: con la casilla marcada, `balance-meta-v2`
+  devuelve `{id:'p1779839499052qkfo', name:'🤖 Robótica', useTargets: true}`. O sea: guarda de
+  verdad, y calla.
+- **Estado:** abierta, **menor**. No hay pérdida de datos ni pantalla que mienta: hay AUSENCIA de
+  confirmación. Por eso no abre ciclo ni bloquea el 01-07.
+- **Por qué se escribe igual:** la meta de la fase es que el operador pueda fiarse de lo que ve. Un
+  camino que cambia datos sin confirmar enseña a no mirar el aviso, y eso desarma la única capa que
+  el operador realmente lee. Es la contrapartida del defecto que el 01-06 cerró para el verde falso.
+- **Qué la reabre / cierra:** se cierra igualando el camino de éxito al de `guardarTodo`. Si se hace,
+  necesita control propio: el 01-06 midió que un aviso puede degradarse sin poner nada en rojo.
+
 ### D-22 · El instrumento de radio de impacto no ve el producto
 - **Qué es:** el brazo G7 de la transición de fase es `code-review-graph`, que construye un grafo
   del código y calcula el alcance de un cambio. **No parsea el JavaScript inline de un `.html`**,
