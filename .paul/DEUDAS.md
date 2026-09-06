@@ -94,6 +94,12 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   el código con el defecto; lo único vigilado es el TEXTO de la consola, no el mecanismo.
 - **Qué la reabre:** se cierra cuando una escritura fallida durante la aplicación impida adelantar
   la marca de tiempo y se vea en pantalla, con oráculo que ejerza ese cruce.
+- **RE-MEDIDA EN FRESCO el 2026-09-06.** Confirmada con las mismas cifras (42 → 2, «Guardado ✓» en
+  `var(--green)`, punto «Sincronizado»), y **agravada**: si la cuota está llena para TODAS las
+  claves —no sólo la del libro, que es lo que pasa en un navegador real— la aplicación **LANZA**,
+  la excepción **escapa sin captura** (nadie la recoge: la bajada llama a aplicar sin `try`), y
+  deja la **memoria con las carteras de la nube mientras el disco sigue viejo**. Segunda familia,
+  no fichada hasta hoy. El enfoque del 01-08 cierra las dos a la vez.
 
 ### D-59 · La capa de aviso del camino de NUBE no tiene oráculo: ocho mutantes vivos
 - **Qué es:** `subirALaNube` es la única función que escribe a la nube y **nada mide lo que
@@ -116,6 +122,20 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   operador, el silencio que esta fase existe para impedir — la misma lectura que abrió el 01-06.
 - **Qué la reabre:** se cierra por RECEPTOR, no enumerando los casos conocidos (§5.15): todo
   pintado del camino de nube afirmado por su color Y su texto, en todas las ramas de fallo.
+- **RE-MEDIDA EN FRESCO el 2026-09-06**, antes de planificar el 01-08 (`01-08-MEDICION-PREVIA.md`).
+  Confirmada, con tres precisiones que la ficha no tenía:
+  1. **U8, U3 y E7 VIVEN** con la puerta entera en `rc=0` y «VERDE — todo ejercido y en verde».
+     E7 (el escucha de la nube muere y se pinta verde) no estaba medido antes.
+  2. **E2 no tiene oráculo: se caza por ACCIDENTE del banco.** El rojo dice literalmente «BANCO
+     ROTO: … ancla no unica … El defecto esta en el BANCO, no en el control», o sea manda a
+     arreglar la herramienta. No cuenta como cobertura.
+  3. **«Por receptor» todavía no tiene artefacto.** `setSyncUI` **no es receptor de ningún
+     instrumento**, y la red del censo de avisos sólo ve identificadores literales. Medido: la
+     rama exacta que el 01-08 va a escribir —si no se aplicó, pintar verde— pasa autopruebas,
+     censo de avisos, sumideros y puerta única de escritura. Cerrarla exige **cambiar la regla de
+     medida** (deriva, `rc=3`, resellado deliberado), no añadir un caso.
+- **La rama «sin sesión» de la subida NO es parte de esta deuda:** medido, deja el estado anterior
+  en pantalla en vez de pisarlo con verde.
 
 ### D-60 · El cable del guardado a la subida puede cortarse en VERDE
 - **Qué es:** `schedulePush` puede dejar de llamar a `subirALaNube` sin que nada se ponga rojo: las
