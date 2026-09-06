@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Arnes de medicion: carga el <script> de un index.html dado y ejecuta un
 caso escrito aparte. Falla CERRADO: si no puede extraer o cargar, rc=2."""
-import json, pathlib, re, subprocess, sys, os
+import json
+import pathlib
+import re
+import subprocess
+import sys
 
 # DIRECTORIO FIJADO EN ABSOLUTO Y AFIRMADO (§3.4, quinta transicion).
 BASE = pathlib.Path(sys.argv[1]).resolve()
@@ -27,7 +31,7 @@ runner = ("process.on('unhandledRejection', e => { console.error('INSTRUMENTO RO
 out = BASE / '_runner_medicion.js'
 out.write_text(runner, encoding='utf-8')
 try:
-    r = subprocess.run(['node', str(out)], cwd=str(BASE), timeout=45)
+    r = subprocess.run(['node', str(out)], cwd=str(BASE), timeout=45, check=False)
     rc = r.returncode
 except subprocess.TimeoutExpired:
     print('INSTRUMENTO ROTO: node no termino en 45s', file=sys.stderr)
