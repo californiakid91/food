@@ -427,8 +427,22 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   aviso que hay.
 - **Cómo se midió:** brazo A de la quinta transición (2026-09-05), reproducido ejecutando. No
   re-verificado por el orquestador.
+- **CONFIRMADA EN EL NAVEGADOR REAL el 2026-09-06**, en la verificación del 01-08 sobre
+  `https://californiakid91.github.io/food/` con `c106225` publicado (huella
+  `64e6e29462fc48b4d7876b14bf514b07`, idéntica a la local, y código nuevo confirmado por
+  `typeof soltarFreno === 'function'`). Deja de ser «reproducida en laboratorio»: es lo que ve el
+  operador. Evidencia leída de la consola del operador, no de una sonda:
+  `document.getElementById('sync-dot').title` → `'Cambios sin subir'`, y
+  `sync-status.textContent` → `'Cambios sin subir (documento NO más nuevo
+  (1788726184823 <= 1788726184823) con 89 operaciones locales que proteger). Tus datos siguen
+  guardados en este dispositivo.'` **Las dos horas son idénticas**: nube y dispositivo están al
+  día y **no hay nada pendiente de subir**. El mismo empate aparece por los DOS caminos —al
+  iniciar sesión (`pullFromFirestore`) y en la escucha en vivo—, así que no es del arranque.
 - **Estado:** abierta. Fuera del alcance del 01-08, pero conviene atacarla junto a D-59: es la
-  máscara que hace invisibles a las otras.
+  máscara que hace invisibles a las otras. **Sube de prioridad**: ahora está medida donde importa.
+- **Nota de la misma medición (a favor del 01-08):** el motivo y las cifras que acompañan al aviso
+  **sí funcionan en el navegador real** — el texto nombra su causa en vez de un «Cambios sin subir»
+  desnudo. Lo que falla es el VEREDICTO del empate, no la capa que lo pinta.
 - **Qué la reabre:** nada la cierra sola.
 
 ### D-68 · Dos pestañas del mismo navegador sin sesión se pisan el libro
