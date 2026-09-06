@@ -12,7 +12,8 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. Medida contra el código el 2026-09-05 en su
 **QUINTA transición**: acta `01-TRANSICION-5.md`.
-Plan: **01-08 por planificar.** El 01-07 está cerrado, desplegado y verificado en navegador.
+Plan: **01-08 PLANIFICADO y revisado** (2026-09-06). El 01-07 está cerrado, desplegado y
+verificado en navegador.
 Status: **QUINTA transición hecha. La fase NO cierra.** Abre D-58 a D-69; reclasifica D-48; corrige
 D-49, D-18, D-56, D-50, D-53, D-01; cierra la ubicación de D-54.
 Last activity: 2026-09-05 — **quinta transición**. Cinco brazos adversarios disjuntos, cada uno
@@ -50,8 +51,9 @@ Progress:
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ○        ○        ○     [ciclo 01-08 por planificar.
-                            Lo abren D-58, D-59, D-48 y D-61]
+  ✓        ○        ○     [ciclo 01-08 planificado y ATACADO.
+                            Lo abren D-58, D-59, D-48 y D-61.
+                            La 1a version del plan fue REFUTADA y corregida]
 ```
 
 Ciclos 01-01 a 01-07: cerrados, cada uno con su acta. Sus CINCO transiciones midieron la meta
@@ -291,22 +293,41 @@ Permanentes del proyecto:
 
 ## Session Continuity
 
-Last session: 2026-09-05
-Stopped at: **QUINTA transición cerrada**. Acta `01-TRANSICION-5.md`, libro de deudas y los cuatro
-sitios del estado actualizados en el mismo commit. Árbol limpio; `index.html` en
-`9459b0fc3b40a50a38d0c506fec2b862`; puerta en **rc=0**, once pasos; **118 sabotajes** muerden,
-cifra re-derivada en fresco (un brazo publicó 119: es falsa).
+Last session: 2026-09-06
+Stopped at: **PLAN 01-08 escrito, atacado y CORREGIDO.** Tres commits (`1242939`, `8794e84`,
+`1f35fb1`). Árbol limpio; `index.html` en `9459b0fc3b40a50a38d0c506fec2b862`, **sin tocar en toda
+la sesión**; puerta `rc=0`, once pasos, leída al empezar y al terminar.
 
-**Aviso para quien retome:** los hallazgos de los brazos NO se heredan. Los cuatro decisivos de
-esta transición se re-verificaron a mano ejecutando, y uno de ellos **resultó falso**. Antes de
-planificar el 01-08, volver a medir D-58 y D-59 en fresco: el plan se escribe sobre lo medido, no
-sobre esta acta.
+**Lo que pasó, y por qué importa para quien retome:**
 
-Next action: **`/paul:plan` del ciclo 01-08** — que el camino de la nube no pueda pintar verde
-sobre un fallo, y que un libro entrante que no aterriza no adelante el reloj ni se exporte encima.
-Entran D-58, D-59, D-48 y D-61. Fuera: D-65 (falta medir el orden en el navegador), D-60, D-62 a
-D-64, D-66 a D-69, y todo lo de Fase 3.
-Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION-5.md
+1. **Las cuatro deudas que abren el ciclo se re-midieron EJECUTANDO** antes de planificar
+   (`01-08-MEDICION-PREVIA.md`), como pedía el aviso de la quinta transición. Las cuatro se
+   confirman. Además: **E2 se caza por accidente del banco**, no por un oráculo; la rama «sin
+   sesión» de la subida **no** es un hueco; y apareció una **segunda familia de D-58** — con la
+   cuota llena de verdad la aplicación **lanza** y deja la memoria mutada con el disco viejo.
+2. **El enfoque lo decidió una dialéctica adversaria**, no yo solo: era diseño abierto con
+   precedentes propios en las dos direcciones. Gana un enfoque derivado de UN primitivo (un hecho
+   de E/S), y se rechaza por medición el «recibo» con comparación de relojes.
+3. **La primera versión del PLAN estaba MAL y dos brazos adversarios la demolieron.** El freno que
+   protegía la nube era **permanente**: liberar espacio sella la hora actual y la bajada no vuelve
+   a aplicar jamás. Re-verificado a mano ejecutando. Corregido con **T2b** (con el freno puesto, el
+   guardado local no adelanta el reloj), que cierra también el segundo agujero.
+4. **«Por receptor» todavía no tiene artefacto**: la rama que este ciclo va a escribir pasa
+   autopruebas, censo de avisos, sumideros y puerta de escritura. Cerrarla exige cambiar la REGLA
+   DE MEDIDA (deriva `rc=3`), no añadir un caso. Es **T6b**.
+5. **97 anclas del banco, 44 en zona de obra**, con una colisión segura (`if (saveMeta()) {`).
+   Cifra re-derivada por mí, no heredada del brazo (él contó 36 con una lista más estrecha). Es
+   **T10**.
+
+**Aviso para quien retome:** los hallazgos de los brazos NO se heredan, y esta sesión lo volvió a
+demostrar en las dos direcciones — un brazo publicó «puerta en verde» donde la medición da `rc=1`
+por ancla rota, y otro confesó que sus tres primeros hallazgos eran falsos por haber copiado de
+una copia mientras el banco mutaba. Antes de dar por bueno cualquier número del plan, re-medirlo.
+
+Next action: **`/paul:apply` del ciclo 01-08.** El plan está en
+`.paul/phases/01-guardado-fiable/01-08-PLAN.md`, ya revisado; empezar por T1 (aplicación
+todo-o-nada, que obliga a trocear una función de 59 líneas con presupuesto 60).
+Resume file: .paul/phases/01-guardado-fiable/01-08-PLAN.md
 
 ---
 *STATE.md — Updated after every significant action*
