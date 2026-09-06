@@ -209,7 +209,7 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 | ~~**D-48 · cambiar o crear cartera pinta «Guardado ✓» con la escritura fallida**~~ | **CERRADA** en el ciclo 01-08 (`f46887f`) | Los cinco llamantes pintan en ROJO —no «no pintan verde», que pasaría con y sin el arreglo— y deshacen su cambio; borrar ya no destruye los activos antes de saber si la lista se guardó |
 | ~~**D-61 · `avisos.py --update` amnistía en silencio una alarma que desaparece**~~ | **CERRADA** en el ciclo 01-08 (`f46887f`) | `--update` bloquea en LAS DOS direcciones y **nombra** la clave; la dirección viaja dentro de la semántica sellada, así que aflojarla sería deriva (`rc=3`). Control propio en el banco |
 | **D-65 · carrera arranque/sesión** | Mecanismo reproducido, **orden real en el navegador SIN medir** | Primero medir el orden en la app desplegada; sólo entonces decidir si es ciclo |
-| **El ciclo 01-08 NO se ha visto en un NAVEGADOR** | Bloquea dar el ciclo por verificado y bloquea la SEXTA transición. Toca pantalla, y `verify.sh` ejerce funciones puras en node: no prueba la interfaz | Abrir `https://californiakid91.github.io/food/` recargando **dos veces**, confirmando ANTES por una función —no por el aspecto— que el navegador tiene el código nuevo |
+| ~~**El ciclo 01-08 NO se ha visto en un NAVEGADOR**~~ | **RESUELTO** el 2026-09-06: desplegado (`50c0ac4..c106225`) y mirado en la app real | Acta: `01-08-VERIFICACION-NAVEGADOR.md`. Cinco puntos en PASS; dos NO comprobados y dichos como tales; y un hallazgo: **D-67 confirmada en el navegador** |
 | **La FASE 1 no se ha medido contra el código después del 01-08** | La fase no puede cerrarse. `PLAN == SUMMARY` (8 y 8) **no es el disparador** | SEXTA transición, después de la verificación en navegador |
 | **D-60 · el cable del guardado a la subida puede cortarse en VERDE** | **Re-medida en este UNIFY: el cierre de D-59 NO la arrastró.** Mutante T7 sobre copia aislada, ancla única afirmada: **sobrevive**, salida idéntica a la vacuidad | Se cierra cuando el cuerpo de `schedulePush` se ejerza de verdad, con reloj falso, en vez de reasignarse |
 | G7 (radio de impacto) no ve `index.html` | La transición de fase no tiene instrumento propio; hoy se hace a mano | D-22. Se cierra cuando el grafo indexe el `<script>`, o cuando el sustituto sea un script del repo cableado a la puerta |
@@ -344,10 +344,23 @@ FRESCA: `rc=0`, once pasos.
 5. **La fase NO se cierra.** Hay 8 planes y 8 actas, y ése no es el disparador (§7). Falta el
    navegador y falta la sexta transición.
 
-Next action: **abrir la app desplegada y mirarla** — `https://californiakid91.github.io/food/`,
-recargando **dos veces**, confirmando ANTES por una función (p. ej. `typeof soltarFreno`) y no por
-el aspecto de la pantalla, que el navegador tiene el código nuevo. Este ciclo toca pantalla y la
-puerta no puede verla. **Sólo después**, la SEXTA transición.
+**VERIFICADO EN NAVEGADOR el 2026-09-06.** Desplegado (`50c0ac4..c106225`) tras autorización
+explícita del operador. Pages confirmado por **huella** antes de mirar nada (`64e6e294…`, idéntica a
+la local; los dos primeros intentos devolvieron la anterior), y el navegador confirmado por una
+función que **nace en este ciclo** (`typeof soltarFreno === 'function'`). Cinco puntos en PASS,
+entre ellos **89 operaciones intactas** tras `?selftest=1` y **guardar sigue funcionando**. Dos
+puntos NO comprobados y dichos como tales (D-18, y el naranja del freno). Acta:
+`01-08-VERIFICACION-NAVEGADOR.md`.
+
+**El hallazgo de la pasada:** el puntito queda **NARANJA «Cambios sin subir» con las dos marcas de
+tiempo IDÉNTICAS**, o sea sin nada pendiente. Es **D-67**, que estaba fichada como reproducida en
+laboratorio y **sin medir en el navegador**; ahora está medida donde importa y sube de prioridad.
+Lo que falla es el **VEREDICTO del empate**, no la capa que lo pinta: el aviso nombró su causa y
+sus cifras, que es justo lo que este ciclo construyó.
+
+Next action: **SEXTA transición** — medir los objetivos de la Fase 1 CONTRA EL CÓDIGO. Es lo único
+que puede cerrar la fase, y las cinco anteriores cambiaron el resultado las cinco veces. Entra en
+ella el hallazgo de arriba (D-67).
 Resume file: .paul/phases/01-guardado-fiable/01-08-SUMMARY.md
 
 ---

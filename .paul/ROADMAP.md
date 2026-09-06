@@ -204,7 +204,9 @@ fase las cinco veces.
 
 **Planes:**
 - [x] **01-08: El aviso de la nube y el libro que no aterriza** — **BUCLE CERRADO el 2026-09-06**
-  (`f46887f`), acta `01-08-SUMMARY.md`. **Todavía NO visto en un navegador.**
+  (`f46887f`), acta `01-08-SUMMARY.md`. **Desplegado y VERIFICADO en el navegador** el 2026-09-06
+  (`c106225`), acta `01-08-VERIFICACION-NAVEGADOR.md`: cinco puntos en PASS, dos no comprobados y
+  dichos como tales, y **D-67 confirmada en el navegador real** (naranja sin nada pendiente).
   Cierra **D-58** (una escritura fallida al aplicar ya no puede adelantar el reloj), **D-59** (todo
   pintado del camino de nube afirmado por color Y texto, cerrado por receptor), **D-48** (el anuncio
   de la lista de carteras depende de su escritura, en los cinco llamantes) y **D-61** (`avisos.py`
@@ -235,9 +237,8 @@ Acta: `01-TRANSICION-4.md`.
 de cierre** (§7 de `CLAUDE.md`): ha disparado en falso las cinco veces anteriores. Antes de poder
 cerrar la fase hacen falta dos cosas que hoy no existen:
 
-1. **Ver el 01-08 en la app desplegada**, recargando dos veces y confirmando por una función —no por
-   el aspecto de la pantalla— que el navegador tiene el código nuevo. Este ciclo toca pantalla y
-   `tools/verify.sh` no puede verla.
+1. ~~**Ver el 01-08 en la app desplegada**~~ — **HECHO el 2026-09-06**, acta
+   `01-08-VERIFICACION-NAVEGADOR.md`. Confirmado por huella y por una función que nace en el ciclo.
 2. **La SEXTA transición**, que mide los objetivos de la fase CONTRA EL CÓDIGO. Las cinco anteriores
    cambiaron el resultado las cinco veces.
 
