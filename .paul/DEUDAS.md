@@ -85,87 +85,6 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 
 ## Abiertas — riesgo de pérdida de datos
 
-### D-58 · Un libro de la nube que NO CABE adelanta el reloj, y el siguiente guardado lo exporta encima
-- **Qué es:** en `applySyncPayload`, si `saveOpsAll(entrante)` falla —almacenamiento lleno; el
-  libro de la nube es más grande que el local— la función **lo cuenta sólo por `console.error` y
-  sigue**: escribe META con el `savedAt` del documento, recarga el libro VIEJO del disco y devuelve
-  `true`. El dispositivo queda **con el reloj de la nube y el libro pobre**, o sea creyéndose al
-  día sin estarlo. En el primer guardado, `decidirSubida` no ve motivo para frenar (el libro local
-  no está vacío) y **sube el libro pobre encima del rico**: la pérdida ocurre en la NUBE, que es de
-  donde sale la declaración de la renta. Y el otro dispositivo, al arrancar, verá ese documento
-  como más nuevo y adoptará el libro pobre.
-- **Cómo se midió:** brazo A de la quinta transición (2026-09-05), reproducido ejecutando en copia
-  aislada y **re-verificado por el orquestador**: nube con 42 operaciones y cuota simulada →
-  `disco=["o1","o2"] META.savedAt=9000`, `guardarTodo=true save="Guardado ✓" var(--green)`,
-  `subida={"subido":true} nube ahora tiene 2 ops (tenía 42)`, `dotTitle:"Sincronizado"`.
-- **Estado:** **abierta y GRAVE. Abre el ciclo 01-08.** Es la meta literal de la Fase 1 viva: fallo
-  de arranque que empobrece el libro con estado tranquilizador. La puerta entera sale `rc=0` sobre
-  el código con el defecto; lo único vigilado es el TEXTO de la consola, no el mecanismo.
-- **Qué la reabre:** se cierra cuando una escritura fallida durante la aplicación impida adelantar
-  la marca de tiempo y se vea en pantalla, con oráculo que ejerza ese cruce.
-- **RE-MEDIDA EN FRESCO el 2026-09-06.** Confirmada con las mismas cifras (42 → 2, «Guardado ✓» en
-  `var(--green)`, punto «Sincronizado»), y **agravada**: si la cuota está llena para TODAS las
-  claves —no sólo la del libro, que es lo que pasa en un navegador real— la aplicación **LANZA**,
-  la excepción **escapa sin captura** (nadie la recoge: la bajada llama a aplicar sin `try`), y
-  deja la **memoria con las carteras de la nube mientras el disco sigue viejo**. Segunda familia,
-  no fichada hasta hoy. El enfoque del 01-08 cierra las dos a la vez.
-- **CERRADA en el ciclo 01-08 (2026-09-06).** Cerrada por el PRIMITIVO, no por el caso: aplicar
-  el documento de la nube es ahora **todo-o-nada** —el libro primero, luego filas e historial, y la
-  META la ÚLTIMA y sólo si todo lo anterior aterrizó—, así que una escritura fallida **no puede
-  adelantar la marca de tiempo**. Si algo no aterriza, se pone un **freno** que el juez de la
-  subida consume como un primitivo más (`clave: 'nube-pendiente'`), y ni la memoria se muta ni se
-  exporta nada. Cierra también la **segunda familia** (cuota llena para TODAS las claves): las
-  escrituras de filas e historial ya no escapan sin captura, así que **no lanza** y la memoria
-  queda intacta. Evidencia: `pruebasFrenoTodoONada` (AC-1 y AC-2), `pruebasFrenoSeLevanta`
-  (AC-4, AC-5) y los mutantes **T1×2, M1, M2, M4a, M4b, M5, M6, M8, M9** del banco, todos `rc=1`.
-
-### D-59 · La capa de aviso del camino de NUBE no tiene oráculo: ocho mutantes vivos
-- **Qué es:** `subirALaNube` es la única función que escribe a la nube y **nada mide lo que
-  PINTA**. Sobreviven a la puerta entera: pintar **verde** tras una escritura que falla (U8);
-  pintar **verde** una subida omitida por el juez (U3); el aviso naranja sin su motivo en la subida
-  y en la escucha (U2, E2 — es **D-56** medida, no heredada); la escucha de Firestore que **muere**
-  pintada en verde (E7); el texto del estado de error diciendo «Sincronizado con tu cuenta.» con el
-  punto rojo (T5); y un documento con `portfolios: []` declarado sincronizado sin aplicar nada
-  (B5). Se suman los cuatro que la puerta sólo caza **por accidente del banco** («BANCO ROTO:
-  ancla no única»), entre ellos perder `okRows` del veredicto de `guardarTodo`, que no tiene
-  autoprueba propia. Causa común: las pruebas del camino de subida **cuentan escrituras, no
-  pintadas**; el espía del pintor se montó para el arranque y la escucha, nunca para la subida.
-- **Cómo se midió:** brazo B de la quinta transición (2026-09-05), 79 mutantes semánticos con
-  ancla única afirmada; 67 mueren con mensaje nominal y 12 no. **Re-verificados por el orquestador
-  U8 y U3 (`rc=0`, «VERDE — todo ejercido y en verde») y U9**, que el brazo daba por vivo y **no lo
-  está** (`rc=1`, «AC-3 una escritura que lanza no acaba en verde: esperaba error, obtuve ok»): lo
-  que sobrevive es PINTAR, no devolver. El control existente mira el valor devuelto; el operador
-  mira la pantalla.
-- **Estado:** **abierta y GRAVE. Abre el ciclo 01-08.** Un fallo pintado en verde ES, para el
-  operador, el silencio que esta fase existe para impedir — la misma lectura que abrió el 01-06.
-- **Qué la reabre:** se cierra por RECEPTOR, no enumerando los casos conocidos (§5.15): todo
-  pintado del camino de nube afirmado por su color Y su texto, en todas las ramas de fallo.
-- **RE-MEDIDA EN FRESCO el 2026-09-06**, antes de planificar el 01-08 (`01-08-MEDICION-PREVIA.md`).
-  Confirmada, con tres precisiones que la ficha no tenía:
-  1. **U8, U3 y E7 VIVEN** con la puerta entera en `rc=0` y «VERDE — todo ejercido y en verde».
-     E7 (el escucha de la nube muere y se pinta verde) no estaba medido antes.
-  2. **E2 no tiene oráculo: se caza por ACCIDENTE del banco.** El rojo dice literalmente «BANCO
-     ROTO: … ancla no unica … El defecto esta en el BANCO, no en el control», o sea manda a
-     arreglar la herramienta. No cuenta como cobertura.
-  3. **«Por receptor» todavía no tiene artefacto.** `setSyncUI` **no es receptor de ningún
-     instrumento**, y la red del censo de avisos sólo ve identificadores literales. Medido: la
-     rama exacta que el 01-08 va a escribir —si no se aplicó, pintar verde— pasa autopruebas,
-     censo de avisos, sumideros y puerta única de escritura. Cerrarla exige **cambiar la regla de
-     medida** (deriva, `rc=3`, resellado deliberado), no añadir un caso.
-- **La rama «sin sesión» de la subida NO es parte de esta deuda:** medido, deja el estado anterior
-  en pantalla en vez de pisarlo con verde.
-- **CERRADA en el ciclo 01-08 (2026-09-06).** Dos redes disjuntas, no una lista de casos:
-  1. **Oráculo que EJECUTA el pintor.** `pruebasPinturaDeLaSubida` y `pruebasPinturaDeLaEscucha`
-     ejercen las ramas de fallo de la subida y de la escucha dentro de la ventana de pintura y
-     afirman **color Y texto por su VALOR** (`#e67e22`, `#e74c3c`, `#27ae60`), con control de
-     vacuidad en las dos. Los cuatro mutantes de la ficha mueren: **U8, U3, E7 y E2**, `rc=1` con
-     mensaje nominal — E2 deja de cazarse «por accidente del banco».
-  2. **`setSyncUI` pasa a ser RECEPTOR VIGILADO** (RED C de `tools/avisos.py`): cada llamada al
-     pintor viaja en la foto sellada con su argumento normalizado, así que una rama nueva que pinte
-     verde donde toca naranja mueve la huella. Es cambio de la REGLA DE MEDIDA: dio `rc=3` (deriva)
-     y se reselló **a propósito**, con la semántica en `version: 2` y el motivo de cada clave
-     escrito. **Ceguera declarada:** `pullFromFirestore` pinta por dependencia inyectada y no entra
-     en esa huella; lo que lo mide son sus autopruebas y la afirmación del cableado por defecto.
 ### D-60 · El cable del guardado a la subida puede cortarse en VERDE
 - **Qué es:** `schedulePush` puede dejar de llamar a `subirALaNube` sin que nada se ponga rojo: las
   pruebas **reasignan** `schedulePush` para contar llamadas, así que su cuerpo nunca se ejerce. Es
@@ -175,38 +94,17 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Cómo se midió:** brazo B de la quinta transición (2026-09-05), mutante T7: `rc=0`, «VERDE —
   todo ejercido y en verde». `tools/sumideros.py` tampoco lo ve: el sumidero que desaparece se
   atribuye a la flecha y por dominación pasa como «menos superficie de daño».
-- **Estado:** abierta. Fuera del alcance del 01-08 salvo que el cierre de D-59 lo arrastre.
+- **Estado:** **abierta, RE-MEDIDA en el UNIFY del 01-08 (2026-09-06): el cierre de D-59 NO la
+  arrastró.** La ficha decía «fuera del alcance salvo que el cierre de D-59 lo arrastre», y eso no
+  se hereda: se midió. Mutante T7 aplicado sobre **copia aislada** (directorio fijado en absoluto y
+  afirmado; el árbol real sólo se leyó, huella `64e6e294…` idéntica antes y después), con la
+  **unicidad del ancla afirmada** antes de mutar (1 ocurrencia de
+  `pushTimer = setTimeout(() => { subirALaNube('guardado local'); }, 800);`). Resultado: **el
+  mutante SOBREVIVE** — los nueve pasos que miden el código salen OK, salida **idéntica carácter a
+  carácter** a la del control de vacuidad sobre la misma copia sin mutar. Cortar el cable del
+  guardado a la subida sigue sin poner nada en rojo.
 - **Qué la reabre:** nada la cierra sola. Se cierra cuando el cuerpo de `schedulePush` se ejerza de
   verdad, con reloj falso, en vez de reasignarse.
-
-### D-48 · Cambiar o crear una cartera pinta «Guardado ✓» en VERDE con la escritura fallida
-- **Qué es:** cinco llamantes ignoran el booleano de `saveMeta`: `createDefaultPortfolios`,
-  `switchPortfolio`, `addPortfolio`, `deletePortfolio` y `renamePortfolio`. **Su ficha original
-  decía que «ni suben ni anuncian», y eso es falso**: `switchPortfolio` y `addPortfolio` llaman
-  antes a `saveRows()` con anuncio, así que **pintan «Guardado ✓» en VERDE** con la lista de
-  carteras sin escribir. Es la categoría exacta de **D-27**, que el 01-07 cerró para el libro y
-  quedó viva aquí. Ninguno de los cinco sube a la nube, así que el libro de operaciones no se
-  pierde por este camino: el daño es **pantalla que miente**, no pérdida.
-  **El peor sigue siendo `deletePortfolio`**: borra los activos ANTES de guardar la lista, así que
-  si la escritura falla los activos ya no están y la cartera sigue listada, apuntando a datos que
-  no existen. Medido: `rows-B` borrado del disco y META en disco todavía listando B.
-- **Cómo se midió:** brazo E de la quinta transición (2026-09-05), reproducido ejecutando y
-  **re-verificado por el orquestador**: con `saveMeta` lanzando, `switchPortfolio` →
-  `pintado: [{"t":"Guardado ✓","ok":true}] | subidas: 0`, memoria B / disco A; `addPortfolio` →
-  ídem. `renamePortfolio`, `deletePortfolio` y `createDefaultPortfolios` no pintan nada.
-  **Sin oráculo**: quitar el `saveMeta()` de `switchPortfolio` deja la puerta en `rc=0`.
-- **Estado:** abierta, **RECLASIFICADA de «cambio silencioso» a VERDE FALSO** el 2026-09-05.
-  **Entra en el ciclo 01-08** por ser la misma clase que D-27 y D-46.
-- **Qué la reabre:** se cierra cuando el anuncio de éxito de los cinco dependa del resultado de su
-  escritura, y `deletePortfolio` además invierta el orden o repare si falla. Con oráculo propio:
-  hoy no lo tiene ninguno.
-- **CERRADA en el ciclo 01-08 (2026-09-06).** Los cinco llamantes pasan por
-  `guardarListaDeCarteras()`, que **pinta el fallo EN ROJO** —no basta «no pintar verde»: tres de
-  los cinco ya no pintaban nada, así que ese criterio pasaba CON y SIN el arreglo (§5.9)— y
-  devuelve el veredicto; los cinco **deshacen su cambio en memoria** si la lista no aterriza.
-  `deletePortfolio` **invierte el orden**: primero guarda la lista y sólo entonces borra los
-  activos. Evidencia: `pruebasListaDeCarterasFallida` (una fila por llamante),
-  `pruebasListaDeCarterasSana` (control de vacuidad) y los mutantes **D-48×2** del banco, `rc=1`.
 
 ### D-49 · El censo de sumideros y el de escrituras a la nube son ESTÁTICOS y por NOMBRE
 - **Qué es:** `tools/sumideros.py` cuenta llamadas (`f(`, `f?.(`) y referencias por nombre. Una
@@ -461,29 +359,6 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   que resuelva a un elemento de aviso; que un aviso se emita por un canal que no sea
   `console.error`, `console.warn`, `alert` ni `confirm`; o que haga falta un segundo CORTE — el
   segundo corte es la señal de que el criterio está empezando a doblarse.
-
-### D-61 · El censo de avisos AMNISTÍA en silencio una alarma que desaparece
-- **Qué es:** `tools/avisos.py --check` caza que una boca se cierre (`rc=1`, «han DESAPARECIDO
-  avisos») y hasta imprime «No se resella de trámite». Pero **`--update`, SIN `--amnesty`, la sella
-  igualmente, en silencio, sin nombrarla y con `rc=0`** — y a partir de ahí queda verde para
-  siempre. La causa es una asimetría (§5.16): `comparar()` clasifica la desaparición como `mejor`,
-  `--check` la trata como hallazgo y `sellar` sólo se niega ante `peor`. El ciclo 01-06 decidió por
-  escrito que «un aviso que DESAPARECE es un HALLAZGO, no una mejora» y lo cerró **sólo por el lado
-  de `--check`**. `tools/sumideros.py` NO tiene el defecto: allí la boca cerrada va a `peor`.
-- **Cómo se midió:** brazo C de la quinta transición (2026-09-05) y **re-verificado por el
-  orquestador** con ancla única afirmada, cerrando `console.error('No se sincroniza: el guardado
-  local falló.')`: `--check` → `rc=1` nombrando la clave; `--update` → `rc=0` «Foto sellada: 39
-  aviso(s)»; `--check` después → `rc=0` verde.
-- **Estado:** abierta y grave: es un hueco del aparato de medición que **dirige la mano del
-  operador a amnistiar el silencio**. **Entra en el ciclo 01-08.**
-- **Qué la reabre:** se cierra cuando `avisos.py` trate la desaparición como empeoramiento, igual
-  que `sumideros.py`, con sabotaje propio que lo demuestre.
-- **CERRADA en el ciclo 01-08 (2026-09-06).** `--update` bloquea ahora en LAS DOS direcciones:
-  `bloquean = peor + mejor`, así que una boca que se cierra exige `--amnesty` y queda **nombrada**
-  en el diff. La dirección viaja DENTRO de la semántica sellada, así que aflojarla sería deriva
-  (`rc=3`). Evidencia: control propio en `tools/sabotage.py` —«avisos --update se niega a sellar
-  una boca que se cierra, y la nombra»— que además **restaura la foto sellada** pase lo que pase,
-  porque si el arreglo regresara ese mismo control la habría reescrito.
 
 ### D-62 · Un `index.html` que no decodifica sale como `rc=1` «hallazgo del código», no `rc=2`
 - **Qué es:** los **siete** instrumentos Python que leen `index.html` (`check_syntax`,
@@ -1138,6 +1013,143 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué la reabre:** nada; está en cola.
 
 ---
+
+## Cerradas en el ciclo 01-08 (2026-09-06)
+
+### D-58 · Un libro de la nube que NO CABE adelanta el reloj, y el siguiente guardado lo exporta encima — CERRADA 2026-09-06
+- **Qué es:** en `applySyncPayload`, si `saveOpsAll(entrante)` falla —almacenamiento lleno; el
+  libro de la nube es más grande que el local— la función **lo cuenta sólo por `console.error` y
+  sigue**: escribe META con el `savedAt` del documento, recarga el libro VIEJO del disco y devuelve
+  `true`. El dispositivo queda **con el reloj de la nube y el libro pobre**, o sea creyéndose al
+  día sin estarlo. En el primer guardado, `decidirSubida` no ve motivo para frenar (el libro local
+  no está vacío) y **sube el libro pobre encima del rico**: la pérdida ocurre en la NUBE, que es de
+  donde sale la declaración de la renta. Y el otro dispositivo, al arrancar, verá ese documento
+  como más nuevo y adoptará el libro pobre.
+- **Cómo se midió:** brazo A de la quinta transición (2026-09-05), reproducido ejecutando en copia
+  aislada y **re-verificado por el orquestador**: nube con 42 operaciones y cuota simulada →
+  `disco=["o1","o2"] META.savedAt=9000`, `guardarTodo=true save="Guardado ✓" var(--green)`,
+  `subida={"subido":true} nube ahora tiene 2 ops (tenía 42)`, `dotTitle:"Sincronizado"`.
+- **Estado (histórico, antes del ciclo):** **abierta y GRAVE. Abre el ciclo 01-08.** Es la meta literal de la Fase 1 viva: fallo
+  de arranque que empobrece el libro con estado tranquilizador. La puerta entera sale `rc=0` sobre
+  el código con el defecto; lo único vigilado es el TEXTO de la consola, no el mecanismo.
+- **Qué la reabre:** se cierra cuando una escritura fallida durante la aplicación impida adelantar
+  la marca de tiempo y se vea en pantalla, con oráculo que ejerza ese cruce.
+- **RE-MEDIDA EN FRESCO el 2026-09-06.** Confirmada con las mismas cifras (42 → 2, «Guardado ✓» en
+  `var(--green)`, punto «Sincronizado»), y **agravada**: si la cuota está llena para TODAS las
+  claves —no sólo la del libro, que es lo que pasa en un navegador real— la aplicación **LANZA**,
+  la excepción **escapa sin captura** (nadie la recoge: la bajada llama a aplicar sin `try`), y
+  deja la **memoria con las carteras de la nube mientras el disco sigue viejo**. Segunda familia,
+  no fichada hasta hoy. El enfoque del 01-08 cierra las dos a la vez.
+- **CERRADA en el ciclo 01-08 (2026-09-06).** Cerrada por el PRIMITIVO, no por el caso: aplicar
+  el documento de la nube es ahora **todo-o-nada** —el libro primero, luego filas e historial, y la
+  META la ÚLTIMA y sólo si todo lo anterior aterrizó—, así que una escritura fallida **no puede
+  adelantar la marca de tiempo**. Si algo no aterriza, se pone un **freno** que el juez de la
+  subida consume como un primitivo más (`clave: 'nube-pendiente'`), y ni la memoria se muta ni se
+  exporta nada. Cierra también la **segunda familia** (cuota llena para TODAS las claves): las
+  escrituras de filas e historial ya no escapan sin captura, así que **no lanza** y la memoria
+  queda intacta. Evidencia: `pruebasFrenoTodoONada` (AC-1 y AC-2), `pruebasFrenoSeLevanta`
+  (AC-4, AC-5) y los mutantes **T1×2, M1, M2, M4a, M4b, M5, M6, M8, M9** del banco, todos `rc=1`.
+
+### D-59 · La capa de aviso del camino de NUBE no tiene oráculo: ocho mutantes vivos — CERRADA 2026-09-06
+- **Qué es:** `subirALaNube` es la única función que escribe a la nube y **nada mide lo que
+  PINTA**. Sobreviven a la puerta entera: pintar **verde** tras una escritura que falla (U8);
+  pintar **verde** una subida omitida por el juez (U3); el aviso naranja sin su motivo en la subida
+  y en la escucha (U2, E2 — es **D-56** medida, no heredada); la escucha de Firestore que **muere**
+  pintada en verde (E7); el texto del estado de error diciendo «Sincronizado con tu cuenta.» con el
+  punto rojo (T5); y un documento con `portfolios: []` declarado sincronizado sin aplicar nada
+  (B5). Se suman los cuatro que la puerta sólo caza **por accidente del banco** («BANCO ROTO:
+  ancla no única»), entre ellos perder `okRows` del veredicto de `guardarTodo`, que no tiene
+  autoprueba propia. Causa común: las pruebas del camino de subida **cuentan escrituras, no
+  pintadas**; el espía del pintor se montó para el arranque y la escucha, nunca para la subida.
+- **Cómo se midió:** brazo B de la quinta transición (2026-09-05), 79 mutantes semánticos con
+  ancla única afirmada; 67 mueren con mensaje nominal y 12 no. **Re-verificados por el orquestador
+  U8 y U3 (`rc=0`, «VERDE — todo ejercido y en verde») y U9**, que el brazo daba por vivo y **no lo
+  está** (`rc=1`, «AC-3 una escritura que lanza no acaba en verde: esperaba error, obtuve ok»): lo
+  que sobrevive es PINTAR, no devolver. El control existente mira el valor devuelto; el operador
+  mira la pantalla.
+- **Estado (histórico, antes del ciclo):** **abierta y GRAVE. Abre el ciclo 01-08.** Un fallo pintado en verde ES, para el
+  operador, el silencio que esta fase existe para impedir — la misma lectura que abrió el 01-06.
+- **Qué la reabre:** se cierra por RECEPTOR, no enumerando los casos conocidos (§5.15): todo
+  pintado del camino de nube afirmado por su color Y su texto, en todas las ramas de fallo.
+- **RE-MEDIDA EN FRESCO el 2026-09-06**, antes de planificar el 01-08 (`01-08-MEDICION-PREVIA.md`).
+  Confirmada, con tres precisiones que la ficha no tenía:
+  1. **U8, U3 y E7 VIVEN** con la puerta entera en `rc=0` y «VERDE — todo ejercido y en verde».
+     E7 (el escucha de la nube muere y se pinta verde) no estaba medido antes.
+  2. **E2 no tiene oráculo: se caza por ACCIDENTE del banco.** El rojo dice literalmente «BANCO
+     ROTO: … ancla no unica … El defecto esta en el BANCO, no en el control», o sea manda a
+     arreglar la herramienta. No cuenta como cobertura.
+  3. **«Por receptor» todavía no tiene artefacto.** `setSyncUI` **no es receptor de ningún
+     instrumento**, y la red del censo de avisos sólo ve identificadores literales. Medido: la
+     rama exacta que el 01-08 va a escribir —si no se aplicó, pintar verde— pasa autopruebas,
+     censo de avisos, sumideros y puerta única de escritura. Cerrarla exige **cambiar la regla de
+     medida** (deriva, `rc=3`, resellado deliberado), no añadir un caso.
+- **La rama «sin sesión» de la subida NO es parte de esta deuda:** medido, deja el estado anterior
+  en pantalla en vez de pisarlo con verde.
+- **CERRADA en el ciclo 01-08 (2026-09-06).** Dos redes disjuntas, no una lista de casos:
+  1. **Oráculo que EJECUTA el pintor.** `pruebasPinturaDeLaSubida` y `pruebasPinturaDeLaEscucha`
+     ejercen las ramas de fallo de la subida y de la escucha dentro de la ventana de pintura y
+     afirman **color Y texto por su VALOR** (`#e67e22`, `#e74c3c`, `#27ae60`), con control de
+     vacuidad en las dos. Los cuatro mutantes de la ficha mueren: **U8, U3, E7 y E2**, `rc=1` con
+     mensaje nominal — E2 deja de cazarse «por accidente del banco».
+  2. **`setSyncUI` pasa a ser RECEPTOR VIGILADO** (RED C de `tools/avisos.py`): cada llamada al
+     pintor viaja en la foto sellada con su argumento normalizado, así que una rama nueva que pinte
+     verde donde toca naranja mueve la huella. Es cambio de la REGLA DE MEDIDA: dio `rc=3` (deriva)
+     y se reselló **a propósito**, con la semántica en `version: 2` y el motivo de cada clave
+     escrito. **Ceguera declarada:** `pullFromFirestore` pinta por dependencia inyectada y no entra
+     en esa huella; lo que lo mide son sus autopruebas y la afirmación del cableado por defecto.
+
+### D-48 · Cambiar o crear una cartera pinta «Guardado ✓» en VERDE con la escritura fallida — CERRADA 2026-09-06
+- **Qué es:** cinco llamantes ignoran el booleano de `saveMeta`: `createDefaultPortfolios`,
+  `switchPortfolio`, `addPortfolio`, `deletePortfolio` y `renamePortfolio`. **Su ficha original
+  decía que «ni suben ni anuncian», y eso es falso**: `switchPortfolio` y `addPortfolio` llaman
+  antes a `saveRows()` con anuncio, así que **pintan «Guardado ✓» en VERDE** con la lista de
+  carteras sin escribir. Es la categoría exacta de **D-27**, que el 01-07 cerró para el libro y
+  quedó viva aquí. Ninguno de los cinco sube a la nube, así que el libro de operaciones no se
+  pierde por este camino: el daño es **pantalla que miente**, no pérdida.
+  **El peor sigue siendo `deletePortfolio`**: borra los activos ANTES de guardar la lista, así que
+  si la escritura falla los activos ya no están y la cartera sigue listada, apuntando a datos que
+  no existen. Medido: `rows-B` borrado del disco y META en disco todavía listando B.
+- **Cómo se midió:** brazo E de la quinta transición (2026-09-05), reproducido ejecutando y
+  **re-verificado por el orquestador**: con `saveMeta` lanzando, `switchPortfolio` →
+  `pintado: [{"t":"Guardado ✓","ok":true}] | subidas: 0`, memoria B / disco A; `addPortfolio` →
+  ídem. `renamePortfolio`, `deletePortfolio` y `createDefaultPortfolios` no pintan nada.
+  **Sin oráculo**: quitar el `saveMeta()` de `switchPortfolio` deja la puerta en `rc=0`.
+- **Estado (histórico, antes del ciclo):** abierta, **RECLASIFICADA de «cambio silencioso» a VERDE FALSO** el 2026-09-05.
+  **Entra en el ciclo 01-08** por ser la misma clase que D-27 y D-46.
+- **Qué la reabre:** se cierra cuando el anuncio de éxito de los cinco dependa del resultado de su
+  escritura, y `deletePortfolio` además invierta el orden o repare si falla. Con oráculo propio:
+  hoy no lo tiene ninguno.
+- **CERRADA en el ciclo 01-08 (2026-09-06).** Los cinco llamantes pasan por
+  `guardarListaDeCarteras()`, que **pinta el fallo EN ROJO** —no basta «no pintar verde»: tres de
+  los cinco ya no pintaban nada, así que ese criterio pasaba CON y SIN el arreglo (§5.9)— y
+  devuelve el veredicto; los cinco **deshacen su cambio en memoria** si la lista no aterriza.
+  `deletePortfolio` **invierte el orden**: primero guarda la lista y sólo entonces borra los
+  activos. Evidencia: `pruebasListaDeCarterasFallida` (una fila por llamante),
+  `pruebasListaDeCarterasSana` (control de vacuidad) y los mutantes **D-48×2** del banco, `rc=1`.
+
+### D-61 · El censo de avisos AMNISTÍA en silencio una alarma que desaparece — CERRADA 2026-09-06
+- **Qué es:** `tools/avisos.py --check` caza que una boca se cierre (`rc=1`, «han DESAPARECIDO
+  avisos») y hasta imprime «No se resella de trámite». Pero **`--update`, SIN `--amnesty`, la sella
+  igualmente, en silencio, sin nombrarla y con `rc=0`** — y a partir de ahí queda verde para
+  siempre. La causa es una asimetría (§5.16): `comparar()` clasifica la desaparición como `mejor`,
+  `--check` la trata como hallazgo y `sellar` sólo se niega ante `peor`. El ciclo 01-06 decidió por
+  escrito que «un aviso que DESAPARECE es un HALLAZGO, no una mejora» y lo cerró **sólo por el lado
+  de `--check`**. `tools/sumideros.py` NO tiene el defecto: allí la boca cerrada va a `peor`.
+- **Cómo se midió:** brazo C de la quinta transición (2026-09-05) y **re-verificado por el
+  orquestador** con ancla única afirmada, cerrando `console.error('No se sincroniza: el guardado
+  local falló.')`: `--check` → `rc=1` nombrando la clave; `--update` → `rc=0` «Foto sellada: 39
+  aviso(s)»; `--check` después → `rc=0` verde.
+- **Estado (histórico, antes del ciclo):** abierta y grave: es un hueco del aparato de medición que **dirige la mano del
+  operador a amnistiar el silencio**. **Entra en el ciclo 01-08.**
+- **Qué la reabre:** se cierra cuando `avisos.py` trate la desaparición como empeoramiento, igual
+  que `sumideros.py`, con sabotaje propio que lo demuestre.
+- **CERRADA en el ciclo 01-08 (2026-09-06).** `--update` bloquea ahora en LAS DOS direcciones:
+  `bloquean = peor + mejor`, así que una boca que se cierra exige `--amnesty` y queda **nombrada**
+  en el diff. La dirección viaja DENTRO de la semántica sellada, así que aflojarla sería deriva
+  (`rc=3`). Evidencia: control propio en `tools/sabotage.py` —«avisos --update se niega a sellar
+  una boca que se cierra, y la nombra»— que además **restaura la foto sellada** pase lo que pase,
+  porque si el arreglo regresara ese mismo control la habría reescrito.
+
 
 ## Cerradas en el ciclo 01-07 (2026-09-01)
 

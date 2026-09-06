@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 7 (+1 por planificar) | In progress (**7 ciclos cerrados y CINCO transiciones**; la quinta, del 2026-09-05, midió la fase contra el código y **la fase NO cierra**: abre el ciclo **01-08**) | - |
+| 1 | Guardado que no miente | 8 | In progress (**8 ciclos cerrados y CINCO transiciones**; el 01-08 cerró su bucle el 2026-09-06. **La fase NO se cierra por tener tantas actas como planes**: falta verlo en el navegador y falta la SEXTA transición, que es quien mide la meta contra el código) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -203,11 +203,24 @@ un mutante que **muere**: se corrigió al re-verificar.
 fase las cinco veces.
 
 **Planes:**
-- [ ] **01-08: El aviso de la nube y el libro que no aterriza** — por planificar. Entran **D-58**
-  (una escritura fallida al aplicar no puede adelantar el reloj), **D-59** (todo pintado del camino
-  de nube afirmado por color Y texto, cerrado por receptor), **D-48** (el anuncio de la lista de
-  carteras depende de su escritura) y **D-61** (`avisos.py` deja de amnistiar el silencio).
-  **Fuera:** D-65 (falta medir el orden en el navegador), D-60, D-62 a D-64, D-66 a D-69 y Fase 3.
+- [x] **01-08: El aviso de la nube y el libro que no aterriza** — **BUCLE CERRADO el 2026-09-06**
+  (`f46887f`), acta `01-08-SUMMARY.md`. **Todavía NO visto en un navegador.**
+  Cierra **D-58** (una escritura fallida al aplicar ya no puede adelantar el reloj), **D-59** (todo
+  pintado del camino de nube afirmado por color Y texto, cerrado por receptor), **D-48** (el anuncio
+  de la lista de carteras depende de su escritura, en los cinco llamantes) y **D-61** (`avisos.py`
+  deja de amnistiar el silencio, en las dos direcciones).
+  Aplicar lo que llega de la nube pasa a ser **todo-o-nada**, y de ese único hecho cuelgan el reloj
+  que no avanza, el freno que impide exportar el libro pobre encima del rico, y el aviso en pantalla
+  con su causa y sus cifras.
+  **La revisión del diff y TRES brazos adversarios disjuntos demolieron el ciclo ya escrito y con la
+  puerta en verde: once arreglos más.** Los dos peores: el freno se quedaba puesto **para siempre**
+  en un dispositivo nuevo, y **cinco formas de pintar verde sobre un fallo** pasaban la puerta
+  ENTERA porque la ventana de pintura apuntaba los temporizadores y nunca los disparaba.
+  Puerta `rc=0`, once pasos; banco con **161 controles, todos muerden**, árbol idéntico antes y
+  después. Dos cambios de la regla de medida (`avisos.py` v1→v2 con RED C, y tres sumideros nuevos),
+  reseñados con amnistía enumerada.
+  Abre **D-70** a **D-73**. **Fuera:** D-65 (falta medir el orden en el navegador), D-60, D-62 a
+  D-64, D-66 a D-69, D-50 y Fase 3.
 - [x] **01-07: Un solo juez en las dos direcciones** — **CERRADO el 2026-09-05**, acta `01-07-SUMMARY.md`, desplegado y verificado dos veces en el navegador real. Cierra además **D-30** y **D-54**, ésta última encontrada por el propio checkpoint humano: el naranja afirmaba una causa y lo alcanzaban ocho veredictos. Abre D-48 a D-53, D-55, D-56 y D-57.
 
   Detalle original del plan: — cierra **D-45** (el predicado de «hay datos
@@ -217,6 +230,16 @@ fase las cinco veces.
   `id` y el `savedAt` por sección, que siguen siendo Fase 3.
 
 Acta: `01-TRANSICION-4.md`.
+
+**Estado de la fase tras el 01-08 (2026-09-06):** hay 8 planes y 8 actas. **Eso no es el disparador
+de cierre** (§7 de `CLAUDE.md`): ha disparado en falso las cinco veces anteriores. Antes de poder
+cerrar la fase hacen falta dos cosas que hoy no existen:
+
+1. **Ver el 01-08 en la app desplegada**, recargando dos veces y confirmando por una función —no por
+   el aspecto de la pantalla— que el navegador tiene el código nuevo. Este ciclo toca pantalla y
+   `tools/verify.sh` no puede verla.
+2. **La SEXTA transición**, que mide los objetivos de la fase CONTRA EL CÓDIGO. Las cinco anteriores
+   cambiaron el resultado las cinco veces.
 
 ### Phase 2: Backup y restauración
 

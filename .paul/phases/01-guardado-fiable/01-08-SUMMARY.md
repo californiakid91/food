@@ -216,3 +216,36 @@ espacio: es Fase 5.
 **Y lo que la puerta no puede ver:** esto toca pantalla, así que el ciclo **no está verificado**
 hasta abrir `https://californiakid91.github.io/food/` y mirarlo, recargando dos veces, y confirmar
 antes que el navegador tiene el código nuevo por una función y no por el aspecto.
+
+---
+
+## 11. Cierre del bucle (UNIFY, 2026-09-06)
+
+El UNIFY no se limitó a escribir papeles. Lo que midió, y lo que cambió por medirlo:
+
+- **La puerta se releyó FRESCA**, no se heredó del APPLY: `tools/verify.sh` completo → **`rc=0`**,
+  once pasos, «VERDE — todo ejercido y en verde», con `index.html` en
+  `64e6e29462fc48b4d7876b14bf514b07` **idéntico antes y después** y el árbol limpio.
+- **El libro de deudas se contradecía a sí mismo.** Las cuatro fichas que este ciclo cierra —D-58,
+  D-59, D-48 y D-61— tenían su párrafo de cierre escrito, pero **seguían en la sección de ABIERTAS**,
+  con el título sin marcar y con su línea «**Estado:** abierta» justo encima del cierre. El libro es
+  la lista VIVA que se lee al arrancar cada sesión (§8): una ficha que se contradice a sí misma ya
+  costó una re-medición entera con D-15. Movidas a `## Cerradas en el ciclo 01-08 (2026-09-06)`,
+  título marcado, y la línea vieja rotulada «histórico, antes del ciclo».
+- **D-60 se RE-MIDIÓ en vez de heredarse.** Su ficha decía «fuera del alcance del 01-08 **salvo que
+  el cierre de D-59 lo arrastre**», que es una suposición, y una medición no se hereda (§7).
+  Mutante **T7** (cortar el cable `schedulePush` → `subirALaNube`) aplicado sobre **copia aislada**,
+  con el directorio fijado en absoluto y afirmado, el árbol real **sólo leído**, y la **unicidad del
+  ancla afirmada** antes de mutar (1 ocurrencia). Resultado: **el mutante SOBREVIVE** —los nueve
+  pasos que miden el código salen OK— con salida **idéntica** a la del control de vacuidad sobre la
+  misma copia sin mutar. **El cierre de D-59 no arrastró a D-60**; sigue abierta, ahora medida.
+- **La comparación de las dos salidas falló RUIDOSAMENTE** cuando una de sus entradas no existía
+  (ruta equivocada), en vez de devolver «iguales» —§5.14—. Se rehízo afirmando primero que las dos
+  entradas existen y no están vacías. El resultado publicado es el de la comparación buena.
+
+**La FASE 1 no se cierra con este bucle.** Hay 8 planes y 8 actas, y ése es **exactamente** el
+disparador prohibido por §7, que ha fallado en las cinco transiciones anteriores. Además el ciclo
+toca **pantalla** y no se ha visto en un navegador: una sonda verde nunca supera a un intento real.
+Quedan, en este orden: **(1)** abrir `https://californiakid91.github.io/food/` recargando dos veces
+y confirmando por una función que el navegador tiene el código nuevo; **(2)** la **SEXTA
+transición**, que mide la meta contra el código.
