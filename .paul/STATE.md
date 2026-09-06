@@ -51,10 +51,22 @@ Progress:
 Current loop state:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
-  ✓        ○        ○     [ciclo 01-08 planificado y ATACADO.
-                            Lo abren D-58, D-59, D-48 y D-61.
-                            La 1a version del plan fue REFUTADA y corregida]
+  ✓        ✓        ○     [ciclo 01-08 EJECUTADO (f46887f).
+                            Cierra D-58, D-59, D-48 y D-61; abre D-70 a D-73.
+                            El plan y el codigo fueron REFUTADOS y corregidos]
 ```
+
+**APPLY del 01-08 cerrado el 2026-09-06.** Puerta `tools/verify.sh` completa: **rc=0**, once pasos,
+banco de sabotaje y enganche incluidos. Banco: **161 controles, todos muerden**, arbol identico
+antes y despues. Acta: `.paul/phases/01-guardado-fiable/01-08-SUMMARY.md`.
+
+**Lo que hay que recordar de este ciclo:** la revision del diff y **tres brazos adversarios
+disjuntos, cada uno sobre su propia copia, demolieron el ciclo ya escrito y con la puerta en
+verde** — once arreglos mas. Los dos peores: el freno se quedaba puesto **para siempre** en un
+dispositivo nuevo (su reloj nace por delante del de la nube, asi que la rama que lo levantaba no
+disparaba jamas), y **cinco formas de pintar verde sobre un fallo** pasaban la puerta ENTERA porque
+la ventana de pintura apuntaba los temporizadores y nunca los disparaba. Ninguno de los dos lo vio
+el que escribio el codigo.
 
 Ciclos 01-01 a 01-07: cerrados, cada uno con su acta. Sus CINCO transiciones midieron la meta
 contra el código y **las cinco cambiaron el resultado**. `PLAN == SUMMARY` habría cerrado la fase
@@ -324,10 +336,12 @@ demostrar en las dos direcciones — un brazo publicó «puerta en verde» donde
 por ancla rota, y otro confesó que sus tres primeros hallazgos eran falsos por haber copiado de
 una copia mientras el banco mutaba. Antes de dar por bueno cualquier número del plan, re-medirlo.
 
-Next action: **`/paul:apply` del ciclo 01-08.** El plan está en
-`.paul/phases/01-guardado-fiable/01-08-PLAN.md`, ya revisado; empezar por T1 (aplicación
-todo-o-nada, que obliga a trocear una función de 59 líneas con presupuesto 60).
-Resume file: .paul/phases/01-guardado-fiable/01-08-PLAN.md
+Next action: **`/paul:unify` del ciclo 01-08** para reconciliar y cerrar el bucle. El acta ya está
+escrita (`01-08-SUMMARY.md`) y las deudas ya están en el libro; queda actualizar ROADMAP y
+`paul.json`. **Y después, ANTES de dar nada por verificado: abrir la app desplegada y mirarla**,
+recargando dos veces, confirmando primero por una función que el navegador tiene el código nuevo.
+Este ciclo toca pantalla y la puerta no puede verla.
+Resume file: .paul/phases/01-guardado-fiable/01-08-SUMMARY.md
 
 ---
 *STATE.md — Updated after every significant action*
