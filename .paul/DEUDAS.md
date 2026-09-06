@@ -18,6 +18,15 @@ porque todos los dispositivos ya sincronizados tienen META sin marca de tiempo (
 desconocido vale cero» hace ganar a cualquier documento — control en verde y daño vivo (§5.10).
 Acta: `.paul/phases/01-guardado-fiable/01-07-SUMMARY.md`.
 
+**Ciclo 01-08 (2026-09-06): que el camino de la nube no pueda pintar verde sobre un fallo.**
+Cierra **D-58, D-59, D-48 y D-61**; abre **D-70 a D-73**. El arreglo sale de UN primitivo —un hecho
+de entrada/salida: «el documento que bajó NO aterrizó entero»— del que cuelgan el freno de la
+subida, el reloj que no avanza y lo que se pinta. Lo que hizo que el criterio pudiera MORIR fue
+**T2b**: con el freno puesto, el guardado local no adelanta la marca de tiempo, así que la nube
+sigue pareciendo más nueva y la bajada se re-arma sola. Sin eso el freno era permanente, y lo
+descubrieron dos brazos adversarios **sobre el PLAN**, ejecutando, antes de escribir una línea de
+código. Acta: `.paul/phases/01-guardado-fiable/01-08-SUMMARY.md`.
+
 **QUINTA transición de fase (2026-09-05): la fase NO cierra, abre el ciclo 01-08.** Cinco brazos
 adversarios disjuntos, **cada uno sobre su propia copia del proyecto**, y **los cinco demolieron su
 frase**. Abre **D-58 a D-69**. Lo decisivo: un libro de la nube que **no cabe** en el almacenamiento
@@ -100,6 +109,15 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   la excepción **escapa sin captura** (nadie la recoge: la bajada llama a aplicar sin `try`), y
   deja la **memoria con las carteras de la nube mientras el disco sigue viejo**. Segunda familia,
   no fichada hasta hoy. El enfoque del 01-08 cierra las dos a la vez.
+- **CERRADA en el ciclo 01-08 (2026-09-06).** Cerrada por el PRIMITIVO, no por el caso: aplicar
+  el documento de la nube es ahora **todo-o-nada** —el libro primero, luego filas e historial, y la
+  META la ÚLTIMA y sólo si todo lo anterior aterrizó—, así que una escritura fallida **no puede
+  adelantar la marca de tiempo**. Si algo no aterriza, se pone un **freno** que el juez de la
+  subida consume como un primitivo más (`clave: 'nube-pendiente'`), y ni la memoria se muta ni se
+  exporta nada. Cierra también la **segunda familia** (cuota llena para TODAS las claves): las
+  escrituras de filas e historial ya no escapan sin captura, así que **no lanza** y la memoria
+  queda intacta. Evidencia: `pruebasFrenoTodoONada` (AC-1 y AC-2), `pruebasFrenoSeLevanta`
+  (AC-4, AC-5) y los mutantes **T1×2, M1, M2, M4a, M4b, M5, M6, M8, M9** del banco, todos `rc=1`.
 
 ### D-59 · La capa de aviso del camino de NUBE no tiene oráculo: ocho mutantes vivos
 - **Qué es:** `subirALaNube` es la única función que escribe a la nube y **nada mide lo que
@@ -136,7 +154,18 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
      medida** (deriva, `rc=3`, resellado deliberado), no añadir un caso.
 - **La rama «sin sesión» de la subida NO es parte de esta deuda:** medido, deja el estado anterior
   en pantalla en vez de pisarlo con verde.
-
+- **CERRADA en el ciclo 01-08 (2026-09-06).** Dos redes disjuntas, no una lista de casos:
+  1. **Oráculo que EJECUTA el pintor.** `pruebasPinturaDeLaSubida` y `pruebasPinturaDeLaEscucha`
+     ejercen las ramas de fallo de la subida y de la escucha dentro de la ventana de pintura y
+     afirman **color Y texto por su VALOR** (`#e67e22`, `#e74c3c`, `#27ae60`), con control de
+     vacuidad en las dos. Los cuatro mutantes de la ficha mueren: **U8, U3, E7 y E2**, `rc=1` con
+     mensaje nominal — E2 deja de cazarse «por accidente del banco».
+  2. **`setSyncUI` pasa a ser RECEPTOR VIGILADO** (RED C de `tools/avisos.py`): cada llamada al
+     pintor viaja en la foto sellada con su argumento normalizado, así que una rama nueva que pinte
+     verde donde toca naranja mueve la huella. Es cambio de la REGLA DE MEDIDA: dio `rc=3` (deriva)
+     y se reselló **a propósito**, con la semántica en `version: 2` y el motivo de cada clave
+     escrito. **Ceguera declarada:** `pullFromFirestore` pinta por dependencia inyectada y no entra
+     en esa huella; lo que lo mide son sus autopruebas y la afirmación del cableado por defecto.
 ### D-60 · El cable del guardado a la subida puede cortarse en VERDE
 - **Qué es:** `schedulePush` puede dejar de llamar a `subirALaNube` sin que nada se ponga rojo: las
   pruebas **reasignan** `schedulePush` para contar llamadas, así que su cuerpo nunca se ejerce. Es
@@ -171,6 +200,13 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Qué la reabre:** se cierra cuando el anuncio de éxito de los cinco dependa del resultado de su
   escritura, y `deletePortfolio` además invierta el orden o repare si falla. Con oráculo propio:
   hoy no lo tiene ninguno.
+- **CERRADA en el ciclo 01-08 (2026-09-06).** Los cinco llamantes pasan por
+  `guardarListaDeCarteras()`, que **pinta el fallo EN ROJO** —no basta «no pintar verde»: tres de
+  los cinco ya no pintaban nada, así que ese criterio pasaba CON y SIN el arreglo (§5.9)— y
+  devuelve el veredicto; los cinco **deshacen su cambio en memoria** si la lista no aterriza.
+  `deletePortfolio` **invierte el orden**: primero guarda la lista y sólo entonces borra los
+  activos. Evidencia: `pruebasListaDeCarterasFallida` (una fila por llamante),
+  `pruebasListaDeCarterasSana` (control de vacuidad) y los mutantes **D-48×2** del banco, `rc=1`.
 
 ### D-49 · El censo de sumideros y el de escrituras a la nube son ESTÁTICOS y por NOMBRE
 - **Qué es:** `tools/sumideros.py` cuenta llamadas (`f(`, `f?.(`) y referencias por nombre. Una
@@ -442,6 +478,12 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   operador a amnistiar el silencio**. **Entra en el ciclo 01-08.**
 - **Qué la reabre:** se cierra cuando `avisos.py` trate la desaparición como empeoramiento, igual
   que `sumideros.py`, con sabotaje propio que lo demuestre.
+- **CERRADA en el ciclo 01-08 (2026-09-06).** `--update` bloquea ahora en LAS DOS direcciones:
+  `bloquean = peor + mejor`, así que una boca que se cierra exige `--amnesty` y queda **nombrada**
+  en el diff. La dirección viaja DENTRO de la semántica sellada, así que aflojarla sería deriva
+  (`rc=3`). Evidencia: control propio en `tools/sabotage.py` —«avisos --update se niega a sellar
+  una boca que se cierra, y la nombra»— que además **restaura la foto sellada** pase lo que pase,
+  porque si el arreglo regresara ese mismo control la habría reescrito.
 
 ### D-62 · Un `index.html` que no decodifica sale como `rc=1` «hallazgo del código», no `rc=2`
 - **Qué es:** los **siete** instrumentos Python que leen `index.html` (`check_syntax`,
@@ -532,6 +574,70 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   re-verificado por el orquestador.
 - **Estado:** abierta. Adyacente a D-18 y D-23. Fuera del alcance del 01-08.
 - **Qué la reabre:** nada la cierra sola.
+
+### D-70 · Con el freno puesto, ese dispositivo NO tiene copia en la nube
+- **Qué es:** coste FIRMADO POR ADELANTADO del ciclo 01-08, escrito antes de construirlo. Mientras
+  el documento de la nube no quepa, `decidirSubida` devuelve `nube-pendiente` y **este dispositivo
+  deja de exportar**. Se ve en naranja y con su causa y sus cifras («la nube trae 42 operaciones y
+  no caben en este dispositivo»), pero **no hay camino de arreglo en pantalla**: el operador tiene
+  que deducir que debe hacer sitio.
+- **Cómo se midió:** autopruebas `AC-5c` del 01-08 (con el freno puesto, cero escrituras a la
+  nube), y mutante **M4a/M4b** del banco. Tres brazos adversarios atacaron el criterio de muerte y
+  encontraron **tres formas de que el freno fuera permanente**: dispositivo nuevo (reloj local por
+  delante), reloj local perdido, y nube sin documento. Las tres se cerraron dentro del ciclo —el
+  reintento **no depende del reloj** y el freno se suelta cuando no hay nada pendiente— con
+  `pruebasFrenoNoEsPermanente` y tres mutantes propios (**PERMANENTE-1/2/3**).
+- **Estado:** abierta y **declarada**. Es la familia de D-23 y D-35, **con una diferencia que se
+  exige por escrito: ésta SÍ tiene criterio de muerte medible** —el freno cae solo cuando el
+  documento entero aterriza (`AC-4`, `AC-5d`)—, que es justamente lo que a D-23 y D-35 les falta.
+- **Qué la reabre:** se cierra con el camino de remediación en pantalla (podar / exportar para
+  liberar espacio), que es **Fase 5**, junto a D-18, D-23 y D-35.
+
+### D-71 · Lo que se teclee con el freno puesto se sustituirá cuando la nube aterrice
+- **Qué es:** con el freno puesto la marca de tiempo local **no avanza** (es lo que impide el
+  callejón sin salida). Consecuencia: la nube sigue pareciendo más nueva, así que cuando por fin
+  quepa, la bajada **aplica el documento entero encima** de lo que el operador haya escrito
+  mientras tanto. No es un descuido: es la elección de este ciclo, y decidir quién gana cuando dos
+  libros difieren **es fusión**.
+- **Cómo se midió:** derivado del arreglo, no de una sonda: `marcaDeGuardado()` devuelve la marca
+  vieja mientras `libroPendiente` esté puesto (mutante **M9**), y `decidirBajada` aplica porque
+  `remoto > localSaved` (autoprueba `AC-5d`).
+- **Estado:** abierta y **declarada**. Boundary respetado a propósito.
+- **Qué la reabre:** la semántica de fusión de la **Fase 3**.
+
+### D-72 · El caso MIXTO deja el libro en disco y el viejo en memoria
+- **Qué es:** si el libro CABE y las filas o el historial NO, el freno se pone igual —su primitivo
+  es «el documento no aterrizó ENTERO», no «el libro no cupo»—, así que ni el reloj avanza ni se
+  sube nada. Lo que queda abierto es que el libro nuevo **ya está escrito en disco** mientras las
+  filas siguen siendo las viejas: el disco queda internamente desparejado hasta que la bajada
+  vuelva a intentarlo. No hay pérdida definitiva: la nube conserva el suyo (la subida está frenada)
+  y la siguiente bajada lo trae entero.
+- **Cómo se midió:** autoprueba `pruebasFrenoCasoMixto` del 01-08, que lo mide en vez de suponerlo:
+  `aplicado=false`, `savedAt=1000` (no avanza), `freno.ops=42`, memoria con «Vieja», y
+  **`opsEnDisco() = 42`**.
+- **Lo PEOR de esta ficha se cerró DENTRO del ciclo**, y no por decisión mía: un brazo adversario
+  midió que la memoria se quedaba con el libro VIEJO mientras el disco tenía el nuevo, y que el
+  siguiente guardado lo escribía encima pintando «Guardado ✓» en verde. Ahora `applySyncPayload`
+  **relee el disco** al fallar, así que memoria y disco vuelven a coincidir (`ops.length = 42`), con
+  su mutante propio en el banco.
+- **Estado:** abierta y **declarada**, ya sin la parte que causaba pérdida. El plan 01-08 la exigía
+  «definida por escrito» (AC-2); ésta es la definición, con su medición.
+- **Qué la reabre:** se cierra si la aplicación pasa a ser transaccional de verdad —recuperar el
+  contenido anterior de cada clave escrita y devolverlo al fallar—, que es Fase 3 por la fusión que
+  implica.
+
+### D-73 · Cada aviso nuevo obliga a resellar el censo con amnistía
+- **Qué es:** desde el 01-06 el censo de avisos trata un aviso **nuevo** como empeoramiento, y
+  desde el 01-08 también uno que **desaparece** (cierre de D-61). Efecto secundario declarado:
+  **todo ciclo que añada un aviso tiene que resellar con `--amnesty`**, y la amnistía se convierte
+  en rutina si nadie la mira. El freno de la nube añadió once claves de aviso y once de receptor.
+- **Cómo se midió:** resellado del 01-08: `--update` se negó dos veces y hubo que pasar
+  `--amnesty`, enumerando cada clave; los motivos se escribieron uno a uno en
+  `.paul/baseline-avisos.json` (cero claves con «SIN MOTIVO ESCRITO»).
+- **Estado:** abierta, **de proceso**. La mitigación de hoy es que el resellado **enumera** lo que
+  amnistía y que el motivo es obligatorio; lo que no hay es nada que impida amnistiar sin leer.
+- **Qué la reabre:** se cierra si el instrumento distingue «aviso nuevo con motivo escrito en el
+  mismo commit» de «aviso nuevo sin más», o si el motivo pasa a ser obligatorio para sellar.
 
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
 > **RE-MEDIDA el 2026-09-05 (quinta transición, brazo A): pasa de «no reproducida en vivo» a

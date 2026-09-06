@@ -278,9 +278,18 @@ CASOS = [
          "      const ok = opsIlegible ? repararLibroIlegible(fusionadas) : saveOpsAll(fusionadas);",
          "      const ok = saveOpsAll(fusionadas);",
          1, "AC-5 el formato antiguo tambi\u00e9n escribe la reparaci\u00f3n"),
+    # RE-ANCLADO en el 01-08 (T10): el bloque vive ahora en `aterrizaElLibro`,
+    # que es el trozo de `applySyncPayload` que decide si el libro llego al
+    # disco, y cada rama termina en un `return`. La mutacion sigue siendo la
+    # misma: poner el cerrojo ilegible POR DELANTE del juez de no-vaciado.
     Caso("se invierte la PRECEDENCIA de las dos guardas del cruce", INDEX,
-         "    if (vaciariaElLibro(opsDelDocumento(data), ops)) {\n      console.warn('[SYNC] libro recibido vacío: se conservan las', ops.length,\n                   'operaciones locales');\n    } else if (opsIlegible) {\n      // El CRUCE: libro local ilegible + lo que llega. Una nube sin operaciones\n      // no es una reparación, así que el cerrojo se queda puesto.\n      if (!tieneOperaciones(entrante)) {\n        console.error('Libro local ilegible y no llega nada con que repararlo: el cerrojo sigue puesto.');\n      } else if (!repararLibroIlegible(entrante)) {\n        console.error('No se pudo reparar el libro ilegible: el cerrojo sigue puesto.');\n      }\n",
-         "    if (opsIlegible) {\n      // El CRUCE: libro local ilegible + lo que llega. Una nube sin operaciones\n      // no es una reparación, así que el cerrojo se queda puesto.\n      if (!tieneOperaciones(entrante)) {\n        console.error('Libro local ilegible y no llega nada con que repararlo: el cerrojo sigue puesto.');\n      } else if (!repararLibroIlegible(entrante)) {\n        console.error('No se pudo reparar el libro ilegible: el cerrojo sigue puesto.');\n      }\n    } else if (vaciariaElLibro(opsDelDocumento(data), ops)) {\n      console.warn('[SYNC] libro recibido vacío: se conservan las', ops.length,\n                   'operaciones locales');\n",
+         "    if (vaciariaElLibro(opsDelDocumento(data), ops)) {\n"
+         "      console.warn('[SYNC] libro recibido vacío: se conservan las', ops.length,\n"
+         "                   'operaciones locales');\n"
+         "      return true;\n"
+         "    }\n"
+         "    if (opsIlegible) {",
+         "    if (opsIlegible) {",
          1, "AC-1 en el cruce gana el aviso de no-vaciado"),
     Caso("la reparacion buena deja de dejar constancia", INDEX,
          "    console.warn('Libro local ilegible REPARADO con', list.length, 'operaciones de la nube.');\n",
@@ -500,8 +509,8 @@ CASOS = [
          "  const r = fn(v); v.cerrar(); return r;",
          1, "AC-0 y aun as\u00ed restaur\u00f3 getElementById"),
     Caso("ARNES: el reloj falso deja de dar identificadores unicos", INDEX,
-         "sig++; v.programaciones.push({ id: sig, fn: fn, ms: ms }); return sig;",
-         "v.programaciones.push({ id: sig, fn: fn, ms: ms }); return sig;",
+         "    sig++;\n    v.programaciones.push({ id: sig, fn: fn, ms: ms, args: args });",
+         "    v.programaciones.push({ id: sig, fn: fn, ms: ms, args: args });",
          1, "AC-2 con identificadores distintos"),
     # Ancla ESTABLE a proposito: no la expresion regular (que ya cambio una vez
     # y dejo tres mutadores mudos), sino la linea del fallo cerrado.
@@ -543,8 +552,8 @@ CASOS = [
     # codigo suelto del arranque: nueve avisos reales del camino de la fase
     # quedaban fuera y un aviso sembrado ahi salia verde.
     Caso("aviso NUEVO sembrado en el guardado por sincronizacion", INDEX,
-         "  } else if (!saveOpsAll(entrante)) {",
-         "  } else if (console.warn('aviso sembrado en sync'), !saveOpsAll(entrante)) {",
+         "    if (!saveOpsAll(entrante)) {",
+         "    if (console.warn('aviso sembrado en sync'), !saveOpsAll(entrante)) {",
          1, "aviso NUEVO o CAMBIADO"),
     # Degradar a un canal NO censado (`console.log`) hace DESAPARECER el aviso.
     # Antes salia rotulado como mejora y con el comando de resellado debajo:
@@ -576,8 +585,8 @@ CASOS = [
     # nuevo. La rama que cierra D-45 no habria disparado nunca en la app real: el
     # control habria pasado con el dano vivo (5.10).
     Caso("el reloj del sync vuelve a ponerse a cero al aplicar", INDEX,
-         ",\n                                                  savedAt: Number(data.savedAt) || 0 }));",
-         " }));",
+         "           savedAt: Number(data.savedAt) || 0,\n           pendiente: null };",
+         "           pendiente: null };",
          1, "AC-3 la marca de tiempo del documento SOBREVIVE al aplicar"),
     # El hallazgo 1: la bajada devolvia el mismo valor tanto si aplicaba como si
     # rechazaba, y el arranque lo traducia a VERDE. Cerrar solo la bajada habria
@@ -733,8 +742,8 @@ CASOS = [
          "  return 'Cambios sin subir (este dispositivo no tiene operaciones). ' + base;",
          1, "D-54 sin motivo"),
     Caso("un cambio de la nube entra al disco y la pantalla no se entera", INDEX,
-         "    applySyncPayload(data);\n    repintarTrasSync();",
-         "    applySyncPayload(data);",
+         "      return;\n    }\n    repintarTrasSync();",
+         "      return;\n    }",
          1, "AC-2 y AHÍ sí repinta la pantalla"),
     # La guarda `utilizable`, ejercida sobre la funcion ENTERA y no sobre el
     # juez aislado.
@@ -744,8 +753,8 @@ CASOS = [
          1, "AC-2 un documento sin carteras no cuenta como sincronizado"),
     # El `|| 0` del reloj, afirmado por su VALOR y no solo por un ancla.
     Caso("el reloj se sella con la hora actual en vez de con la del documento", INDEX,
-         "savedAt: Number(data.savedAt) || 0 }));",
-         "savedAt: Number(data.savedAt) || Date.now() }));",
+         "savedAt: Number(data.savedAt) || 0,",
+         "savedAt: Number(data.savedAt) || Date.now(),",
          1, "AC-3 un documento SIN marca deja el reloj local en cero"),
     # D-27 cerrada por la CLASE: el panel de importacion tenia su PROPIO anuncio
     # de exito, mas grande que el indicador, y lo pintaba en verde pasara lo que
@@ -807,6 +816,169 @@ CASOS = [
     Caso("no se puede medir: index.html vacio", INDEX,
          None, "",
          2, "INSTRUMENTO ROTO"),
+    # ── Ciclo 01-08: el freno de la nube ────────────────────────────────────
+    #
+    # Cada uno REVIERTE, y cada uno tiene su ancla afirmada unica antes de
+    # mutar. Si el ancla no casara, el defecto seria de ESTE banco y no del
+    # control: se dice asi en vez de reportar "no muerde" (CLAUDE.md 5.4).
+    Caso("T1: las escrituras de la bajada vuelven a escapar sin captura", INDEX,
+         "    if (!escribirClave(rowsKey(id), pd)) faltan.push(rowsKey(id));",
+         "    localStorage.setItem(rowsKey(id), JSON.stringify(pd));",
+         1, "AC-2 mixto: aplicar tampoco LANZA cuando fallan s\u00f3lo las filas"),
+    Caso("T1: la memoria se muta ANTES de saber si el documento aterriza", INDEX,
+         "  const faltan = aterrizaDocumento(data);",
+         "  portfolios = data.portfolios;\n  const faltan = aterrizaDocumento(data);",
+         1, "AC-2 la memoria NO queda mutada (carteras)"),
+    Caso("M1: la marca de tiempo vuelve a sellarse incondicionalmente", INDEX,
+         "  if (faltan.length) return faltan;\n"
+         "  if (!escribirClave(META_KEY, metaDelDocumento(data))) faltan.push(META_KEY);",
+         "  if (!escribirClave(META_KEY, metaDelDocumento(data))) faltan.push(META_KEY);",
+         1, "AC-2 mixto: la marca de tiempo tampoco avanza"),
+    Caso("M2: aplicar vuelve a decir que si pasara lo que pasara", INDEX,
+         "    ops = loadOpsAll();\n    return false;",
+         "    ops = loadOpsAll();\n    return true;",
+         1, "AC-1 el documento que no cabe NO se da por aplicado"),
+    Caso("M3: el arranque vuelve a ignorar si se aplico", INDEX,
+         "  if (decision.aplicar && !aplicado) {",
+         "  if (false && decision.aplicar && !aplicado) {",
+         1, "AC-3 el arranque no se da por sincronizado en verde"),
+    Caso("M4a: el freno sale del cableado de la subida", INDEX,
+         "           pendiente: () => libroPendiente,",
+         "           pendiente: () => null,",
+         1, "AC-2 y su freno lee EL freno de verdad"),
+    Caso("M4b: el freno sale del juez de la subida", INDEX,
+         "  if (estado.nubePendiente) {",
+         "  if (false && estado.nubePendiente) {",
+         1, "AC-1 con el freno de la nube puesto NO sube"),
+    Caso("M5: el freno se suelta ANTES de confirmar la escritura", INDEX,
+         "    ops = loadOpsAll();\n    return false;",
+         "    libroPendiente = null;\n    ops = loadOpsAll();\n    return false;",
+         1, "AC-1 el freno queda puesto CON SUS CIFRAS"),
+    Caso("M6: el freno se queda solo en memoria", INDEX,
+         "      previa.pendiente = libroPendiente;\n"
+         "      localStorage.setItem(META_KEY, JSON.stringify(previa));",
+         "      previa.pendiente = libroPendiente;",
+         1, "AC-1 y persistido, para sobrevivir a una recarga (M6)"),
+    Caso("M7: ANTI-CALLEJON, el freno bloquea tambien la escritura local", INDEX,
+         "function saveOpsAll(list) {",
+         "function saveOpsAll(list) {\n  if (libroPendiente) return false;",
+         1, "AC-5a con el freno puesto, el guardado local S\u00cd escribe"),
+    Caso("M8: guardar la lista de carteras borra el hecho del freno", INDEX,
+         "                                                    savedAt: marcaDeGuardado(),\n"
+         "                                                    pendiente: libroPendiente }));",
+         "                                                    savedAt: marcaDeGuardado() }));",
+         1, "AC-5b y el guardado CONSERVA el freno"),
+    Caso("M9: el guardado local vuelve a adelantar el reloj con el freno puesto", INDEX,
+         "  if (!libroPendiente) return Date.now();",
+         "  if (true) return Date.now();",
+         1, "AC-5b y la marca de tiempo NO avanza"),
+    Caso("M10: la escucha en vivo ignora si se aplico", INDEX,
+         "    if (!applySyncPayload(data)) {",
+         "    if (applySyncPayload(data) === 'nunca') {",
+         1, "AC-3 la escucha en vivo pinta el NARANJA por su valor"),
+    # Los cuatro mutantes de PINTURA que el 2026-09-06 sobrevivieron a la puerta
+    # entera (U8, U3, E7) o solo murieron por ancla rota del banco (E2).
+    Caso("U8: una escritura a la nube que FALLA se pinta en verde", INDEX,
+         "    setSyncUI(estadoSync('error'));\n"
+         "    return { subido: false, aviso: 'error', motivo: 'la escritura falló' };",
+         "    setSyncUI(estadoSync('ok'));\n"
+         "    return { subido: false, aviso: 'error', motivo: 'la escritura falló' };",
+         1, "AC-6 una escritura que lanza pinta ROJO"),
+    Caso("U3: una subida OMITIDA por el juez se pinta en verde", INDEX,
+         "    setSyncUI(estadoSync(decision.aviso), decision.motivo);\n"
+         "    return { subido: false, aviso: decision.aviso, motivo: decision.motivo };",
+         "    setSyncUI(estadoSync('ok'));\n"
+         "    return { subido: false, aviso: decision.aviso, motivo: decision.motivo };",
+         1, "AC-6 una subida omitida por el juez pinta NARANJA"),
+    Caso("E7: el escucha de la nube MUERE y se pinta en verde", INDEX,
+         "    console.error('[SYNC] el escucha de la nube falló:', e);\n"
+         "    setSyncUI(estadoSync('error'));",
+         "    console.error('[SYNC] el escucha de la nube falló:', e);\n"
+         "    setSyncUI(estadoSync('ok'));",
+         1, "AC-6 un escucha que muere pinta ROJO"),
+    Caso("E2: el naranja de la escucha pierde su MOTIVO", INDEX,
+         "      setSyncUI(estadoSync(decision.aviso), decision.motivo);\n      return;",
+         "      setSyncUI(estadoSync(decision.aviso));\n      return;",
+         1, "AC-6 y el texto lleva su motivo"),
+    # D-48: los cinco llamantes de la lista de carteras.
+    Caso("D-48: el fallo de la lista de carteras vuelve a ser mudo", INDEX,
+         "  const ok = saveMeta();\n  if (!ok) {",
+         "  const ok = saveMeta();\n  if (false) {",
+         1, "AC-7 switchPortfolio avisa EN ROJO"),
+    Caso("D-48: borrar cartera vuelve a destruir los activos ANTES de guardar", INDEX,
+         "  if (!guardarListaDeCarteras()) {\n"
+         "    portfolios = listaPrevia;\n"
+         "    currentPortId = activaPrevia;\n"
+         "    return;\n"
+         "  }\n"
+         "  localStorage.removeItem(rowsKey(id));",
+         "  localStorage.removeItem(rowsKey(id));\n"
+         "  if (!guardarListaDeCarteras()) {\n"
+         "    portfolios = listaPrevia;\n"
+         "    currentPortId = activaPrevia;\n"
+         "    return;\n"
+         "  }",
+         1, "AC-7 y NO borra los activos que la lista sigue anunciando"),
+    # ── Arreglos nacidos de la revision adversaria del diff (01-08) ─────────
+    # Cada uno cierra un agujero que un brazo MIDIO ejecutando, y cada uno tiene
+    # aqui su mutante: escribir la leccion no la evita, sólo un control que se
+    # ejecuta la evita (5.17).
+    Caso("B2: pintar VERDE con retardo tras la escritura fallida", INDEX,
+         "    setSyncUI(estadoSync('error'));\n"
+         "    return { subido: false, aviso: 'error', motivo: 'la escritura fall\u00f3' };",
+         "    setSyncUI(estadoSync('error'));\n"
+         "    setTimeout(setSyncUI, 0, estadoSync('ok'));\n"
+         "    return { subido: false, aviso: 'error', motivo: 'la escritura fall\u00f3' };",
+         1, "AC-6 una escritura que lanza pinta ROJO"),
+    # NO hay un `Caso` para «dejar de disparar los avisos aplazados»: sin un
+    # pintado aplazado que cazar, disparar o no disparar da exactamente el mismo
+    # resultado, asi que ese control pasaria CON y SIN el arreglo (5.9). Quien
+    # demuestra que `dispararAplazados` muerde es el caso B2 de aqui arriba, que
+    # sin el sobrevive a la puerta entera: esa es su pareja, y por eso van juntos.
+    Caso("PERMANENTE-1: el freno deja de ganar al reloj en el juez de la bajada", INDEX,
+         "  if (local.frenoPuesto) {",
+         "  if (false && local.frenoPuesto) {",
+         1, "AC-5d con el freno puesto la bajada reintenta"),
+    Caso("PERMANENTE-2: una nube sin documento deja de soltar el freno", INDEX,
+         "      d.soltarFreno();\n      return { sincronizado: false, aplicado: false, aviso: 'pendiente',",
+         "      return { sincronizado: false, aplicado: false, aviso: 'pendiente',",
+         1, "AC-5d una nube SIN documento suelta el freno"),
+    Caso("PERMANENTE-3: un documento inutilizable deja de soltar el freno", INDEX,
+         "    d.soltarFreno();\n    return { sincronizado: false, aplicado: false, aviso: decision.aviso,",
+         "    return { sincronizado: false, aplicado: false, aviso: decision.aviso,",
+         1, "AC-5d un documento inutilizable tambi\u00e9n suelta el freno"),
+    Caso("la memoria deja de releer el disco tras un aterrizaje fallido", INDEX,
+         "    ops = loadOpsAll();\n    return false;",
+         "    return false;",
+         1, "AC-2 mixto: y la memoria refleja el disco"),
+    Caso("el aviso vuelve a culpar SIEMPRE al libro", INDEX,
+         "  if (!faltan.length || faltan.indexOf(CLAVE_DEL_LIBRO) >= 0) {\n"
+         "    return motivoNoCabe(f.ops || 0);\n"
+         "  }",
+         "  if (true) {\n"
+         "    return motivoNoCabe(f.ops || 0);\n"
+         "  }",
+         1, "AC-3 con las filas sin aterrizar, el motivo NO culpa al libro"),
+    Caso("las filas se escriben aunque el libro no haya aterrizado", INDEX,
+         "  if (!aterrizaElLibro(data)) return [CLAVE_DEL_LIBRO];",
+         "  if (!aterrizaElLibro(data)) faltan.push(CLAVE_DEL_LIBRO);",
+         1, "AC-1 y no deja claves hu\u00e9rfanas de la nube en disco"),
+    Caso("un libro VACIO de la nube vuelve a armar el freno", INDEX,
+         "      console.warn('[SYNC] libro recibido vac\u00edo: se conservan las', ops.length,\n"
+         "                   'operaciones locales');\n"
+         "      return true;",
+         "      console.warn('[SYNC] libro recibido vac\u00edo: se conservan las', ops.length,\n"
+         "                   'operaciones locales');\n"
+         "      return false;",
+         1, "AC-2 un libro VAC\u00cdO de la nube no arma el freno"),
+    Caso("el HISTORIAL de la nube deja de escribirse", INDEX,
+         "    if (!escribirClave(histKey(id), hist)) faltan.push(histKey(id));",
+         "    if (!hist) faltan.push(histKey(id));",
+         1, "AC-2 y el HISTORIAL de la nube llega al disco"),
+    Caso("el contador deja de mirar el de cada cartera", INDEX,
+         "    if (pd && pd.nextId) n = Math.max(n, pd.nextId);",
+         "    if (false) n = Math.max(n, pd.nextId);",
+         1, "AC-2 el contador sale del mayor de las carteras"),
 ]
 
 
@@ -929,6 +1101,89 @@ def main():
             print("  OK    --update se niega a sellar un empeoramiento sin --amnesty")
     finally:
         INDEX.write_text(original, encoding='utf-8')
+
+    # D-61 (01-08). El censo de avisos cazaba con `--check` una boca que se
+    # CIERRA y la sellaba igual con `--update`: rc=0, sin nombrarla, y verde
+    # para siempre. Cerrado por un lado y abierto por el otro. No cabe como
+    # `Caso` porque la puerta solo corre `--check`: lo que se mide aqui es la
+    # otra mitad del instrumento.
+    #
+    # Corre SOBRE UNA COPIA, no sobre el arbol real. `--update` ESCRIBE la foto
+    # sellada, y este proyecto ya tiene medido un brazo que murio a mitad de un
+    # sabotaje dejando el fichero sucio: restaurar en un `finally` deja una
+    # ventana en la que lo que queda en el arbol es una foto sellada DESDE UN
+    # FICHERO SABOTEADO, con la boca de aviso amnistiada dentro y la puerta
+    # verde. Sobre una copia no hay ventana ninguna. Lo destapo la revision del
+    # diff del 01-08.
+    with tempfile.TemporaryDirectory() as tmp:
+        d = pathlib.Path(tmp) / 'copia'
+        (d / 'tools').mkdir(parents=True)
+        (d / '.paul').mkdir()
+        for f in sorted(ROOT.glob('tools/*.py')):
+            (d / 'tools' / f.name).write_bytes(f.read_bytes())
+        (d / '.paul' / 'baseline-avisos.json').write_bytes(BASELINE_AVISOS.read_bytes())
+        copia_index = d / 'index.html'
+        copia_index.write_text(INDEX.read_text(encoding='utf-8'), encoding='utf-8')
+        sustituir_unico(
+            copia_index,
+            "  else console.error('No se sincroniza: el guardado local fall\u00f3.');",
+            "  else console.log('No se sincroniza: el guardado local fall\u00f3.');")
+        avisos_copia = str(d / 'tools' / 'avisos.py')
+        r = subprocess.run([sys.executable, avisos_copia, '--update'],
+                           capture_output=True, text=True, check=False, cwd=str(d))
+        nombra = 'ha desaparecido' in r.stdout and 'guardarTodo' in r.stdout
+        if r.returncode == 0 or 'NO SE SELLA' not in r.stdout or not nombra:
+            print("  NO MUERDE: avisos --update sello una boca de aviso CERRADA "
+                  f"(rc={r.returncode}), o no la nombro")
+            fallos.append("avisos --update amnistia el silencio")
+        else:
+            print("  OK    avisos --update se niega a sellar una boca que se cierra, "
+                  "y la nombra")
+        # Y la OTRA puerta: borrar la foto. El remedio que el propio instrumento
+        # imprime era su amnistia por detras --sellaba desde cero, sin nombrar la
+        # boca cerrada y con todos los motivos en blanco--. Lo midio un brazo
+        # adversario. Ahora `--check` exige motivos de verdad, como sumideros.py.
+        (d / '.paul' / 'baseline-avisos.json').unlink()
+        subprocess.run([sys.executable, avisos_copia, '--update'],
+                       capture_output=True, text=True, check=False, cwd=str(d))
+        r2 = subprocess.run([sys.executable, avisos_copia, '--check'],
+                            capture_output=True, text=True, check=False, cwd=str(d))
+        if r2.returncode == 0:
+            print("  NO MUERDE: borrar la foto y resellar deja el silencio amnistiado "
+                  "y --check en verde")
+            fallos.append("avisos: borrar la foto amnistia el silencio")
+        else:
+            print("  OK    una foto resellada desde cero SIN motivos no pasa --check "
+                  f"(rc={r2.returncode})")
+
+        # CONTROL DE VACUIDAD de la RED C, ejercido de verdad. No cabe como
+        # `Caso` porque lo que se mide es que el instrumento sepa decir «no medi
+        # nada», y eso no pone roja la puerta: hay que quitarle TODAS las
+        # llamadas al receptor dejando su declaracion viva. La revision del diff
+        # midio que ese control era codigo muerto --el contador se incrementaba
+        # ANTES del filtro de la declaracion, que casa siempre-- asi que el
+        # instrumento no podia hablar jamas (5.4).
+        sin_llamadas = copia_index.read_text(encoding='utf-8')
+        antes_n = sin_llamadas.count('setSyncUI(')
+        sin_llamadas = sin_llamadas.replace('setSyncUI(', 'pintorMudo(')
+        sin_llamadas = sin_llamadas.replace('function pintorMudo(state, motivo) {',
+                                            'function setSyncUI(state, motivo) {')
+        if antes_n < 2:
+            print("  BANCO ROTO: esperaba varias llamadas a setSyncUI y encontre "
+                  f"{antes_n}. El defecto esta en el BANCO.")
+            fallos.append("vacuidad de la RED C (banco)")
+        else:
+            copia_index.write_text(sin_llamadas, encoding='utf-8')
+            (d / '.paul' / 'baseline-avisos.json').write_bytes(BASELINE_AVISOS.read_bytes())
+            r3 = subprocess.run([sys.executable, avisos_copia, '--check'],
+                                capture_output=True, text=True, check=False, cwd=str(d))
+            if r3.returncode != 2 or 'midiendo el vacio' not in (r3.stdout + r3.stderr):
+                print(f"  NO MUERDE: sin ninguna LLAMADA al pintor, avisos da rc="
+                      f"{r3.returncode} en vez de rc=2 'midiendo el vacio'")
+                fallos.append("vacuidad de la RED C")
+            else:
+                print("  OK    sin ninguna LLAMADA al pintor, la RED C dice rc=2 "
+                      "'midiendo el vacio'")
 
     # ── Ciclo 01-05: controles que no caben como Caso, y por que. ──────────
 

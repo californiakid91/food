@@ -7,7 +7,7 @@ degradado a un mensaje informativo, o que cambia de texto sin que nadie se
 entere, ES ese silencio. Hasta el 01-06 la capa de aviso no tenia oraculo
 ninguno (D-38): nueve mutantes de esa capa sobrevivian a la puerta ENTERA.
 
-Dos redes DISJUNTAS, como en cloudwrites.py:
+Tres redes DISJUNTAS (dos hasta el 01-08), como en cloudwrites.py:
 
   RED A -- por RECEPTOR. Los elementos del aviso (el indicador de guardado y
   los del indicador de sincronizacion) se DERIVAN del texto de los pintores, y
@@ -21,7 +21,28 @@ Dos redes DISJUNTAS, como en cloudwrites.py:
   `console.error` a `console.info`, o cambiar el texto, mueve la huella y la
   puerta se pone roja.
 
+  RED C -- por RECEPTOR DEL INDICADOR (01-08). Censo de las LLAMADAS al pintor
+  del indicador de sincronizacion (`setSyncUI`) con su argumento normalizado.
+  Hasta el 01-08 ese pintor no era receptor de NINGUN instrumento: la RED A mira
+  quien toca los ELEMENTOS y el pintor los toca por definicion. Medido el
+  2026-09-06: una rama nueva que pintara VERDE donde toca naranja pasaba las
+  autopruebas, este censo, los sumideros y la puerta de escritura a la nube; solo
+  la cazaba el banco de sabotaje POR ANCLA ROTA, cuyo mensaje manda a arreglar el
+  banco en vez del codigo.
+
 CEGUERAS DECLARADAS (antes de que alguien las descubra):
+  - `argumentos_de` no sabe de EXPRESIONES REGULARES: una barra-parentesis dentro de los
+    argumentos de una llamada al receptor descuadra el conteo de parentesis. NO
+    produce un falso verde --sale rc=2 «no cierra su parentesis», o mueve la
+    huella y sale rc=1--, pero rotula codigo legitimo como instrumento roto.
+    Medido por un brazo adversario el 2026-09-06.
+  - Reformatear los espacios DENTRO de una llamada al receptor mueve la huella
+    parcialmente: se normalizan los blancos, no la forma de la expresion.
+  - La RED C solo ve llamadas LITERALES por nombre. `pullFromFirestore` pinta a
+    traves de una dependencia inyectada (`d.pintar`), asi que sus ramas NO estan
+    en esta huella: lo que las mide son las autopruebas del camino de bajada y la
+    afirmacion de que el cableado por defecto pinta con `setSyncUI`. Se dice aqui
+    para que nadie lea esta red como «todas las ramas que pintan».
   - ES ESTATICO. Presencia no es precedencia (CLAUDE.md 5.11): un literal
     escrito dentro de una CADENA cuenta como cobertura. Los comentarios SI se
     borran antes de medir, asi que un comentario no cuela.
@@ -83,7 +104,10 @@ BASELINE = ROOT / '.paul' / 'baseline-avisos.json'
 # La SEMANTICA de la medida. Si esto cambia, la foto anterior no es comparable
 # y el instrumento dice DERIVA (rc=3) SIN ofrecer el comando de resellado.
 SEMANTICA = {
-    'version': 1,
+    # v2 (01-08): entra la RED C (el pintor del indicador como receptor
+    # vigilado) y la direccion 'ambas' pasa a valer tambien en --update. Las dos
+    # son APRIETES de la vara, y por eso obligan a resellar A PROPOSITO.
+    'version': 2,
     'ambito': 'bloque <script> inline de index.html',
     # '<nivel superior>' NO es una funcion: es el codigo suelto del <script>,
     # que es literalmente el ARRANQUE (init de Firebase, el listener de `load`,
@@ -115,8 +139,30 @@ SEMANTICA = {
     'cortes': ['runSelfTests'],
     'canales': {'console.error': 'error', 'console.warn': 'aviso',
                 'alert': 'emergente', 'confirm': 'emergente'},
+    # RED C -- por RECEPTOR DEL INDICADOR (01-08). Hasta este ciclo `setSyncUI`
+    # no era receptor de NINGUN instrumento: la RED A solo mira quien toca los
+    # ELEMENTOS, y el pintor los toca por definicion, asi que una rama nueva que
+    # pintara verde donde toca naranja pasaba el censo entero. Medido el
+    # 2026-09-06: la rama exacta que el 01-08 iba a escribir sobrevivia a las
+    # autopruebas, al censo, a los sumideros y a la puerta de escritura; solo la
+    # cazaba el banco POR ANCLA ROTA, con un mensaje que manda a arreglar el
+    # banco. Ahora cada LLAMADA al pintor viaja en la huella con su argumento
+    # normalizado: una rama nueva, o un 'ok' donde habia otra cosa, mueve la
+    # huella y sale roja con su nombre.
+    'receptores': ['setSyncUI'],
+    # DIRECCION de la comparacion, y por que NO es la de funcsize: aqui un aviso
+    # que DESAPARECE es el dano que da nombre a la fase. Vale para --check Y
+    # para --update: hasta el 01-08 `--update` sellaba una boca cerrada con rc=0
+    # y sin nombrarla, asi que el instrumento escrito para impedir el silencio
+    # lo amnistiaba por el otro lado (D-61).
+    'direccion': 'ambas (aparecer y desaparecer son empeoramiento), tambien en --update',
     'huella': 'multiconjunto {funcion|nivel|prefijo}: cuantos, sin numero de linea',
 }
+
+# El marcador que `--update` deja en los motivos nuevos. Vive en una constante
+# porque lo ESCRIBE `--update` y lo PROHIBE `cargar_baseline`: dos sitios que
+# tienen que hablar del mismo texto, no dos copias que se desincronizan.
+MARCA_DE_RELLENO = 'SIN MOTIVO ESCRITO'
 
 REMEDIO_FOTO = ("Si la foto esta corrupta y quieres volver a sellarla desde cero: "
                 "borra el fichero y corre --update (con el fichero ausente, "
@@ -230,6 +276,57 @@ def prefijo_literal(codigo, i):
     return bruto.split('${')[0]
 
 
+def argumentos_de(codigo, i):
+    """Texto normalizado de los argumentos de la llamada cuyo `(` esta en `i`.
+
+    Salta cadenas para no cortar por un parentesis escrito dentro de una. Si no
+    encuentra el cierre, el instrumento NO adivina: rc=2 con nombre.
+    """
+    prof, k = 1, i + 1
+    while k < len(codigo) and prof:
+        c = codigo[k]
+        if c in '"\'`':
+            k = fin_de_cadena(codigo, k)
+            continue
+        if c == '(':
+            prof += 1
+        elif c == ')':
+            prof -= 1
+            if not prof:
+                return ' '.join(codigo[i + 1:k].split())
+        k += 1
+    roto("una llamada a un receptor vigilado no cierra su parentesis: no puedo "
+         "normalizar sus argumentos y no voy a adivinarlos")
+    return None
+
+
+def censar_receptores(codigo, funciones, alcance):
+    """{funcion|receptor|argumentos: cuantos} de los receptores vigilados."""
+    cuenta = {}
+    for receptor in SEMANTICA['receptores']:
+        patron = r'(?<![\w.$])' + re.escape(receptor) + r'\s*\('
+        visto = False
+        for m in re.finditer(patron, codigo):
+            # La DECLARACION no es una llamada. Y el contador de vacuidad se
+            # incrementa DESPUES de ese filtro: ponerlo antes lo volvia codigo
+            # muerto --la declaracion casa siempre el patron--, asi que el
+            # control que existe para decir «no medi nada» no podia hablar
+            # jamas (5.4). Lo destapo la revision del diff.
+            antes = codigo[max(0, m.start() - 20):m.start()]
+            if antes.rstrip().endswith('function'):
+                continue
+            visto = True
+            quien = funcion_de(funciones, m.start()) or '<nivel superior>'
+            if quien not in alcance:
+                continue
+            clave = f"{quien}|receptor|{receptor}({argumentos_de(codigo, m.end() - 1)})"
+            cuenta[clave] = cuenta.get(clave, 0) + 1
+        if not visto:
+            roto(f"el receptor vigilado '{receptor}' no tiene ni una LLAMADA en "
+                 "index.html: la RED C estaria midiendo el vacio")
+    return cuenta
+
+
 def censar():
     """{funcion|nivel|prefijo: cuantos}. Falla CERRADO si no puede medir."""
     codigo, funciones = leer()
@@ -250,6 +347,7 @@ def censar():
     if not cuenta:
         roto("el censo de avisos salio VACIO: o el ambito no se derivo o los "
              "patrones no casan. Cero avisos no es 'ningun hallazgo'.")
+    cuenta.update(censar_receptores(codigo, funciones, alcance))
     return cuenta, sorted(alcance)
 
 
@@ -285,6 +383,22 @@ def cargar_baseline():
             if not isinstance(v, str):
                 roto(f"avisos: la foto sellada {BASELINE.name}: '{grupo}[{k}]' "
                      "deberia ser un texto", REMEDIO_FOTO)
+    # El MOTIVO, CABLEADO. Es el MISMO predicado que `sumideros.py` (5.16): alli
+    # ya se exigia y aqui no, y esa asimetria ERA el defecto. Lo destapo un brazo
+    # adversario BORRANDO la foto: `--update` la sellaba desde cero con la boca
+    # de aviso cerrada dentro, los 56 motivos en el marcador de relleno, y todo
+    # verde para siempre. El remedio impreso por este mismo instrumento era la
+    # puerta de atras de su propia amnistia.
+    sin_motivo = sorted(set(d['avisos']) - set(d['motivos']))
+    if sin_motivo:
+        roto("avisos: hay avisos sellados SIN motivo escrito: "
+             + ', '.join(sin_motivo),
+             "Escribe por que existe cada uno en 'motivos', en el mismo commit.")
+    relleno = sorted(k for k, v in d['motivos'].items() if MARCA_DE_RELLENO in v)
+    if relleno:
+        roto("avisos: hay avisos sellados con el marcador de relleno, sin motivo "
+             "de verdad: " + ', '.join(relleno),
+             "Sustituye el marcador por el motivo real en 'motivos'.")
     return d
 
 
@@ -368,22 +482,28 @@ def main():
             peor, mejor = comparar_o_roto(actual, sellado['avisos'], 'avisos')
             previo = sellado['motivos']
             exentos = sellado['exentos_red_a']
-        if peor and not args.amnesty:
+        # LAS DOS DIRECCIONES, tambien aqui. Hasta el 01-08 `--check` cazaba la
+        # boca que se cierra y `--update` la sellaba igual, con rc=0 y SIN
+        # NOMBRARLA: cerrado por un lado y abierto por el otro (D-61). La
+        # asimetria ERA el defecto (5.16), la misma que `sumideros.py` ya no
+        # tiene para su sumidero 'anunciar'.
+        bloquean = peor + mejor
+        if bloquean and not args.amnesty:
             print("NO SE SELLA: esto es un EMPEORAMIENTO, no una mejora.")
-            for p in peor:
+            for p in bloquean:
                 print(f"   - {p}")
             print("\nApretar cuesta un comando; aflojar cuesta decirlo en voz alta.")
             print("Si de verdad quieres sellarlo, repite con --amnesty y quedara en el diff.")
             sys.exit(1)
-        motivos = {k: previo.get(k, 'SIN MOTIVO ESCRITO — escribelo') for k in actual}
+        motivos = {k: previo.get(k, MARCA_DE_RELLENO + ' — escribelo') for k in actual}
         BASELINE.parent.mkdir(parents=True, exist_ok=True)
         BASELINE.write_text(json.dumps(
             {'semantica': SEMANTICA, 'avisos': actual, 'motivos': motivos,
              'exentos_red_a': exentos, 'elementos_de_aviso': ids},
             indent=2, ensure_ascii=False, sort_keys=True) + '\n', encoding='utf-8')
-        if peor:
-            print(f"SELLADO CON AMNISTIA ({len(peor)} empeoramiento(s)):")
-            for p in peor:
+        if peor or mejor:
+            print(f"SELLADO CON AMNISTIA ({len(peor) + len(mejor)} empeoramiento(s)):")
+            for p in peor + mejor:
                 print(f"   - {p}")
         else:
             print(f"Foto sellada: {sum(actual.values())} aviso(s) en {len(actual)} claves.")

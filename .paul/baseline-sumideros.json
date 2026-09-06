@@ -2,6 +2,7 @@
   "motivos": {
     "bancoDeSumideros|subir-referencia|schedulePush": "AUTOPRUEBAS. El arnes del 01-07 hace lo mismo: guarda el lanzador, lo sustituye por un contador y lo restaura en `finally`.",
     "depsDeSesion|subir-referencia|subirALaNube": "EL SUMIDERO DEL ARRANQUE, nombrado. El manejador de inicio de sesion recibe la funcion de subida como dependencia (`subir: subirALaNube`) y la llama por el alias. El plan del 01-07 lo prometia como exencion nombrada; sin contar las REFERENCIAS se habria quedado invisible en vez de exento, que es justo lo que 5.15 prohibe.",
+    "guardarListaDeCarteras|anunciar|showSaveIndicator": "01-08 (D-48): el ANUNCIO del fallo de la lista de carteras. Es el arreglo en persona: hasta hoy dos llamantes pintaban verde con la escritura fallida y tres no pintaban nada. Gobernado por el booleano de saveMeta, con control positivo por llamante en pruebasListaDeCarterasFallida.",
     "guardarTodo|anunciar|showSaveIndicator": "EL anuncio del guardado completo. Sale del veredicto `todoBien`, que exige las TRES escrituras (activos, libro y lista de carteras).",
     "guardarTodo|subir|schedulePush": "La subida del guardado completo, condicionada a `todoBien`. Si el guardado local fallo, lo que hay en memoria no es de fiar y subirlo machacaria la copia buena de la nube.",
     "idsDeLosPintores|anunciar-referencia|showSaveIndicator": "NO es un sumidero: es el NOMBRE del pintor escrito dentro de una cadena, porque el arnes observable deriva de ahi los identificadores del marcado. Ceguera declarada en la cabecera (las cadenas se conservan a proposito, porque el prefijo de un aviso vive en una cadena).",
@@ -12,7 +13,9 @@
     "pruebasDuracionDelAviso|anunciar|showSaveIndicator": "AUTOPRUEBAS. Ejerce el pintor dos veces para medir la duracion real de cada aviso y el cruce del temporizador.",
     "pruebasFalloDeEscritura|anunciar-referencia|showSaveIndicator": "AUTOPRUEBAS. Sustituye el pintor por un espia y lo restaura: son las referencias del guardado y la restauracion, no llamadas.",
     "pruebasFalloDeEscritura|subir-referencia|schedulePush": "AUTOPRUEBAS. Sustituye el lanzador de subidas por un contador y lo restaura, para poder exigir CERO subidas tras un fallo parcial.",
+    "pruebasFrenoSeLevanta|subir|subirALaNube": "01-08: la suite que ejerce el freno de la nube necesita LLAMAR a la subida para demostrar que con el freno puesto no escribe. Es prueba, no producto: la escritura va contra un `ref` de mentira.",
     "pruebasPintorDelGuardado|anunciar|showSaveIndicator": "AUTOPRUEBAS. Ejecuta el pintor de verdad sobre un DOM observable para afirmar sus colores POR VALOR. No es un aviso al operador real.",
+    "pruebasPinturaDeLaSubida|subir|subirALaNube": "01-08: las tres ramas de pintura de la subida (omitida por el juez, escritura que lanza, camino feliz) se EJECUTAN. Es prueba, no producto: `ref` de mentira, cero escrituras reales.",
     "pruebasTuberiaDeSubida|subir|subirALaNube": "AUTOPRUEBAS. Las ocho filas de la matriz de la puerta de subida, todas con dependencias inyectadas: ninguna escribe en la nube.",
     "saveRows|anunciar|showSaveIndicator": "Los dos avisos --exito y fallo-- del guardado de activos, y SOLO cuando quien llama pide `anunciar:true`. Los caminos que forman parte de un guardado mayor pasan `false`.",
     "schedulePush|subir|subirALaNube": "El unico sitio del producto que LLAMA a la funcion de subida: el lanzador aplazado."
@@ -37,6 +40,7 @@
   "sumideros": {
     "bancoDeSumideros|subir-referencia|schedulePush": 3,
     "depsDeSesion|subir-referencia|subirALaNube": 1,
+    "guardarListaDeCarteras|anunciar|showSaveIndicator": 1,
     "guardarTodo|anunciar|showSaveIndicator": 1,
     "guardarTodo|subir|schedulePush": 1,
     "idsDeLosPintores|anunciar-referencia|showSaveIndicator": 1,
@@ -47,7 +51,9 @@
     "pruebasDuracionDelAviso|anunciar|showSaveIndicator": 2,
     "pruebasFalloDeEscritura|anunciar-referencia|showSaveIndicator": 3,
     "pruebasFalloDeEscritura|subir-referencia|schedulePush": 3,
+    "pruebasFrenoSeLevanta|subir|subirALaNube": 1,
     "pruebasPintorDelGuardado|anunciar|showSaveIndicator": 2,
+    "pruebasPinturaDeLaSubida|subir|subirALaNube": 3,
     "pruebasTuberiaDeSubida|subir|subirALaNube": 8,
     "saveRows|anunciar|showSaveIndicator": 2,
     "schedulePush|subir|subirALaNube": 1
