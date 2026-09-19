@@ -2947,6 +2947,16 @@ function textoPendiente(motivo) {
            : 'Cambios sin subir. ' + base;
 }
 
+// El texto del freno: misma regla que `textoPendiente` —la causa SALE del
+// veredicto y sin causa no se inventa ninguna—, con la cabecera que dice lo que
+// de verdad pasa. «Cambios sin subir» describía el efecto, no la avería.
+function textoFrenado(motivo) {
+  const base = 'Tus datos siguen guardados en este dispositivo; haz sitio para que llegue.';
+  const m = typeof motivo === 'string' ? motivo.trim() : '';
+  return m ? 'La nube no cabe en este dispositivo (' + m + '). ' + base
+           : 'La nube no cabe en este dispositivo. ' + base;
+}
+
 // El segundo parámetro es el MOTIVO del veredicto, no un texto de pantalla: quien
 // llama pasa `decision.motivo` tal cual y no compone frases por su cuenta.
 function setSyncUI(state, motivo) {
@@ -2974,6 +2984,16 @@ function setSyncUI(state, motivo) {
     dot.style.background = '#e67e22';
     dot.title = 'Cambios sin subir';
     status.textContent = textoPendiente(motivo);
+    status.style.display = 'block';
+  } else if (state === 'frenado') {
+    // EL FRENO DE LA NUBE, con aviso PROPIO (01-09, D-67). Compartía punto y
+    // título con todos los pendientes, y entre ellos con el eco de cada
+    // sincronización correcta: el aviso que precede a la pérdida era
+    // indistinguible del ruido. Rojo porque exige una acción del operador
+    // —hacer sitio—; el naranja es lo que a propósito no se subió y se arregla solo.
+    dot.style.background = '#e74c3c';
+    dot.title = 'La nube no cabe en este dispositivo';
+    status.textContent = textoFrenado(motivo);
     status.style.display = 'block';
   } else if (state === 'error') {
     // Rojo propio: NO se reutiliza 'auth' porque su mensaje mentiría sobre la
@@ -3507,6 +3527,17 @@ function desempatePorReloj(local, doc) {
     return { aplicar: true, utilizable: true, aviso: 'ok', clave: 'nube-mas-nueva',
              motivo: 'el documento es más nuevo que lo local' };
   }
+  // EL EMPATE ESTÁ AL DÍA (01-09, D-67). Lo local adopta la marca del documento
+  // aplicado, y cualquier guardado posterior sella la hora actual —con el freno
+  // puesto, el juez decide antes de llegar aquí—: misma marca significa «lo
+  // local es exactamente lo último que bajó o subió». Pintarlo NARANJA era el
+  // aviso que salía tras CADA sincronización correcta, idéntico al del riesgo
+  // real: enseñaba a ignorar el único aviso que precede a la pérdida de D-74.
+  // NO se aplica: con `>=` se volvía a aplicar y se comía una edición sin guardar.
+  if (remoto === localSaved) {
+    return { aplicar: false, utilizable: true, aviso: 'ok', clave: 'al-dia',
+             motivo: 'lo local es el último documento sincronizado' };
+  }
   return { aplicar: false, utilizable: true, aviso: 'pendiente', clave: 'nube-no-mas-nueva',
            motivo: 'documento NO más nuevo (' + remoto + ' <= ' + localSaved + ') con ' +
                    (local.ops || []).length + ' operaciones locales que proteger' };
@@ -3591,8 +3622,8 @@ async function pullFromFirestore(deps) {
   if (decision.aplicar && !aplicado) {
     const motivo = motivoFrenoPuesto(d.freno());
     console.error('[SYNC] el documento de la nube no se pudo aplicar:', motivo);
-    d.pintar(estadoSync('pendiente'), motivo);
-    return { sincronizado: true, aplicado: false, aviso: 'pendiente',
+    d.pintar(estadoSync('frenado'), motivo);
+    return { sincronizado: true, aplicado: false, aviso: 'frenado',
              clave: 'no-aterrizo', motivo: motivo };
   }
   d.pintar(estadoSync(decision.aviso), decision.motivo);
@@ -3639,7 +3670,7 @@ function decidirSubida(estado) {
   // Es un primitivo INYECTADO, como el cerrojo del libro ilegible: este juez
   // sigue siendo puro y no mira ninguna global.
   if (estado.nubePendiente) {
-    return { subir: false, aviso: 'pendiente', clave: 'nube-pendiente',
+    return { subir: false, aviso: 'frenado', clave: 'nube-pendiente',
              motivo: motivoFrenoPuesto(estado.nubePendiente) };
   }
   const hacenFaltaDatosDeLaNube = !tieneOperaciones(estado.opsLocales) || !estado.hayActivosLocales;
@@ -3665,6 +3696,7 @@ function decidirSubida(estado) {
 function estadoSync(resultado) {
   if (resultado === 'ok')        return 'ok';
   if (resultado === 'pendiente') return 'pendiente';
+  if (resultado === 'frenado')   return 'frenado';
   if (resultado === 'offline')   return 'offline';
   if (resultado === 'auth')      return 'auth';
   return 'error';
@@ -3787,7 +3819,7 @@ function listenFirestore(deps) {
     if (!applySyncPayload(data)) {
       const motivo = motivoFrenoPuesto(libroPendiente);
       console.error('[SYNC] el cambio de la nube no se pudo aplicar:', motivo);
-      setSyncUI(estadoSync('pendiente'), motivo);
+      setSyncUI(estadoSync('frenado'), motivo);
       return;
     }
     repintarTrasSync();
@@ -6038,6 +6070,9 @@ async function suitesDelFreno(ejercida, contado) {
                  () => pruebasFrenoMetaCorruptaYNubeIlegible(contado));
   await ejercida('pruebasFrenoPuedeMorir', () => pruebasFrenoPuedeMorir(contado));
   await ejercida('pruebasFrenoAlArrancar', () => pruebasFrenoAlArrancar(contado));
+  // D-67: el empate al día y el aviso propio del freno.
+  await ejercida('pruebasEmpateAlDia', () => pruebasEmpateAlDia(contado));
+  await ejercida('pruebasAvisoPropioDelFreno', () => pruebasAvisoPropioDelFreno(contado));
 }
 
 // LA TUBERÍA de la puerta de subida, ejecutada de verdad. El productor tenía su
@@ -6185,8 +6220,11 @@ function pruebasPuertaDeSubida(check, base) {
   };
   // Oraculo del AVISO, escrito APARTE como el de la clave: si llamara a
   // `decidirSubida` mediria su propio reflejo. Un paquete incompleto es un
-  // error del dispositivo (rojo); los demas rechazos son «pendiente».
-  const avisoEsperado = q => (q === 'ok' ? 'ok' : q === 'incompleto' ? 'error' : 'pendiente');
+  // error del dispositivo (rojo); el freno de la nube tiene su aviso PROPIO desde
+  // el 01-09 (D-67: compartía el naranja con el eco de cada sincronización); los
+  // demas rechazos son «pendiente».
+  const avisoEsperado = q => (q === 'ok' ? 'ok' : q === 'incompleto' ? 'error'
+                              : q === 'nube-pendiente' ? 'frenado' : 'pendiente');
   check('AC-1 la matriz recorre las 168 combinaciones',
         recorrerMatriz(check, libros, nubes, esperado, avisoEsperado), 168);
 
@@ -6453,7 +6491,7 @@ function pruebasPintorDeSincronizacion(check) {
     // seguía siendo distinguible (medido el 2026-08-31). Un estado NUEVO no
     // estará en este mapa y saldrá ROJO con su nombre: falla CERRADO.
     const colorDeEstado = { ok: '#27ae60', pendiente: '#e67e22', error: '#e74c3c',
-                            auth: '#e74c3c', offline: 'var(--border)' };
+                            auth: '#e74c3c', frenado: '#e74c3c', offline: 'var(--border)' };
     const firmas = [];
     let verdes = 0;
     let okVerde = false;
@@ -6529,7 +6567,8 @@ function pruebasTextoPendiente(check) {
 // Se cierra por RECEPTOR —`setSyncUI`, el único pintor de este camino— y se
 // afirma color Y texto POR SU VALOR. «Distinguible» no basta: intercambiar los
 // colores lo satisface, y eso es pintar el fallo en verde (§5.8).
-const COLOR_DE_SYNC = { ok: '#27ae60', pendiente: '#e67e22', error: '#e74c3c' };
+const COLOR_DE_SYNC = { ok: '#27ae60', pendiente: '#e67e22', error: '#e74c3c',
+                        frenado: '#e74c3c' };
 const TEXTO_DE_ERROR_SYNC = 'No se pudo sincronizar: los cambios siguen guardados en este dispositivo.';
 
 // La ventana de pintura, alrededor de algo ASÍNCRONO. No se puede usar
@@ -7259,7 +7298,8 @@ async function pruebasFrenoSeLevanta(check) {
   const t = arnesDeSubida({ pendiente: () => libroPendiente });
   const rs = await subirALaNube('prueba', t.deps);
   check('AC-5c con el freno puesto NO se escribe en la nube', t.escrituras.length, 0);
-  check('AC-5c y el aviso no es verde', rs.aviso, 'pendiente');
+  // Desde el 01-09 el freno tiene aviso PROPIO (D-67), no el naranja común.
+  check('AC-5c y el aviso no es verde: es el del freno', rs.aviso, 'frenado');
   // (d) Y el freno acaba cayendo SOLO: la nube sigue pareciendo más nueva.
   const decision = decidirBajada({ ops: ops, hayActivosLocales: false,
                                    savedAt: savedAtEnDisco() }, documentoRico());
@@ -7354,8 +7394,10 @@ async function pruebasFrenoSobreviveRecarga(check) {
     dispararAplazados(v);
     check('01-09 AC-1 y la subida NO escribe en la nube', escrituras.length, 0);
     check('01-09 AC-1 porque el freno la para', (r.valor || {}).motivo, MOTIVO_FRENO_DEDUCIDO);
-    check('01-09 AC-1 y el punto NO queda verde', v.el('sync-dot').style.background,
-          COLOR_DE_SYNC.pendiente);
+    check('01-09 AC-1 y el punto queda ROJO, el del freno', v.el('sync-dot').style.background,
+          COLOR_DE_SYNC.frenado);
+    check('01-09 AC-1 con el título del freno', v.el('sync-dot').title,
+          'La nube no cabe en este dispositivo');
   });
 }
 
@@ -7460,6 +7502,76 @@ async function pruebasFrenoYaAterrizado(check) {
         yaAterrizo(0, { savedAt: 0 }), false);
 }
 
+// 01-09 AC-6 · D-67: el empate de relojes está AL DÍA. Por el juez y por los dos
+// caminos reales, con el color por su VALOR.
+async function pruebasEmpateAlDia(check) {
+  const docIgual = Object.assign(documentoRico(), { savedAt: 1000 });
+  const local = { ops: [{ id: 'o1' }], hayActivosLocales: true, savedAt: 1000 };
+  const d = decidirBajada(local, docIgual);
+  check('01-09 AC-6 el empate NO se aplica', d.aplicar, false);
+  check('01-09 AC-6 y está al día, no pendiente', d.aviso, 'ok');
+  check('01-09 AC-6 y lo dice por su nombre', d.clave, 'al-dia');
+  check('01-09 AC-6 un documento MÁS nuevo sigue aplicándose',
+        decidirBajada(local, Object.assign(documentoRico(), { savedAt: 1001 })).clave,
+        'nube-mas-nueva');
+  check('01-09 AC-6 y uno más viejo sigue pendiente',
+        decidirBajada(local, Object.assign(documentoRico(), { savedAt: 999 })).clave,
+        'nube-no-mas-nueva');
+
+  sembrarDiscoPobreMigrado();   // hora 1000 en disco, igual que el documento
+  const t = arnesDeBajada(docIgual);
+  const r = await pullFromFirestore(t.deps);
+  check('01-09 AC-6 el arranque con empate no reaplica', r.aplicado, false);
+  check('01-09 AC-6 y pinta VERDE', t.pintados[t.pintados.length - 1], 'ok');
+  check('01-09 AC-6 y el libro local no se ha tocado', opsEnDisco(), 2);
+
+  sembrarDiscoPobreMigrado();
+  const previo = { unsub: unsubFirestore, repintar: repintarTrasSync };
+  conVentanaDePintura(v => {
+    let entregar = null;
+    try {
+      repintarTrasSync = () => {};
+      unsubFirestore = null;
+      listenFirestore({ ref: { onSnapshot: (cb) => { entregar = cb; return () => {}; } } });
+      entregar({ exists: true, data: () => docIgual });
+    } finally { repintarTrasSync = previo.repintar; unsubFirestore = previo.unsub; }
+    dispararAplazados(v);
+    check('01-09 AC-6 la escucha con empate pinta el VERDE por su valor',
+          v.el('sync-dot').style.background, COLOR_DE_SYNC.ok);
+    check('01-09 AC-6 y no reaplica', opsEnDisco(), 2);
+  });
+}
+
+// 01-09 AC-7 · el freno tiene aviso PROPIO y ningún otro pendiente lo comparte.
+// Tres de sus caminos se afirman en sus suites (subida en AC-1, bajada y escucha
+// en `pruebasAvisoNubeQueNoCabe`); aquí el cuarto —el freno DEDUCIDO al arrancar,
+// que se pinta por la bajada que lo reintenta— y la vacuidad por la otra cara.
+async function pruebasAvisoPropioDelFreno(check) {
+  check('01-09 AC-7 el mapa cerrado conoce el freno', estadoSync('frenado'), 'frenado');
+  sembrarDiscoPobreMigrado();
+  aterrizajeFallidoConDiscoLleno();
+  recargar();
+  const pintados = [];
+  await pullFromFirestore(Object.assign(arnesDeBajada(documentoRico()).deps, {
+    aplicar: (data) => conDiscoRoto(() => true, () => applySyncPayload(data)),
+    pintar: (estado, motivo) => { pintados.push(estado); } }));
+  check('01-09 AC-7 el freno deducido, reintentado y sin sitio, pinta el del freno',
+        pintados[pintados.length - 1], 'frenado');
+  conVentanaDePintura(v => {
+    ['sin-carteras', 'reloj-desconocido', 'nube-no-mas-nueva'].forEach(m => {
+      setSyncUI('pendiente', m);
+      check('01-09 AC-7 vacuidad: un pendiente (' + m + ') NO lleva el título del freno',
+            v.el('sync-dot').title === 'La nube no cabe en este dispositivo', false);
+    });
+    setSyncUI('frenado', MOTIVO_FRENO_DEDUCIDO);
+    check('01-09 AC-7 el freno pinta su título', v.el('sync-dot').title,
+          'La nube no cabe en este dispositivo');
+    check('01-09 AC-7 y su texto dice la avería con su causa',
+          v.el('sync-status').textContent.indexOf('La nube no cabe en este dispositivo (' +
+                                                  MOTIVO_FRENO_DEDUCIDO) === 0, true);
+  });
+}
+
 // 01-09 AC-5 · LA MATRIZ del freno al arrancar, fila a fila y escrita a mano.
 // Derivar lo esperado con la misma fórmula sería tautológico (§5.8).
 function pruebasFrenoAlArrancar(check) {
@@ -7546,7 +7658,6 @@ function pruebasMotivoDelFreno(check) {
 // bajada. El color y el texto se afirman POR SU VALOR: «distintos» lo satisface
 // intercambiarlos, que es pintar el fallo en verde (§5.8).
 async function pruebasAvisoNubeQueNoCabe(check) {
-  const naranja = '#e67e22';
   const previo = { unsub: unsubFirestore, repintar: repintarTrasSync };
   sembrarDiscoPobre();
   const pintados = [];
@@ -7563,10 +7674,10 @@ async function pruebasAvisoNubeQueNoCabe(check) {
     pintar: (estado, motivo) => { pintados.push({ estado, motivo }); } }));
   check('AC-3 la bajada no LANZA cuando el documento no cabe', rPullEnvuelto.lanzo, false);
   const rPull = rPullEnvuelto.valor || {};
-  check('AC-3 el arranque no se da por sincronizado en verde', rPull.aviso, 'pendiente');
+  check('AC-3 el arranque no se da por sincronizado en verde', rPull.aviso, 'frenado');
   check('AC-3 y dice que NO aplicó', rPull.aplicado, false);
-  check('AC-3 y pinta el aviso de "hay algo pendiente"',
-        (pintados[0] || {}).estado, 'pendiente');
+  check('AC-3 y pinta el aviso PROPIO del freno (01-09, D-67)',
+        (pintados[0] || {}).estado, 'frenado');
   check('AC-3 con la causa y las CIFRAS',
         (pintados[0] || {}).motivo, 'la nube trae 42 operaciones y no caben en este dispositivo');
 
@@ -7589,7 +7700,10 @@ async function pruebasAvisoNubeQueNoCabe(check) {
       unsubFirestore = previo.unsub;
     }
     dispararAplazados(v);
-    check('AC-3 la escucha en vivo pinta el NARANJA por su valor', dot.style.background, naranja);
+    check('AC-3 la escucha en vivo pinta el ROJO del freno por su valor', dot.style.background,
+          COLOR_DE_SYNC.frenado);
+    check('AC-3 y el título del freno, no el de los pendientes', dot.title,
+          'La nube no cabe en este dispositivo');
     check('AC-3 y el texto lleva la causa con cifras',
           status.textContent.indexOf('la nube trae 42 operaciones') >= 0, true);
     check('AC-3 y el aviso queda VISIBLE', status.style.display, 'block');
