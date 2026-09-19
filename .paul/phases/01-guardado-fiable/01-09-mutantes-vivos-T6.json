@@ -1,0 +1,98 @@
+[
+ {
+  "id": "A07",
+  "que": "fallo de la META no cuenta como faltante",
+  "fichero": "index.html",
+  "ancla": "  if (!escribirClave(META_KEY, metaDelDocumento(data))) faltan.push(META_KEY);",
+  "por": "  escribirClave(META_KEY, metaDelDocumento(data));",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "A11",
+  "que": "reparar libro ilegible falla y se da por aterrizado",
+  "fichero": "index.html",
+  "ancla": "        console.error('No se pudo reparar el libro ilegible: el cerrojo sigue puesto.');\n        return false;",
+  "por": "        console.error('No se pudo reparar el libro ilegible: el cerrojo sigue puesto.');\n        return true;",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "A12",
+  "que": "formato antiguo: fallo del libro se da por aterrizado",
+  "fichero": "index.html",
+  "ancla": "      if (!ok) console.error('No se pudo guardar el libro recibido en formato antiguo.');\n      return ok;",
+  "por": "      if (!ok) console.error('No se pudo guardar el libro recibido en formato antiguo.');\n      return true;",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "A20",
+  "que": "memoria mutada con la lista ANTES del veredicto (cruce: META/memoria antes de libro)",
+  "fichero": "index.html",
+  "ancla": "  const meta = metaDelDocumento(data);\n  portfolios    = meta.portfolios;",
+  "por": "  const meta = metaDelDocumento(data);\n  portfolios    = meta.portfolios.slice(0, 1);",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "F04",
+  "que": "escucha: nube sin documento NO suelta el freno",
+  "fichero": "index.html",
+  "ancla": "    if (!doc.exists) { soltarFreno(); return; }",
+  "por": "    if (!doc.exists) { return; }",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "F05",
+  "que": "escucha: documento inutilizable NO suelta el freno",
+  "fichero": "index.html",
+  "ancla": "    if (!decision.utilizable) soltarFreno();\n",
+  "por": "",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "F08",
+  "que": "escucha: el juez no ve el freno",
+  "fichero": "index.html",
+  "ancla": "                                     frenoPuesto: !!libroPendiente,",
+  "por": "                                     frenoPuesto: false,",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "F09",
+  "que": "arranque: el juez no ve el freno",
+  "fichero": "index.html",
+  "ancla": "                                   frenoPuesto: !!d.freno(),",
+  "por": "                                   frenoPuesto: false,",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "F15",
+  "que": "CRUCE: freno se recupera solo si META trae carteras",
+  "fichero": "index.html",
+  "ancla": "      libroPendiente = data.pendiente || null;\n      if (data.portfolios && data.portfolios.length > 0) {",
+  "por": "      if (data.portfolios && data.portfolios.length > 0) {\n      libroPendiente = data.pendiente || null;",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "C02",
+  "que": "switchPortfolio no restaura las filas",
+  "fichero": "index.html",
+  "ancla": "    rows = loadRows(anterior);\n",
+  "por": "",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "C06",
+  "que": "deletePortfolio no restaura la cartera activa",
+  "fichero": "index.html",
+  "ancla": "    currentPortId = activaPrevia;\n",
+  "por": "",
+  "apariciones_ancla_hoy": 1
+ },
+ {
+  "id": "C12",
+  "que": "deletePortfolio exito: no recarga filas de la nueva activa (fuera del if)",
+  "fichero": "index.html",
+  "ancla": "  if (activaPrevia === id) rows = loadRows(currentPortId);\n",
+  "por": "",
+  "apariciones_ancla_hoy": 1
+ }
+]

@@ -12,7 +12,7 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 Milestone: v0.1 Datos fiables (v0.1.0)
 Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. Medida contra el código el 2026-09-19 en su
 **SEXTA transición**: acta `01-TRANSICION-6.md`.
-Plan: **01-09 por PLANIFICAR.** El 01-08 está cerrado, desplegado y verificado en navegador.
+Plan: **01-09 PLANIFICADO, esperando aprobación** (`01-09-PLAN.md`). El 01-08 está cerrado, desplegado y verificado en navegador.
 Status: **SEXTA transición hecha. La fase NO cierra.** Abre D-74 a D-79; sube D-67 a meta; amplía
 D-70; re-mide D-60 (viva).
 Last activity: 2026-09-19 — **sexta transición**. Cinco brazos adversarios disjuntos, cada uno sobre
@@ -67,6 +67,14 @@ Progress:
 ## Loop Position
 
 Current loop state:
+```
+PLAN ──▶ APPLY ──▶ UNIFY
+  ✓        ○        ○     [ciclo 01-09: PLAN escrito el 2026-09-19, pendiente de aprobación.
+                            Enfoque por dialéctica Fable; DOS revisiones adversarias
+                            encontraron 4 + 2 agujeros graves, todos incorporados (§2.6, §2.7)]
+```
+
+Ciclo anterior:
 ```
 PLAN ──▶ APPLY ──▶ UNIFY
   ✓        ✓        ✓     [ciclo 01-08 CERRADO el 2026-09-06.
@@ -344,14 +352,13 @@ Permanentes del proyecto:
 ## Session Continuity
 
 Last session: 2026-09-19
-Stopped at: **SEXTA transición de la Fase 1 HECHA.** La fase NO cierra: abre el ciclo **01-09**.
-Acta `01-TRANSICION-6.md`; fichas nuevas D-74 a D-79 en `.paul/DEUDAS.md`; `PROJECT.md`,
-`ROADMAP.md` y `paul.json` al día. `index.html` sin tocar (`64e6e294…`). Puerta `rc=0` al empezar.
+Stopped at: **PLAN 01-09 escrito y revisado dos veces, esperando aprobación del operador.** El 01-09
+cierra D-74 (recibo de aterrizaje: fallo cerrado por inversión), D-67 (empate en verde, freno en rojo
+propio) y D-76 (cables del freno). **El ciclo se partió**: D-77 y D-78 pasan al **01-10**.
+Mutantes vivos de la sexta transición copiados en `01-09-mutantes-vivos-T6.json`.
 
-Next action: **`/paul:plan` del 01-09** — el freno que sobrevive a la recarga (D-74), el aviso de
-empate que no enmascara el real (D-67), y oráculo para D-76/D-77/D-78. Diseño ABIERTO en D-74 ⇒
-**dialéctica** antes de fijar el enfoque, y revisión adversaria del plan.
-Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION-6.md
+Next action: aprobar el plan y **`/paul:apply .paul/phases/01-guardado-fiable/01-09-PLAN.md`**.
+Resume file: .paul/phases/01-guardado-fiable/01-09-PLAN.md
 
 ---
 *STATE.md — Updated after every significant action*

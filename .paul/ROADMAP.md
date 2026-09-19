@@ -15,7 +15,7 @@ Phases: 1 of 7 complete (Fase 0)
 | Phase | Name | Plans | Status | Completed |
 |-------|------|-------|--------|-----------|
 | 0 | Hotfix separador decimal | 1 | Complete | 2026-08-29 |
-| 1 | Guardado que no miente | 8 | In progress (**8 ciclos cerrados y CINCO transiciones**; el 01-08 cerró su bucle el 2026-09-06. **La fase NO se cierra por tener tantas actas como planes**: falta verlo en el navegador y falta la SEXTA transición, que es quien mide la meta contra el código) | - |
+| 1 | Guardado que no miente | 10 | In progress (**8 ciclos cerrados y CINCO transiciones**; el 01-08 cerró su bucle el 2026-09-06. **La fase NO se cierra por tener tantas actas como planes**: falta verlo en el navegador y falta la SEXTA transición, que es quien mide la meta contra el código) | - |
 | 2 | Backup y restauración | 2 | Not started | - |
 | 3 | Sync que fusiona | 2 | Not started | - |
 | 4 | Corrección fiscal del FIFO | 4 | Not started | - |
@@ -261,9 +261,12 @@ Las cuatro deudas que cerró el 01-08 están **bien cerradas**, re-medidas revir
 **Sexta vez consecutiva que medir cambia el resultado.**
 
 **Planes:**
-- [ ] **01-09: El freno que sobrevive y el aviso que no miente** — cierra D-74, D-67, D-76, D-77 y
-  D-78. Diseño abierto (dónde vive el freno cuando el disco está lleno) ⇒ **dialéctica** en el
-  PLAN. **Fuera:** D-75 (estímulo sin medir), D-79, D-60 y Fase 3.
+- [ ] **01-09: El freno que sobrevive y el aviso que no miente** — **PLAN escrito 2026-09-19,
+  esperando aprobación.** Cierra D-74, D-67 y D-76. Enfoque decidido por **dialéctica**: el freno no
+  se escribe, se escribe el **recibo de aterrizaje** y su ausencia frena. Dos revisiones adversarias
+  del plan, 6 agujeros graves incorporados. **Fuera:** D-75, D-79, D-60, D-80 y Fase 3.
+- [ ] **01-10: Oráculo de carteras y del todo-o-nada** — D-77 y D-78 (C02, C06, C12, A07, A11, A12,
+  A20). **Partido del 01-09 a propósito**: no depende del diseño del freno y juntos eran 5 tareas.
 
 ### Phase 2: Backup y restauración
 
