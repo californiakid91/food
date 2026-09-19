@@ -476,6 +476,12 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Estado:** abierta. Fuera del alcance del 01-08.
 - **Qué la reabre:** nada la cierra sola.
 
+- **Nota del 01-09 (revisión del diff, brazo A, H3):** con sesión y red **no** resistía un caso
+  nuevo del propio ciclo: un guardado en la otra pestaña reponía el recibo que ésta había quitado
+  al fallar su aterrizaje, y la recarga subía el libro pobre (42 -> 2). Cerrado dentro del ciclo:
+  el recibo sólo lo repone la pestaña que lo DEBE (`01-09 H3a/H3b/H3c`). El resto de la ficha
+  sigue igual.
+
 ### D-69 · El punto de sincronía sigue en VERDE tras un guardado local fallido
 - **Qué es:** `guardarTodo` pinta «No se pudo guardar» en rojo durante 5 segundos y **no toca el
   indicador durable**, que sigue diciendo «Sincronizado con tu cuenta.» con memoria y disco ya
@@ -691,6 +697,16 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Estado:** abierta, declarada.
 - **Qué la reabre:** medir el 1 en el navegador con el disco relleno (`?selftest=1`), o un informe
   de freno perdido en un dispositivo migrado.
+
+### D-84 · Si el disco entero no deja LEER, la app no arranca
+- **Qué es:** con un `localStorage.getItem` que lanza para TODAS las claves, el arranque lanza en
+  `loadOpsAll` ← `initPortfolios` ← `arrancarDesdeDisco`: la app no llega a pintar. El «falla
+  cerrado» de `primitivosDelFreno` (01-09) sólo cubre fallos SELECTIVOS de lectura (medido: si
+  sólo fallan las marcas, frena — `01-09 B10`).
+- **Cómo se midió:** brazo B de la revisión del diff del 01-09, al escribir el control de
+  vacuidad de B10 en su copia. No re-verificado por el orquestador. **Anterior al 01-09.**
+- **Estado:** abierta. No pierde libro (no arranca nada), pero es un fallo mudo en pantalla.
+- **Qué la reabre:** capturar la lectura en el arranque con un aviso al operador.
 
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
 > **RE-MEDIDA el 2026-09-05 (quinta transición, brazo A): pasa de «no reproducida en vivo» a

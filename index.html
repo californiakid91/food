@@ -3343,6 +3343,8 @@ function applySyncPayload(data) {
   if (!data.portfolios || !data.portfolios.length) return false;
   // El recibo se QUITA antes de tocar nada: desde aquí, si algo falla —o la
   // página se cierra a medias—, la próxima recarga frena sola (D-74).
+  // Un aterrizaje nuevo decide por sí mismo: la deuda del anterior caduca.
+  reciboDebido = false;
   if (!quitarRecibo()) {
     armarFreno(data, [RECIBO_KEY]);
     return false;
@@ -3384,6 +3386,7 @@ function applySyncPayload(data) {
   // una cartera entera (medido por la segunda revisión adversaria del plan). El
   // recibo lo repone el siguiente guardado con éxito.
   if (!escribirMarca(RECIBO_KEY)) {
+    reciboDebido = true;
     console.warn('[SYNC] documento aplicado, pero sin recibo: lo repondrá el próximo guardado');
   }
   return true;
@@ -3569,7 +3572,7 @@ function depsDeBajada() {
   return { ref: userDocRef(), leerMeta: () => localStorage.getItem(META_KEY),
            aplicar: applySyncPayload, ops: () => ops,
            freno: () => libroPendiente, soltarFreno: soltarFreno,
-           activos: hasRealLocalData, pintar: setSyncUI };
+           sellarReloj: saveMeta, activos: hasRealLocalData, pintar: setSyncUI };
 }
 
 async function pullFromFirestore(deps) {
@@ -3604,13 +3607,13 @@ async function pullFromFirestore(deps) {
   const decision = decidirBajada({ ops: d.ops(), hayActivosLocales: d.activos(),
                                    frenoPuesto: !!d.freno(),
                                    savedAt: localSaved }, data);
-  // La salida (iii) del freno —el documento YA estaba aquí— hace lo mismo que un
-  // documento inutilizable: soltar sin aplicar y devolver «no sincronizado», para
-  // que el inicio de sesión SUBA lo tecleado con el reloj congelado. Sin verde.
+  // Salida (iii) —el documento YA estaba aquí— = documento inutilizable: soltar
+  // sin aplicar y «no sincronizado», para que el inicio de sesión SUBA; y (iii)
+  // sella el reloj, o el eco empataría en VERDE con cambios sin subir (H1).
   if (decision.soltar || !decision.utilizable) {
-    // Un documento que no se puede aplicar tampoco deja nada pendiente: el freno
-    // cae, o esperaría eternamente a un documento que no llegará en esa forma.
+    // Un documento inutilizable no deja nada pendiente: sin soltar, esperaría siempre.
     d.soltarFreno();
+    if (decision.soltar) d.sellarReloj();
     return { sincronizado: false, aplicado: false, aviso: decision.aviso,
              clave: decision.clave, motivo: decision.motivo };
   }
@@ -3811,7 +3814,7 @@ function listenFirestore(deps) {
       setSyncUI(estadoSync(decision.aviso), decision.motivo);
       // Salida (iii): el documento ya estaba aquí; se sube lo tecleado con el
       // reloj congelado, y el naranja de arriba queda hasta que la subida pinte.
-      if (decision.soltar) schedulePush();
+      if (decision.soltar) { saveMeta(); schedulePush(); }
       return;
     }
     // El GEMELO de la rama de arriba, en el otro camino de bajada. Nombrar
@@ -3948,18 +3951,22 @@ function quitarRecibo() {
   }
 }
 
-// Si el documento está aterrizado y falta el recibo, lo repone. Existe porque la
-// escritura del recibo puede fallar DESPUÉS de haber aterrizado todo, y sin
-// reponerlo la siguiente recarga deduciría un freno sin nada pendiente. Sólo con
-// el freno SUELTO en memoria —si está puesto, falta algo de verdad— y sólo si
-// el dispositivo habla el contrato.
+// ¿ESTA pestaña debe el recibo? Sólo cuando SU aterrizaje fue completo y lo único
+// que no cupo fue el recibo. Se pone en `applySyncPayload` y en nada más.
+let reciboDebido = false;
+
+// Repone el recibo que ESTA pestaña debe. Existe porque la escritura del recibo
+// puede fallar DESPUÉS de haber aterrizado todo, y sin reponerlo la siguiente
+// recarga deduciría un freno sin nada pendiente (D-82).
+//
+// Por DEUDA propia y no por «falta el recibo»: la primera versión miraba el disco
+// y la revisión del diff (brazo A, H3) midió que un guardado en OTRA pestaña
+// —con la memoria sin freno— reponía el recibo que ESTA había quitado al fallar
+// su aterrizaje, y la recarga subía el libro pobre: 42 -> 2. El disco es
+// compartido; la deuda, no.
 function reponerRecibo() {
-  if (libroPendiente) return;
-  try {
-    if (localStorage.getItem(FORMATO_KEY) === null) return;
-    if (localStorage.getItem(RECIBO_KEY) !== null) return;
-  } catch (e) { return; }
-  escribirMarca(RECIBO_KEY);
+  if (!reciboDebido) return;
+  if (escribirMarca(RECIBO_KEY)) reciboDebido = false;
 }
 
 // ── Persistencia meta (lista de carteras + activa) ──
@@ -4290,9 +4297,18 @@ function arrancarDesdeDisco() {
   if (!libroPendiente) {
     const r = frenoAlArrancar(primitivosDelFreno());
     libroPendiente = r.freno;
-    // La siembra va ANTES de crear las carteras por defecto: esa creación
-    // escribe la META, y el contrato tiene que estar en su sitio antes.
+    // Se siembra antes de crear las carteras por defecto por claridad. Con las
+    // marcas FUERA de la META el orden ya no cambia el resultado (la revisión del
+    // diff lo midió: B38 es equivalente); lo que importaba era NO poner la marca
+    // dentro de la META, que creaba un freno falso (agujero 2 del plan).
     sembrarContrato(r.sembrar);
+  } else {
+    // ...pero SÍ se deja el formato. Revisión del diff (brazo A, H2): si la
+    // sesión gana a `load` en el primer arranque de esta versión y su bajada no
+    // aterriza, el dispositivo se quedaba en la regla ANTERIOR, y la recarga
+    // siguiente —sin `pendiente` en la META, que no cupo— lo soltaba: 42 -> 2.
+    // Con el formato puesto y sin recibo, la recarga frena.
+    sembrarContrato([FORMATO_KEY]);
   }
   const loaded = initPortfolios();
   if (!loaded) createDefaultPortfolios();
@@ -6014,7 +6030,7 @@ async function pruebasSincronizacion(check) {
         Object.keys(copiaSeguridad).length >= 3, true);
   const previo = { ops: ops, ilegible: opsIlegible, portfolios: portfolios,
                    currentPortId: currentPortId, nextId: nextId, rows: rows,
-                   pendiente: libroPendiente };
+                   pendiente: libroPendiente, reciboDebido: reciboDebido };
   // Un `await` perdido dejaría una suite asíncrona SIN EJERCER y la puerta
   // saldría verde y sorda: medido el 2026-08-30, sin el await el sabotaje del
   // manejador de sesión dejaba de morder y todo seguía en verde. Esto lo caza
@@ -6049,7 +6065,13 @@ async function pruebasSincronizacion(check) {
     ops = previo.ops; opsIlegible = previo.ilegible; portfolios = previo.portfolios;
     currentPortId = previo.currentPortId; nextId = previo.nextId; rows = previo.rows;
     libroPendiente = previo.pendiente;
+    // La deuda del recibo es de la PÁGINA: si una suite la dejara puesta, el
+    // siguiente guardado del operador tras `?selftest=1` repondría un recibo
+    // que su disco real no debe.
+    reciboDebido = previo.reciboDebido;
   }
+  check('01-09 la suite devuelve la deuda del recibo como la encontró',
+        reciboDebido, previo.reciboDebido);
   // Contar claves NO basta: devolver el almacenamiento con todos los valores
   // corrompidos daba verde. Se comparan los VALORES, uno a uno.
   const clavesAntes = Object.keys(copiaSeguridad);
@@ -6077,6 +6099,8 @@ async function suitesDelFreno(ejercida, contado) {
   await ejercida('pruebasAvisoPropioDelFreno', () => pruebasAvisoPropioDelFreno(contado));
   // D-76: los cables del freno en sus dos llamantes, con el cableado real.
   await ejercida('pruebasCablesDelFreno', () => pruebasCablesDelFreno(contado));
+  // Lo que la revisión del diff reprodujo sobre el ciclo ya escrito.
+  await ejercida('pruebasRevisionDelDiff', () => pruebasRevisionDelDiff(contado));
 }
 
 // LA TUBERÍA de la puerta de subida, ejecutada de verdad. El productor tenía su
@@ -6845,6 +6869,7 @@ function pruebasCableadoPorDefecto(check) {
     check('AC-2 y ese juez ve los activos sembrados', b.activos(), true);
     check('AC-2 y aplica con applySyncPayload', b.aplicar, applySyncPayload);
     check('AC-2 y pinta con setSyncUI', b.pintar, setSyncUI);
+    check('01-09 AC-8 y al soltar por (iii) sella el reloj con saveMeta', b.sellarReloj, saveMeta);
 
     const s = depsDeSubida();
     check('AC-2 el cableado de la subida construye con buildSyncPayload',
@@ -6892,6 +6917,7 @@ function arnesDeBajada(documento) {
     ops: () => ops,
     freno: () => libroPendiente,
     soltarFreno: soltarFreno,
+    sellarReloj: saveMeta,
     activos: hasRealLocalData,
     pintar: (estado) => { t.pintados.push(estado); },
   };
@@ -7153,7 +7179,7 @@ function recargar() {
   clearTimeout(saveTimer);
   clearTimeout(pushTimer);
   ops = []; rows = []; portfolios = []; currentPortId = null; nextId = 1;
-  libroPendiente = null; opsIlegible = false; saveMensaje = null;
+  libroPendiente = null; opsIlegible = false; saveMensaje = null; reciboDebido = false;
   arrancarDesdeDisco();
 }
 
@@ -7496,7 +7522,15 @@ async function pruebasFrenoYaAterrizado(check) {
   check('01-09 AC-4iii y pide SUBIR, no se da por sincronizado', r.sincronizado, false);
   check('01-09 AC-4iii con aviso naranja, no verde', r.aviso, 'pendiente');
   check('01-09 AC-4iii la operación borrada sigue borrada', opsEnDisco(), 41);
-  check('01-09 AC-4iii nada se pinta verde', t.pintados.indexOf('ok'), -1);
+  // La bajada NO pinta en (iii): lo que pinta es la subida que el inicio de sesión
+  // lanza después. «Ningún verde» se cumplía también sin pintar nada (vacuo).
+  check('01-09 AC-4iii la bajada no pinta nada: pinta la subida que sigue', t.pintados.length, 0);
+  check('01-09 AC-4iii y dice su motivo', r.motivo,
+        'el documento de la nube ya estaba en este dispositivo: se suben los cambios');
+  // REVISIÓN DEL DIFF, brazo A (H1): al soltar, la marca tiene que AVANZAR. Con el
+  // reloj congelado, si la subida posterior fallaba, el siguiente eco del mismo
+  // documento era un EMPATE y se pintaba VERDE «al día» con cambios sin subir.
+  check('01-09 AC-4iii al soltar por (iii) la marca de tiempo AVANZA', savedAtEnDisco() > 9000, true);
   check('01-09 AC-4iii y el recibo vuelve', localStorage.getItem(RECIBO_KEY), '1');
 
   // VACUIDAD: con un documento POSTERIOR el freno no se suelta por (iii).
@@ -7657,6 +7691,103 @@ function pruebasSalidaYaAterrizadoEnLaEscucha(check) {
   });
 }
 
+// REVISIÓN DEL DIFF del 01-09: lo que los brazos A y B reprodujeron sobre el
+// código ya escrito y con la puerta en verde. Cada fila nació roja.
+function pruebasRevisionDelDiff(check) {
+  // H1 (brazo A): tras soltar por (iii) y FALLAR la subida, el eco del mismo
+  // documento no puede pintar VERDE «al día» con una operación sin subir.
+  sembrarDiscoPobreMigrado();
+  conDiscoRoto(k => k === RECIBO_KEY, () => applySyncPayload(documentoRico()));
+  recargar();
+  ops = ops.slice(1);
+  guardarTodo();
+  conVentanaDePintura(v => {
+    entregarALaEscucha({ exists: true, data: () => documentoRico() });   // (iii)
+    clearTimeout(pushTimer);                                              // la subida no llega
+    entregarALaEscucha({ exists: true, data: () => documentoRico() });   // el eco
+    check('01-09 H1 el eco tras soltar por (iii) NO pinta verde con cambios sin subir',
+          v.el('sync-dot').style.background, COLOR_DE_SYNC.pendiente);
+  });
+
+  // H3 (brazo A): OTRA pestaña no puede reponer el recibo que ésta quitó.
+  sembrarDiscoPobreMigrado();
+  aterrizajeFallidoConDiscoLleno();          // pestaña A: recibo quitado, freno en su memoria
+  libroPendiente = null;                      // pestaña B: su memoria no sabe nada
+  guardarTodo();
+  check('01-09 H3 un guardado de OTRA pestaña no repone el recibo',
+        localStorage.getItem(RECIBO_KEY), null);
+  recargar();
+  check('01-09 H3 y la pestaña A, al recargar, sigue frenada', !!libroPendiente, true);
+
+  // H3b: la deuda CADUCA al empezar otro aterrizaje. Si no, una deuda vieja
+  // repondría el recibo que un aterrizaje posterior y fallido acaba de quitar.
+  sembrarDiscoPobreMigrado();
+  conDiscoRoto(k => k === RECIBO_KEY, () => applySyncPayload(documentoRico()));
+  aterrizajeFallidoConDiscoLleno();
+  guardarTodo();
+  check('01-09 H3b tras un aterrizaje fallido, una deuda vieja no repone el recibo',
+        localStorage.getItem(RECIBO_KEY), null);
+
+  // B54 (brazo B): con el freno CON CIFRAS puesto tampoco se repone.
+  sembrarDiscoPobreMigrado();
+  conDiscoRoto(k => k === OPS_KEY, () => applySyncPayload(documentoRico()));
+  guardarTodo();
+  check('01-09 B54 con el freno con cifras puesto el guardado no repone el recibo',
+        localStorage.getItem(RECIBO_KEY), null);
+
+  pruebasRevisionDelDiffEscuchaYDisco(check);
+}
+
+function pruebasRevisionDelDiffEscuchaYDisco(check) {
+  // B30 (brazo B): la escucha sólo SUBE en la salida (iii). Sin la condición,
+  // cada eco rechazado programaba una subida: ping-pong contra Firestore.
+  const usuarioPrevio = currentUser;
+  [['al-dia', 1000], ['nube-no-mas-nueva', 500]].forEach(([caso, marca]) => {
+    sembrarDiscoPobreMigrado();
+    conVentanaDePintura(v => {
+      try {
+        currentUser = { uid: 'prueba-01-09' };
+        entregarALaEscucha({ exists: true,
+                             data: () => Object.assign(documentoRico(), { savedAt: marca }) });
+        check('01-09 B30 la escucha con ' + caso + ' NO programa ninguna subida',
+              v.programaciones.some(p => p.ms === 800), false);
+      } finally { currentUser = usuarioPrevio; clearTimeout(pushTimer); }
+    });
+  });
+
+  // B14/B52 (brazo B): si el recibo no se puede QUITAR, aplicar falla cerrado.
+  sembrarDiscoPobreMigrado();
+  const quitarReal = localStorage.removeItem;
+  let r;
+  try {
+    localStorage.removeItem = (k) => {
+      if (k === RECIBO_KEY) throw errorDeCuota();
+      return quitarReal.call(localStorage, k);
+    };
+    r = sinLanzar(() => conDiscoRoto(() => false, () => applySyncPayload(documentoRico())));
+  } finally { localStorage.removeItem = quitarReal; }
+  check('01-09 B14 sin poder quitar el recibo, el documento NO se aplica', r.valor, false);
+  check('01-09 B14 y no aterriza nada', opsEnDisco(), 2);
+  check('01-09 B52 y el freno queda puesto', !!libroPendiente, true);
+
+  // B10 (brazo B): si el disco no deja leer las marcas al arrancar, se FRENA.
+  sembrarDiscoPobreMigrado();
+  const leerReal = localStorage.getItem;
+  try {
+    localStorage.getItem = (k) => {
+      if (k === RECIBO_KEY || k === FORMATO_KEY) throw new Error('lectura rota a propósito');
+      return leerReal.call(localStorage, k);
+    };
+    const errReal = console.error;
+    try { console.error = () => {}; recargar(); } finally { console.error = errReal; }
+  } finally { localStorage.getItem = leerReal; }
+  check('01-09 B10 con las marcas ilegibles el arranque FRENA', !!libroPendiente, true);
+  // Se deja la deuda PUESTA a propósito: así la restauración de
+  // `pruebasSincronizacion` tiene algo que restaurar, y su control se ve rojo.
+  sembrarDiscoPobreMigrado();
+  conDiscoRoto(k => k === RECIBO_KEY, () => applySyncPayload(documentoRico()));
+}
+
 // 01-09 AC-5 · LA MATRIZ del freno al arrancar, fila a fila y escrita a mano.
 // Derivar lo esperado con la misma fórmula sería tautológico (§5.8).
 function pruebasFrenoAlArrancar(check) {
@@ -7712,7 +7843,14 @@ function pruebasFrenoAlArrancarEnCadena(check) {
   libroPendiente = { ops: 7, faltan: [CLAVE_DEL_LIBRO] };
   arrancarDesdeDisco();
   check('01-09 AC-5 el arranque no pisa un freno ya armado', (libroPendiente || {}).ops, 7);
-  check('01-09 AC-5 ni siembra con él puesto', localStorage.getItem(FORMATO_KEY), null);
+  // REVISIÓN DEL DIFF, brazo A (H2): con el freno armado se siembra SÓLO el
+  // formato. No sembrar nada dejaba al dispositivo en la regla anterior, y la
+  // recarga siguiente —sin `pendiente` en la META, que no cupo— lo soltaba.
+  check('01-09 AC-5 con él puesto siembra sólo el formato',
+        localStorage.getItem(FORMATO_KEY) + '/' + localStorage.getItem(RECIBO_KEY), '1/null');
+  recargar();
+  check('01-09 AC-5 y la recarga SIGUIENTE sigue frenada (la sesión ganó a load)',
+        !!libroPendiente, true);
   libroPendiente = null;
 }
 
