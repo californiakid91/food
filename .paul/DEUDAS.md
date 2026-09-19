@@ -27,6 +27,15 @@ sigue pareciendo más nueva y la bajada se re-arma sola. Sin eso el freno era pe
 descubrieron dos brazos adversarios **sobre el PLAN**, ejecutando, antes de escribir una línea de
 código. Acta: `.paul/phases/01-guardado-fiable/01-08-SUMMARY.md`.
 
+**SEXTA transición de fase (2026-09-19): la fase NO cierra, abre el ciclo 01-09.** Cinco brazos
+adversarios disjuntos, cada uno sobre su propia copia; cuatro demuelen su frase y **el del aparato
+de medición resiste**. Abre **D-74 a D-79** y sube **D-67** a meta. Lo decisivo: **el freno del
+01-08 no sobrevive a una recarga cuando no se pudo escribir en disco** —el caso para el que
+existe— y entonces la nube pierde el libro en verde (42 → 2), **re-verificado por el orquestador**;
+y el único aviso que precede a esa pérdida es el naranja de empate que sale tras cada
+sincronización correcta. Las cuatro deudas que cerró el 01-08 se re-midieron revirtiendo su
+arreglo: **las cuatro están bien cerradas**. Acta: `.paul/phases/01-guardado-fiable/01-TRANSICION-6.md`.
+
 **QUINTA transición de fase (2026-09-05): la fase NO cierra, abre el ciclo 01-08.** Cinco brazos
 adversarios disjuntos, **cada uno sobre su propia copia del proyecto**, y **los cinco demolieron su
 frase**. Abre **D-58 a D-69**. Lo decisivo: un libro de la nube que **no cabe** en el almacenamiento
@@ -103,6 +112,10 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   mutante SOBREVIVE** — los nueve pasos que miden el código salen OK, salida **idéntica carácter a
   carácter** a la del control de vacuidad sobre la misma copia sin mutar. Cortar el cable del
   guardado a la subida sigue sin poner nada en rojo.
+- **Re-medida otra vez en la SEXTA transición (2026-09-19)** por el brazo E, en su copia: comentar
+  la llamada a `subirALaNube` dentro del temporizador de `schedulePush` da **rc=0, «VERDE — todo
+  ejercido y en verde»**. Sigue viva. No re-verificado por el orquestador esta vez (ya lo estaba
+  del UNIFY del 01-08, y el código no ha cambiado: misma huella).
 - **Qué la reabre:** nada la cierra sola. Se cierra cuando el cuerpo de `schedulePush` se ejerza de
   verdad, con reloj falso, en vez de reasignarse.
 
@@ -443,6 +456,14 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Nota de la misma medición (a favor del 01-08):** el motivo y las cifras que acompañan al aviso
   **sí funcionan en el navegador real** — el texto nombra su causa en vez de un «Cambios sin subir»
   desnudo. Lo que falla es el VEREDICTO del empate, no la capa que lo pinta.
+- **AGRAVADA en la SEXTA transición (2026-09-19)** — brazo E, re-verificado por el orquestador
+  leyendo el código: `setSyncUI('pendiente', …)` pinta **todas** las claves pendientes con el mismo
+  punto `#e67e22` y el mismo título «Cambios sin subir»; sólo cambia el texto largo, oculto. Entre
+  ellas está `nube-pendiente`, **el freno real de D-70**. Y en el camino de **D-74** el único aviso
+  previo a la pérdida es exactamente este naranja. Deja de ser limpieza: **es la máscara concreta de
+  una pérdida reproducida.** Causa: `desempatePorReloj` es estricto a propósito (`remoto >
+  localSaved`), así que el empate —estado normal tras sincronizar— cae en `nube-no-mas-nueva`.
+- **Estado (desde la sexta transición):** abierta, **entra en el ciclo 01-09**.
 - **Qué la reabre:** nada la cierra sola.
 
 ### D-68 · Dos pestañas del mismo navegador sin sesión se pisan el libro
@@ -479,6 +500,10 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Estado:** abierta y **declarada**. Es la familia de D-23 y D-35, **con una diferencia que se
   exige por escrito: ésta SÍ tiene criterio de muerte medible** —el freno cae solo cuando el
   documento entero aterriza (`AC-4`, `AC-5d`)—, que es justamente lo que a D-23 y D-35 les falta.
+- **Corrección de la SEXTA transición (2026-09-19):** además de su criterio de muerte medible,
+  el freno tiene un criterio de **muerte ACCIDENTAL** que esta ficha no decía: si no se pudo
+  escribir en disco, **una recarga lo borra** (ver **D-74**). Y su aviso es indistinguible del eco
+  de D-67.
 - **Qué la reabre:** se cierra con el camino de remediación en pantalla (podar / exportar para
   liberar espacio), que es **Fase 5**, junto a D-18, D-23 y D-35.
 
@@ -527,6 +552,87 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
   amnistía y que el motivo es obligatorio; lo que no hay es nada que impida amnistiar sin leer.
 - **Qué la reabre:** se cierra si el instrumento distingue «aviso nuevo con motivo escrito en el
   mismo commit» de «aviso nuevo sin más», o si el motivo pasa a ser obligatorio para sellar.
+
+### D-74 · El freno que no pudo escribirse no sobrevive a la recarga: la nube pierde el libro en VERDE
+- **Qué es:** con el almacenamiento lleno de verdad, `applySyncPayload` no escribe el libro y
+  `armarFreno` tampoco puede escribir la META (best-effort): el freno vive **sólo en memoria**
+  (`libroPendiente`), y la «segunda red» —el reloj que no avanza, `marcaDeGuardado()`— mira la
+  misma variable. Tras una **recarga** desaparecen las dos a la vez: un guardado local sella la hora
+  actual, la bajada dice `nube-no-mas-nueva` y la subida exporta el libro pobre. **D-58 vuelve
+  entera por esta puerta.** Variante sin carrera: si la lectura de la nube falla al iniciar sesión,
+  `decidirSubida` sube a ciegas porque hay datos locales. Y otra entrada de la misma familia: con
+  la META corrupta al recargar, `initPortfolios` lanza antes de leer `pendiente` y
+  `createDefaultPortfolios` sella una hora nueva y `pendiente: null` encima.
+- **Cómo se midió:** brazo A de la sexta transición (2026-09-19), reproducido ejecutando con las
+  piezas de las autopruebas (`documentoRico`, `sembrarDiscoPobre`, `conDiscoRoto`) y el pintor
+  real; **RE-VERIFICADO POR EL ORQUESTADOR** en copia propia: `42 → 2` en la nube, punto
+  `#27ae60` «Sincronizado», «Guardado ✓» en verde. Control: con el freno escrito en disco, la
+  recarga lo recupera y la subida se frena. La variante de META corrupta, sólo por el brazo.
+- **Sin medir:** la ventana real en el navegador (de `load` a la respuesta de la nube; la abre el
+  primer `schedSave` de 600 ms) y la frecuencia de «cuota llena de verdad».
+- **Estado:** abierta, **meta de la Fase 1**. **Entra en el ciclo 01-09.**
+- **Qué la reabre:** nada la cierra sola. Diseño abierto (dónde vive el freno cuando el disco está
+  lleno): dialéctica en el PLAN.
+
+### D-75 · La escucha suelta el freno con `exists: false` y no pinta nada
+- **Qué es:** `listenFirestore` hace `if (!doc.exists) { soltarFreno(); return; }` sin tocar la
+  pantalla. Soltado el freno, el siguiente guardado adelanta el reloj, el documento real ya no se
+  aplica y la subida pisa el libro rico en verde; mientras, la pantalla sigue diciendo «la nube
+  trae 42 operaciones y no caben».
+- **Cómo se midió:** brazo A de la sexta transición, mecanismo reproducido ejecutando. **El
+  estímulo NO está medido**: si el SDK con `enablePersistence` puede entregar un snapshot
+  `exists: false` por fallo de caché sin red.
+- **Estado:** abierta. Fuera del 01-09 salvo que su plan mida el estímulo.
+- **Qué la reabre:** medir el estímulo; si existe, es la familia de D-74.
+
+### D-76 · Los cables del freno en los dos llamantes de bajada no tienen oráculo
+- **Qué es:** el freno se prueba en el JUEZ (`decidirBajada` llamado a mano con `frenoPuesto`), no
+  en sus llamantes. Cambiar `frenoPuesto: !!d.freno()` por `false` en el arranque (F09) o
+  `!!libroPendiente` por `false` en la escucha (F08) reabre el **freno permanente** de un
+  dispositivo nuevo con la puerta en verde. También viven: la escucha que no suelta el freno con la
+  nube sin documento (F04) o con un documento inutilizable (F05), y la recuperación del freno al
+  arrancar metida dentro del `if` de carteras (F15), que contradice su comentario (§5.1).
+- **Cómo se midió:** brazo B de la sexta transición (81 mutantes); **F09 re-verificado por el
+  orquestador**: `rc=4` «VERDE, PERO EL BANCO NO CORRIO» con autopruebas e instrumentos verdes.
+- **Estado:** abierta. Es **D-49 otra vez**: el cableado por defecto no lo toca ninguna prueba.
+  **Entra en el ciclo 01-09.**
+- **Qué la reabre:** se cierra cuando los dos caminos de bajada se ejerzan con sus dependencias
+  POR DEFECTO y el freno puesto, y cada mutante muera con mensaje nominal.
+
+### D-77 · Los llamantes de carteras restauran la cartera activa pero no sus FILAS, sin oráculo
+- **Qué es:** el código actual es correcto; lo que falta es el control. Borrar
+  `rows = loadRows(anterior);` en `switchPortfolio` (C02), o la restauración de filas de
+  `deletePortfolio` en la rama de ÉXITO cuando se borra la cartera activa (C12), deja en memoria
+  los activos de OTRA cartera: el siguiente guardado los escribe encima. La pantalla pinta rojo y
+  restaura la cartera activa, así que el daño no se ve. C06 (`deletePortfolio` no restaura
+  `currentPortId`) sólo lo caza el banco por accidente de ancla.
+- **Cómo se midió:** brazo B de la sexta transición, con demostración propia en copia (`DEMO-C02
+  … esperaba 0, obtuve 1`); **C02 re-verificado por el orquestador**: `rc=4`.
+- **Estado:** abierta. §5.8: las pruebas miran la rama de fallo y sólo borran una cartera NO
+  activa. **Entra en el ciclo 01-09.**
+- **Qué la reabre:** controles que afirmen las filas en memoria tras el fallo, y el borrado de la
+  cartera ACTIVA en la rama de éxito.
+
+### D-78 · El todo-o-nada tiene ramas sin oráculo
+- **Qué es:** si falla SÓLO la escritura de la META —la última—, ignorar su resultado (A07) hace
+  que aplicar diga que sí: la memoria cambia, el freno cae y el punto sale verde. También viven:
+  reparar el libro ilegible devolviendo `true` al fallar (A11), la rama del formato antiguo
+  devolviendo `true` (A12) —el mismo defecto que A10 sí caza en la otra rama—, y quedarse con una
+  sola cartera tras sincronizar (A20), porque las pruebas aplican documentos de una sola cartera.
+- **Cómo se midió:** brazo B de la sexta transición; **A07 re-verificado por el orquestador**:
+  `rc=4` (un primer intento mío rompió la sintaxis y dio `rc=1` por el paso de sintaxis: defecto
+  del mutante, no del código).
+- **Estado:** abierta. **Entra en el ciclo 01-09.**
+- **Qué la reabre:** controles para «falla sólo la META», para las dos ramas de reparación y para
+  documentos con varias carteras.
+
+### D-79 · `avisos.py`: dos mitades sin control propio
+- **Qué es:** una foto editada a mano con claves sin motivo pasa `--check` (V03b: el banco sólo
+  ejerce la variante «marcador de relleno»); y la mitad «lo NUEVO bloquea» de `--update` no tiene
+  control propio (V01), mitigado porque el `--check` siguiente da `rc=2`.
+- **Cómo se midió:** brazo B de la sexta transición. No re-verificado por el orquestador.
+- **Estado:** abierta. Instrumento; no daña el libro. Fuera del 01-09.
+- **Qué la reabre:** un sabotaje propio para cada mitad en `tools/sabotage.py`.
 
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
 > **RE-MEDIDA el 2026-09-05 (quinta transición, brazo A): pasa de «no reproducida en vivo» a

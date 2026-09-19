@@ -239,8 +239,31 @@ cerrar la fase hacen falta dos cosas que hoy no existen:
 
 1. ~~**Ver el 01-08 en la app desplegada**~~ — **HECHO el 2026-09-06**, acta
    `01-08-VERIFICACION-NAVEGADOR.md`. Confirmado por huella y por una función que nace en el ciclo.
-2. **La SEXTA transición**, que mide los objetivos de la fase CONTRA EL CÓDIGO. Las cinco anteriores
-   cambiaron el resultado las cinco veces.
+2. ~~**La SEXTA transición**~~ — **HECHA el 2026-09-19**, acta `01-TRANSICION-6.md`. **La fase NO
+   cierra: abre el ciclo 01-09.**
+
+#### SEXTA transición (2026-09-19) — la fase tampoco cierra: abre el ciclo 01-09
+
+Cinco brazos adversarios disjuntos, cada uno sobre su propia copia. **Por primera vez desde la
+cuarta, uno resiste entero: el del aparato de medición** (161 controles, todos muerden; las dos
+variantes ejercen lo mismo). Pero la META no se cumple:
+
+- **D-74** — el freno del 01-08 **no sobrevive a una recarga** cuando no se pudo escribir en disco
+  (el almacenamiento lleno, justo su caso), y entonces la nube pierde el libro **en verde**
+  (42 → 2). Re-verificado por el orquestador.
+- **D-67** sube a meta — el naranja de empate es el mismo aviso que el riesgo real, y es el único
+  que precede a la pérdida de D-74.
+- **D-76, D-77, D-78** — doce mutantes con defecto real pasan la puerta en `rc=0`: los cables del
+  freno en los llamantes, la restauración de filas en los llamantes de carteras, y ramas del
+  todo-o-nada.
+
+Las cuatro deudas que cerró el 01-08 están **bien cerradas**, re-medidas revirtiendo su arreglo.
+**Sexta vez consecutiva que medir cambia el resultado.**
+
+**Planes:**
+- [ ] **01-09: El freno que sobrevive y el aviso que no miente** — cierra D-74, D-67, D-76, D-77 y
+  D-78. Diseño abierto (dónde vive el freno cuando el disco está lleno) ⇒ **dialéctica** en el
+  PLAN. **Fuera:** D-75 (estímulo sin medir), D-79, D-60 y Fase 3.
 
 ### Phase 2: Backup y restauración
 
@@ -332,4 +355,4 @@ cerrar la fase hacen falta dos cosas que hoy no existen:
 
 ---
 *Roadmap created: 2026-08-29*
-*Last updated: 2026-09-05*
+*Last updated: 2026-09-19*

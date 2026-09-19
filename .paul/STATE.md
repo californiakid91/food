@@ -10,13 +10,31 @@ See: .paul/PROJECT.md (updated 2026-08-29)
 ## Current Position
 
 Milestone: v0.1 Datos fiables (v0.1.0)
-Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. Medida contra el código el 2026-09-05 en su
-**QUINTA transición**: acta `01-TRANSICION-5.md`.
-Plan: **01-08 CERRADO** (2026-09-06): PLAN ✓ APPLY ✓ UNIFY ✓. Acta `01-08-SUMMARY.md`.
-**Todavía NO visto en un navegador.** El 01-07 está cerrado, desplegado y verificado en navegador.
-Status: **QUINTA transición hecha. La fase NO cierra.** Abre D-58 a D-69; reclasifica D-48; corrige
-D-49, D-18, D-56, D-50, D-53, D-01; cierra la ubicación de D-54.
-Last activity: 2026-09-05 — **quinta transición**. Cinco brazos adversarios disjuntos, cada uno
+Phase: 1 of 6 (Guardado que no miente) — **ABIERTA**. Medida contra el código el 2026-09-19 en su
+**SEXTA transición**: acta `01-TRANSICION-6.md`.
+Plan: **01-09 por PLANIFICAR.** El 01-08 está cerrado, desplegado y verificado en navegador.
+Status: **SEXTA transición hecha. La fase NO cierra.** Abre D-74 a D-79; sube D-67 a meta; amplía
+D-70; re-mide D-60 (viva).
+Last activity: 2026-09-19 — **sexta transición**. Cinco brazos adversarios disjuntos, cada uno sobre
+su propia copia; **el del aparato de medición RESISTE entero** y los otros cuatro demuelen su
+frase. Puerta al empezar `rc=0`, once pasos; `index.html` en `64e6e29462fc48b4d7876b14bf514b07`
+sin un byte de diferencia al terminar, igual que la huella servida por Pages.
+
+**Lo que hay que recordar de la SEXTA medición:**
+
+1. **El freno del 01-08 sólo vive en memoria si el disco está lleno de verdad**, y una recarga lo
+   olvida junto con la «segunda red» (el reloj que no avanza mira la misma variable). Después, un
+   guardado normal exporta el libro pobre: **42 → 2 en la nube, en verde**. Re-verificado por el
+   orquestador en copia propia (D-74).
+2. **El único aviso previo a esa pérdida es el naranja de empate** que sale tras cada
+   sincronización correcta: mismo punto y mismo título para todos los pendientes (D-67).
+3. **Doce mutantes con defecto real pasan la puerta en `rc=0`**: el freno se probó en el JUEZ y no
+   en sus llamantes; los llamantes de carteras, en su rama de fallo y no en la de éxito (§5.8).
+4. **Dos brazos rompieron la exclusividad dentro de su copia** lanzando el banco en segundo plano;
+   el control de huella los delató y el árbol real no se tocó. Regla práctica: **los brazos
+   ejecutan en primer plano**.
+
+**Lo que se recordó de la QUINTA (2026-09-05), histórico:** Cinco brazos adversarios disjuntos, cada uno
 sobre su **propia copia** del proyecto, y **los cinco demolieron su frase**. Puerta al empezar y al
 terminar: `rc=0`, once pasos, `index.html` en `9459b0fc3b40a50a38d0c506fec2b862` sin un byte de
 diferencia.
@@ -56,10 +74,8 @@ PLAN ──▶ APPLY ──▶ UNIFY
                             El plan y el codigo fueron REFUTADOS y corregidos]
 ```
 
-**BUCLE CERRADO. La FASE 1 sigue ABIERTA.** Hay 8 planes y 8 actas, y **eso no es el disparador de
-cierre** (§7): ha disparado en falso las cinco transiciones anteriores. Faltan dos cosas que hoy no
-existen: **verlo en el navegador** (este ciclo toca pantalla y la puerta no puede verla) y **la
-SEXTA transición**, que mide la meta contra el código.
+**BUCLE CERRADO. La FASE 1 sigue ABIERTA.** El 01-08 se vio en el navegador (2026-09-06) y la
+**SEXTA transición** (2026-09-19) midió la meta contra el código: **no cierra**, abre el **01-09**.
 
 **La puerta, releída FRESCA en el UNIFY** (no heredada del APPLY): `tools/verify.sh` completo →
 **`rc=0`**, once pasos, «VERDE — todo ejercido y en verde», con `index.html` en
@@ -178,6 +194,10 @@ las cinco veces.
 | `avisos.py` se arregla DENTRO del 01-08 en vez de diferirse | Fase 1 transición 5 | Es un hueco del propio aparato de medición y de la clase que la fase persigue: un instrumento que amnistía el silencio dirige la mano del operador a blanquearlo (§4.4). Diferirlo mientras se cierra D-59 dejaría el nuevo control sellable en silencio |
 | Las deudas cerradas se MUEVEN a su sección y se marcan en el título | 01-08 UNIFY | Las cuatro fichas del ciclo tenían el párrafo de cierre escrito pero seguían entre las abiertas, con «Estado: abierta» encima. El libro de deudas es la lista VIVA que se lee al arrancar: una ficha que se contradice a sí misma ya costó una re-medición entera con D-15 |
 | D-60 se re-mide en vez de heredar «salvo que el cierre de D-59 lo arrastre» | 01-08 UNIFY | «Lo arrastra» es una suposición, y una medición no se hereda (§7). Medido: el mutante T7 SOBREVIVE con salida idéntica a la vacuidad. Si se hubiera heredado, se habría cerrado una deuda viva — y una deuda cerrada con la categoría equivocada es peor que una abierta (§5.10) |
+| La SEXTA transición tampoco cierra la FASE 1: abre el ciclo 01-09 | Fase 1 transición 6 | El freno del 01-08 no sobrevive a una recarga con el disco lleno y la nube pierde el libro en verde (D-74, re-verificado). Ficharlo como deuda lo blanquearía como «fase hecha» (§5.10) — misma decisión que en las cinco anteriores |
+| D-67 sube de limpieza a META | Fase 1 transición 6 | Ya no es «un aviso que salta siempre»: es el único aviso que precede a la pérdida de D-74 y es indistinguible del freno real de D-70. Un aviso que enseña a ignorar el aviso real es silencio |
+| Los mutantes vivos del brazo B entran en el 01-09, no se difieren | Fase 1 transición 6 | Son guardas de la META sin oráculo (cables del freno, filas de carteras, todo-o-nada). D-79 (`avisos.py`) sí se difiere: no daña el libro |
+| La métrica de invariantes de PROJECT.md cuenta FAMILIAS, no asertos | Fase 1 transición 6 | El brazo D la dio por falsa contando 359 `check()`; la lectura correcta es 2 de 4 familias (decimal y sync), medido con `grep` de `computeFifo` en las autopruebas: 0. Un brazo puede inventar un agujero (§5.4) |
 | El UNIFY del 01-08 NO dispara la transición de fase | 01-08 UNIFY | El conteo dice 8 planes y 8 actas, que es justo el disparador prohibido por §7 y que ha fallado las cinco veces anteriores. Y el ciclo toca PANTALLA sin haberse visto en un navegador: una sonda verde nunca supera a un intento real |
 
 ### Deferred Issues
@@ -210,7 +230,10 @@ arrancar cada sesión. Esta tabla ya no se mantiene: duplicarla sería tener dos
 | ~~**D-61 · `avisos.py --update` amnistía en silencio una alarma que desaparece**~~ | **CERRADA** en el ciclo 01-08 (`f46887f`) | `--update` bloquea en LAS DOS direcciones y **nombra** la clave; la dirección viaja dentro de la semántica sellada, así que aflojarla sería deriva (`rc=3`). Control propio en el banco |
 | **D-65 · carrera arranque/sesión** | Mecanismo reproducido, **orden real en el navegador SIN medir** | Primero medir el orden en la app desplegada; sólo entonces decidir si es ciclo |
 | ~~**El ciclo 01-08 NO se ha visto en un NAVEGADOR**~~ | **RESUELTO** el 2026-09-06: desplegado (`50c0ac4..c106225`) y mirado en la app real | Acta: `01-08-VERIFICACION-NAVEGADOR.md`. Cinco puntos en PASS; dos NO comprobados y dichos como tales; y un hallazgo: **D-67 confirmada en el navegador** |
-| **La FASE 1 no se ha medido contra el código después del 01-08** | La fase no puede cerrarse. `PLAN == SUMMARY` (8 y 8) **no es el disparador** | SEXTA transición, después de la verificación en navegador |
+| ~~**La FASE 1 no se ha medido contra el código después del 01-08**~~ | **RESUELTO** el 2026-09-19 | Acta: `01-TRANSICION-6.md`. Medir volvió a cambiar el resultado: la fase NO cierra |
+| **D-74 · el freno no sobrevive a la recarga con el disco lleno: la nube pierde el libro en VERDE** | **Abre el ciclo 01-09.** Meta literal de la fase, viva y re-verificada | Ciclo 01-09, con dialéctica sobre dónde vive el freno cuando el disco está lleno |
+| **D-67 · el naranja de empate enmascara el aviso real** | **Abre el ciclo 01-09.** Único aviso previo a D-74 | Ciclo 01-09 |
+| **D-76, D-77, D-78 · guardas del 01-08 sin oráculo** | **Abren el ciclo 01-09.** 12 mutantes con defecto real en `rc=0` | Ciclo 01-09 |
 | **D-60 · el cable del guardado a la subida puede cortarse en VERDE** | **Re-medida en este UNIFY: el cierre de D-59 NO la arrastró.** Mutante T7 sobre copia aislada, ancla única afirmada: **sobrevive**, salida idéntica a la vacuidad | Se cierra cuando el cuerpo de `schedulePush` se ejerza de verdad, con reloj falso, en vez de reasignarse |
 | G7 (radio de impacto) no ve `index.html` | La transición de fase no tiene instrumento propio; hoy se hace a mano | D-22. Se cierra cuando el grafo indexe el `<script>`, o cuando el sustituto sea un script del repo cableado a la puerta |
 
@@ -320,48 +343,15 @@ Permanentes del proyecto:
 
 ## Session Continuity
 
-Last session: 2026-09-06
-Stopped at: **UNIFY del 01-08 CERRADO.** Bucle completo: PLAN ✓ APPLY ✓ UNIFY ✓. Árbol limpio;
-`index.html` en `64e6e29462fc48b4d7876b14bf514b07`, **sin tocar en el UNIFY**; puerta releída
-FRESCA: `rc=0`, once pasos.
+Last session: 2026-09-19
+Stopped at: **SEXTA transición de la Fase 1 HECHA.** La fase NO cierra: abre el ciclo **01-09**.
+Acta `01-TRANSICION-6.md`; fichas nuevas D-74 a D-79 en `.paul/DEUDAS.md`; `PROJECT.md`,
+`ROADMAP.md` y `paul.json` al día. `index.html` sin tocar (`64e6e294…`). Puerta `rc=0` al empezar.
 
-**Lo que hizo el UNIFY además de escribir papeles, y por qué importa:**
-
-1. **La puerta se releyó fresca**, no se heredó del APPLY. `rc=0`, once pasos, huella idéntica antes
-   y después.
-2. **El libro de deudas se contradecía a sí mismo.** Las cuatro fichas cerradas por el ciclo (D-58,
-   D-59, D-48, D-61) seguían en la sección de ABIERTAS, con el título sin marcar y con su línea
-   «Estado: abierta» encima del párrafo que las cerraba. Es exactamente lo que pasó con D-15 y que
-   costó una re-medición entera. Movidas a `## Cerradas en el ciclo 01-08`, título marcado y la
-   línea vieja rotulada «histórico, antes del ciclo».
-3. **D-60 se RE-MIDIÓ en vez de heredarse.** Su ficha decía «fuera del alcance salvo que el cierre
-   de D-59 lo arrastre», que es una suposición. Mutante T7 sobre **copia aislada** —directorio
-   fijado en absoluto y afirmado, árbol real sólo leído— con **unicidad del ancla afirmada** antes
-   de mutar: **sobrevive**, con salida idéntica a la del control de vacuidad. El cierre de D-59 NO
-   la arrastró. Anotado en su ficha.
-4. **La comparación de salidas falló RUIDOSAMENTE** cuando una de sus entradas no existía, en vez de
-   decir «iguales» (§5.14). Rehecha afirmando primero que las dos existen y no están vacías.
-5. **La fase NO se cierra.** Hay 8 planes y 8 actas, y ése no es el disparador (§7). Falta el
-   navegador y falta la sexta transición.
-
-**VERIFICADO EN NAVEGADOR el 2026-09-06.** Desplegado (`50c0ac4..c106225`) tras autorización
-explícita del operador. Pages confirmado por **huella** antes de mirar nada (`64e6e294…`, idéntica a
-la local; los dos primeros intentos devolvieron la anterior), y el navegador confirmado por una
-función que **nace en este ciclo** (`typeof soltarFreno === 'function'`). Cinco puntos en PASS,
-entre ellos **89 operaciones intactas** tras `?selftest=1` y **guardar sigue funcionando**. Dos
-puntos NO comprobados y dichos como tales (D-18, y el naranja del freno). Acta:
-`01-08-VERIFICACION-NAVEGADOR.md`.
-
-**El hallazgo de la pasada:** el puntito queda **NARANJA «Cambios sin subir» con las dos marcas de
-tiempo IDÉNTICAS**, o sea sin nada pendiente. Es **D-67**, que estaba fichada como reproducida en
-laboratorio y **sin medir en el navegador**; ahora está medida donde importa y sube de prioridad.
-Lo que falla es el **VEREDICTO del empate**, no la capa que lo pinta: el aviso nombró su causa y
-sus cifras, que es justo lo que este ciclo construyó.
-
-Next action: **SEXTA transición** — medir los objetivos de la Fase 1 CONTRA EL CÓDIGO. Es lo único
-que puede cerrar la fase, y las cinco anteriores cambiaron el resultado las cinco veces. Entra en
-ella el hallazgo de arriba (D-67).
-Resume file: .paul/phases/01-guardado-fiable/01-08-SUMMARY.md
+Next action: **`/paul:plan` del 01-09** — el freno que sobrevive a la recarga (D-74), el aviso de
+empate que no enmascara el real (D-67), y oráculo para D-76/D-77/D-78. Diseño ABIERTO en D-74 ⇒
+**dialéctica** antes de fijar el enfoque, y revisión adversaria del plan.
+Resume file: .paul/phases/01-guardado-fiable/01-TRANSICION-6.md
 
 ---
 *STATE.md — Updated after every significant action*

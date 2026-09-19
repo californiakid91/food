@@ -119,6 +119,21 @@ cambio, mira la pantalla. Pintar verde sobre una subida fallida pasa la verifica
 Los dos abren el ciclo **01-08**. **Las cinco mediciones de esta fase han cambiado el resultado al
 hacerlas**; contar actas la habría cerrado las cinco veces.
 
+**El ciclo 01-08 cerró los dos el 2026-09-06**, se desplegó y se vio en el navegador real. Aplicar
+lo que llega de la nube pasó a ser todo-o-nada, y si el libro no cabe se pone un **freno** que
+impide exportar el libro pequeño encima del grande. La pasada del navegador confirmó además que el
+punto se queda en **naranja sin nada pendiente** tras cada sincronización correcta (D-67).
+
+**La SEXTA medición se hizo el 2026-09-19, y la fase SIGUE abierta.** Esta vez las herramientas de
+medición resistieron enteras. Lo que falla es el propio freno: **si el almacenamiento está tan lleno
+que ni siquiera el freno se puede apuntar, una recarga de la página lo olvida**, y en el siguiente
+guardado la nube vuelve a perder el libro (42 → 2) con el punto en verde. Y el único aviso previo es
+ese mismo naranja que sale siempre y que el operador ya ha aprendido a ignorar. Junto a eso, doce
+formas de romper el código que la verificación entera no detecta.
+
+Lo abren el ciclo **01-09**. **Las seis mediciones de esta fase han cambiado el resultado al
+hacerlas.**
+
 ### Planned (Next)
 
 - [ ] Fase 2 — Backup/restore JSON
@@ -179,7 +194,7 @@ hacerlas**; contar actas la habría cerrado las cinco veces.
 |--------|--------|---------|--------|
 | La puerta (`tools/verify.sh`) en verde antes de cada push | 100% | enganchada a pre-push | On track |
 | Controles de la puerta con sabotaje que demuestra que muerden | 100% | todos (cifra viva en la salida de `tools/sabotage.py`; no se copia aquí) | Achieved |
-| Invariantes cubiertos por `runSelfTests()` | 4 (decimal, FIFO, año fiscal, sync) | 1 | On track |
+| Familias de invariantes cubiertas por `runSelfTests()` | 4 (decimal, FIFO, año fiscal, sync) | 2 (decimal, sync) — contado a mano el 2026-09-19 buscando las familias en `runSelfTests`; FIFO y año fiscal son Fases 4 | On track |
 | Escenarios de pérdida de datos abiertos | 0 | 4 (ops sin cargar, dedupe, sync, sin backup) | At risk |
 | Riesgos fiscales conocidos sin resolver | 0 | 4 (orden intradía, split, 2 meses, opFx) | At risk |
 
@@ -205,4 +220,4 @@ hacerlas**; contar actas la habría cerrado las cinco veces.
 
 ---
 *PROJECT.md — Updated when requirements or context change*
-*Last updated: 2026-09-05*
+*Last updated: 2026-09-19*
