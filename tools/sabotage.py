@@ -824,7 +824,10 @@ CASOS = [
     Caso("T1: las escrituras de la bajada vuelven a escapar sin captura", INDEX,
          "    if (!escribirClave(rowsKey(id), pd)) faltan.push(rowsKey(id));",
          "    localStorage.setItem(rowsKey(id), JSON.stringify(pd));",
-         1, "AC-2 mixto: aplicar tampoco LANZA cuando fallan s\u00f3lo las filas"),
+         # Desde el 01-09 la excepcion ya no ESCAPA de aplicar (la captura el
+         # `try` de 01-09 R17); el dano que queda es el MENSAJE: sin esta
+         # escritura capturada, el aviso deja de nombrar la clave que no cupo.
+         1, "AC-3 el caso mixto nombra la clave que no cupo"),
     Caso("T1: la memoria se muta ANTES de saber si el documento aterriza", INDEX,
          "  try { faltan = aterrizaDocumento(data); }",
          "  portfolios = data.portfolios;\n  try { faltan = aterrizaDocumento(data); }",
@@ -875,7 +878,7 @@ CASOS = [
     Caso("M10: la escucha en vivo ignora si se aplico", INDEX,
          "    if (!applySyncPayload(data)) {",
          "    if (applySyncPayload(data) === 'nunca') {",
-         1, "AC-3 la escucha en vivo pinta el NARANJA por su valor"),
+         1, "AC-3 la escucha en vivo pinta el ROJO del freno por su valor"),
     # Los cuatro mutantes de PINTURA que el 2026-09-06 sobrevivieron a la puerta
     # entera (U8, U3, E7) o solo murieron por ancla rota del banco (E2).
     Caso("U8: una escritura a la nube que FALLA se pinta en verde", INDEX,
@@ -1046,7 +1049,7 @@ CASOS = [
          "",
          1, "01-09 AC-4ii y repone el recibo"),
     Caso("01-09 R17: un aterrizaje que lanza escapa", INDEX,
-         "    faltan = [CLAVE_DEL_LIBRO];\n  }",
+         "    faltan = ['el documento (el aterrizaje fall\u00f3 de forma inesperada)'];\n  }",
          "    throw e;\n  }",
          1, "01-09 AC-1 un aterrizaje que LANZA no escapa de aplicar"),
     Caso("01-09 R18: sin formato, pendiente no frena", INDEX,
@@ -1102,6 +1105,33 @@ CASOS = [
          "    status.textContent = textoFrenado(motivo);",
          "    status.textContent = textoPendiente(motivo);",
          1, "01-09 AC-7 y su texto dice la aver\u00eda con su causa"),
+    # ── 01-09 · D-76: los cables del freno en sus dos llamantes (mutantes vivos
+    # de la sexta transicion). F15 se RETIRA: su ancla no existe desde que el
+    # freno se deduce fuera del `try` de la META; su clase la cubre 01-09 R04. ──
+    Caso("01-09 F09: arranque: el juez no ve el freno", INDEX,
+         "                                   frenoPuesto: !!d.freno(),",
+         "                                   frenoPuesto: false,",
+         1, "01-09 AC-8 el ARRANQUE con freno reintenta aunque su reloj vaya por delante"),
+    Caso("01-09 F08: escucha: el juez no ve el freno", INDEX,
+         "                                     frenoPuesto: !!libroPendiente,",
+         "                                     frenoPuesto: false,",
+         1, "01-09 AC-8 la ESCUCHA con freno tambi\u00e9n reintenta"),
+    Caso("01-09 F04: escucha: nube sin documento NO suelta el freno", INDEX,
+         "    if (!doc.exists) { soltarFreno(); return; }",
+         "    if (!doc.exists) { return; }",
+         1, "01-09 AC-8 la escucha con la nube SIN documento suelta el freno"),
+    Caso("01-09 F05: escucha: documento inutilizable NO suelta el freno (ancla reescrita contra el 01-09)", INDEX,
+         "    if (decision.soltar || !decision.utilizable) soltarFreno();\n",
+         "    if (decision.soltar) soltarFreno();\n",
+         1, "01-09 AC-8 la escucha con un documento inutilizable suelta el freno"),
+    Caso("01-09 L01: (iii) la escucha suelta el freno pero NO sube lo tecleado", INDEX,
+         "      if (decision.soltar) schedulePush();\n",
+         "",
+         1, "01-09 AC-4iii y PROGRAMA la subida de lo tecleado"),
+    Caso("01-09 R20: una excepcion del aterrizaje vuelve a culpar al libro", INDEX,
+         "    faltan = ['el documento (el aterrizaje fall\u00f3 de forma inesperada)'];",
+         "    faltan = [CLAVE_DEL_LIBRO];",
+         1, "01-09 AC-1 y el motivo NO culpa al libro de una excepci\u00f3n ajena"),
 ]
 
 

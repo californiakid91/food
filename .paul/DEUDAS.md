@@ -633,6 +633,64 @@ D-12 y D-13 vienen de la revisión adversaria del plan 01-01, no de la auditorí
 - **Cómo se midió:** brazo B de la sexta transición. No re-verificado por el orquestador.
 - **Estado:** abierta. Instrumento; no daña el libro. Fuera del 01-09.
 - **Qué la reabre:** un sabotaje propio para cada mitad en `tools/sabotage.py`.
+- **AMPLIADA en el APPLY del 01-09 (2026-09-19), medido por el orquestador:** `--check` ante un
+  delta MIXTO —un aviso nuevo **y** otro que desaparece en el mismo cambio— sólo enumera los
+  nuevos y sale por esa rama: la desaparición queda oculta tras el primer mensaje. Caso real: el
+  receptor naranja de la escucha (`setSyncUI(estadoSync('pendiente'), motivo)`) desapareció al
+  sustituirlo el rojo del freno, y `--check` no lo nombró. **No es silencio total**: `--update`
+  sí lo nombró («(1 -> 0): ha desaparecido») y exigió `--amnesty`. Pero el mensaje que dirige la
+  mano (§4.4) esconde la mitad del cambio. Arreglo barato (imprimir las dos listas en la rama de
+  empeoramiento), con su sabotaje; se deja aquí porque es la misma familia de esta ficha.
+
+### D-80 · Con el recibo INTACTO, la nube ilegible no frena la subida si hay libro y activos
+- **Qué es:** `decidirSubida` sube con la nube `'ilegible'` cuando hay operaciones Y activos
+  locales. Tras el 01-09, la variante (b) de D-74 —recarga sin freno y lectura fallida— está
+  cerrada porque el freno se deduce del recibo y va ANTES que `'ilegible'`. Lo que queda es la
+  política vigente para un dispositivo SIN nada pendiente: subir a ciegas. Si otro dispositivo
+  dejó la nube más rica, eso es D-01.
+- **Cómo se midió:** lectura del juez en la síntesis de la dialéctica del 01-09; autoprueba
+  `01-09 AC-3` mide el caso cerrado (con recibo quitado), no éste.
+- **Estado:** abierta, declarada en el PLAN 01-09 §2.5. Familia de D-01: **Fase 3**.
+- **Qué la reabre:** la fusión de la Fase 3, o decidir que `'ilegible'` bloquee siempre.
+
+### D-81 · `autoSnapshot` lanza sin capturar con la cuota llena y mata el resto de `load`
+- **Qué es:** escribe `balance-hist-*` sin captura. Con la cuota llena lanza `QuotaExceededError`
+  dentro del manejador de `load` y todo lo que va detrás —el pintado, los gráficos, el registro
+  del service worker— no se ejecuta. Defecto ANTERIOR al 01-09; el ciclo lo dejó fuera de
+  `arrancarDesdeDisco` a propósito para que no contaminara la recarga simulada.
+- **Cómo se midió:** segunda revisión adversaria del PLAN 01-09 (Fable), reproducido en node en su
+  copia. No re-verificado por el orquestador.
+- **Estado:** abierta. Adyacente a D-18 y D-70 (el disco lleno).
+- **Qué la reabre:** capturar su escritura con aviso, con autoprueba de cuota llena.
+
+### D-82 · Freno deducido sin nada pendiente: el reintento pisa lo tecleado si otro dispositivo sube
+- **Qué es:** hueco RESIDUAL del 01-09, declarado. El documento aterriza entero y lo único que no
+  cabe es el recibo; si se recarga ANTES de que un guardado con éxito lo reponga, el freno se
+  deduce con el reloj congelado. Si entonces se edita sin red y otro dispositivo sube un documento
+  POSTERIOR (otra marca), la salida (iii) no dispara y el reintento aplica ese documento encima de
+  lo tecleado. Es D-71 en un dispositivo que no tenía nada que aterrizar.
+- **Cómo se midió:** segunda revisión adversaria del plan, reproducido con las funciones puras;
+  vacuidad de `01-09 AC-4iii` (un documento posterior reintenta).
+- **Estado:** abierta y **declarada**. La mitigación del ciclo es que `guardarTodo` repone el
+  recibo en cada guardado con éxito (`01-09 R14`), así que la ventana es «recarga antes del primer
+  guardado».
+- **Qué la reabre:** que `decidirBajada` distinga el freno DEDUCIDO del ARMADO, o la fusión de la
+  Fase 3.
+
+### D-83 · Puntos ciegos del contrato del recibo
+- **Qué es:** tres cosas que la puerta no puede ver, declaradas desde el PLAN 01-09 §2.5:
+  1. **Que `removeItem` no lance con la cuota llena** en WebKit/iOS, Chrome y Firefox. La
+     especificación no lo contempla, pero node sólo mide NUESTRA simulación de la cuota. Si lanzara,
+     `applySyncPayload` falla CERRADO (arma el freno y no aterriza: `01-09 R02/R03`).
+  2. **La migración no rescata un D-74 EN CURSO el día del despliegue**: un freno que vive sólo en
+     memoria se pierde en la misma recarga que trae el código nuevo. Neutro respecto a antes.
+  3. **La siembra puede no caber** si el disco ya está lleno al arrancar la versión nueva: el
+     dispositivo sigue con la regla anterior (freno ⇔ `pendiente` en la META) y reintenta en cada
+     arranque (`01-09 AC-5`, «si el recibo no cabe, el formato NO se escribe»).
+- **Cómo se midió:** por construcción y por las autopruebas citadas; el 1 exige navegador real.
+- **Estado:** abierta, declarada.
+- **Qué la reabre:** medir el 1 en el navegador con el disco relleno (`?selftest=1`), o un informe
+  de freno perdido en un dispositivo migrado.
 
 ### D-01 · El sync reemplaza el libro de operaciones en vez de fusionarlo
 > **RE-MEDIDA el 2026-09-05 (quinta transición, brazo A): pasa de «no reproducida en vivo» a

@@ -3353,8 +3353,10 @@ function applySyncPayload(data) {
     // Una excepción que ESCAPE dejaría el recibo quitado y el freno suelto en
     // memoria: el siguiente guardado repondría el recibo sin que nada hubiera
     // aterrizado. Se trata como lo que es: no aterrizó.
+    // El motivo dice lo que pasó y NO culpa al libro: mandar al operador a
+    // podar operaciones por una excepción de otra parte es dirigir mal la mano.
     console.error('El documento de la nube NO aterrizó entero:', e && e.message);
-    faltan = [CLAVE_DEL_LIBRO];
+    faltan = ['el documento (el aterrizaje falló de forma inesperada)'];
   }
   if (faltan.length) {
     console.error('El documento de la nube NO aterrizó entero:', faltan.join(', '));
@@ -6073,6 +6075,8 @@ async function suitesDelFreno(ejercida, contado) {
   // D-67: el empate al día y el aviso propio del freno.
   await ejercida('pruebasEmpateAlDia', () => pruebasEmpateAlDia(contado));
   await ejercida('pruebasAvisoPropioDelFreno', () => pruebasAvisoPropioDelFreno(contado));
+  // D-76: los cables del freno en sus dos llamantes, con el cableado real.
+  await ejercida('pruebasCablesDelFreno', () => pruebasCablesDelFreno(contado));
 }
 
 // LA TUBERÍA de la puerta de subida, ejecutada de verdad. El productor tenía su
@@ -7459,6 +7463,8 @@ function pruebasAterrizajeQueLanza(check) {
   check('01-09 AC-1 y no se da por aplicado', r.valor, false);
   check('01-09 AC-1 y arma el freno', !!libroPendiente, true);
   check('01-09 AC-1 y el recibo queda QUITADO', localStorage.getItem(RECIBO_KEY), null);
+  check('01-09 AC-1 y el motivo NO culpa al libro de una excepción ajena',
+        motivoFrenoPuesto(libroPendiente).indexOf('la nube trae') === 0, false);
 }
 
 // 01-09 AC-4 (iii). El documento aterrizó ENTERO y lo único que no cupo fue el
@@ -7569,6 +7575,85 @@ async function pruebasAvisoPropioDelFreno(check) {
     check('01-09 AC-7 y su texto dice la avería con su causa',
           v.el('sync-status').textContent.indexOf('La nube no cabe en este dispositivo (' +
                                                   MOTIVO_FRENO_DEDUCIDO) === 0, true);
+  });
+}
+
+// Un dispositivo con el freno ARMADO y su reloj POR DELANTE de la nube: el caso
+// del freno permanente. Sin el cable del freno, el juez desempata por reloj y
+// no vuelve a aplicar JAMÁS.
+function sembrarFrenoConRelojAdelantado() {
+  sembrarDiscoPobreMigrado();
+  localStorage.setItem(META_KEY, JSON.stringify({ portfolios, currentPortId, nextId,
+                                                  savedAt: 20000 }));
+  localStorage.removeItem(RECIBO_KEY);
+  libroPendiente = { ops: 42, faltan: [CLAVE_DEL_LIBRO] };
+}
+
+// La escucha en vivo con su cableado REAL: sólo se sustituye la referencia, y el
+// snapshot se entrega llamando al callback que la propia función registra.
+function entregarALaEscucha(doc) {
+  const previo = { unsub: unsubFirestore, repintar: repintarTrasSync };
+  let entregar = null;
+  try {
+    repintarTrasSync = () => {};
+    unsubFirestore = null;
+    listenFirestore({ ref: { onSnapshot: (cb) => { entregar = cb; return () => {}; } } });
+    entregar(doc);
+  } finally { repintarTrasSync = previo.repintar; unsubFirestore = previo.unsub; }
+}
+
+// 01-09 AC-8 · D-76: los CABLES del freno en sus dos llamantes de bajada. El
+// freno se probaba en el JUEZ, llamado a mano; cortar el cable en el llamante
+// reabría el freno permanente con la puerta en verde (F09 re-verificado). Es
+// D-49 otra vez: el cableado por defecto no lo tocaba ninguna prueba.
+async function pruebasCablesDelFreno(check) {
+  sembrarFrenoConRelojAdelantado();
+  const pintados = [];
+  const r = await pullFromFirestore(Object.assign(depsDeBajada(), {
+    ref: { get: async () => ({ exists: true, data: () => documentoRico() }) },
+    pintar: (estado) => { pintados.push(estado); } }));
+  check('01-09 AC-8 el ARRANQUE con freno reintenta aunque su reloj vaya por delante',
+        r.clave, 'reintento-del-freno');
+  check('01-09 AC-8 y el documento aterriza', opsEnDisco(), 42);
+  check('01-09 AC-8 y el freno cae', libroPendiente, null);
+
+  sembrarFrenoConRelojAdelantado();
+  conVentanaDePintura(() => entregarALaEscucha({ exists: true, data: () => documentoRico() }));
+  check('01-09 AC-8 la ESCUCHA con freno también reintenta', opsEnDisco(), 42);
+  check('01-09 AC-8 y el freno cae', libroPendiente, null);
+
+  sembrarFrenoConRelojAdelantado();
+  conVentanaDePintura(() => entregarALaEscucha({ exists: false, data: () => null }));
+  check('01-09 AC-8 la escucha con la nube SIN documento suelta el freno', libroPendiente, null);
+  check('01-09 AC-8 y lo deja escrito en disco', localStorage.getItem(RECIBO_KEY), '1');
+
+  sembrarFrenoConRelojAdelantado();
+  conVentanaDePintura(() => entregarALaEscucha({ exists: true, data: () => ({ savedAt: 9000 }) }));
+  check('01-09 AC-8 la escucha con un documento inutilizable suelta el freno', libroPendiente, null);
+  check('01-09 AC-8 y lo deja escrito en disco', localStorage.getItem(RECIBO_KEY), '1');
+  pruebasSalidaYaAterrizadoEnLaEscucha(check);
+}
+
+// La salida (iii) por la ESCUCHA: soltar sin reaplicar, SUBIR y no pintar verde.
+function pruebasSalidaYaAterrizadoEnLaEscucha(check) {
+  sembrarDiscoPobreMigrado();
+  conDiscoRoto(k => k === RECIBO_KEY, () => applySyncPayload(documentoRico()));
+  recargar();
+  ops = ops.slice(1);
+  guardarTodo();
+  const usuarioPrevio = currentUser;
+  conVentanaDePintura(v => {
+    try {
+      currentUser = { uid: 'prueba-01-09' };
+      entregarALaEscucha({ exists: true, data: () => documentoRico() });
+      check('01-09 AC-4iii la escucha suelta el freno del documento ya aterrizado',
+            libroPendiente, null);
+      check('01-09 AC-4iii sin reaplicarlo: la operación borrada sigue borrada', opsEnDisco(), 41);
+      check('01-09 AC-4iii y PROGRAMA la subida de lo tecleado',
+            v.programaciones.some(p => p.ms === 800), true);
+      check('01-09 AC-4iii sin pintar verde', v.el('sync-dot').style.background,
+            COLOR_DE_SYNC.pendiente);
+    } finally { currentUser = usuarioPrevio; clearTimeout(pushTimer); }
   });
 }
 
